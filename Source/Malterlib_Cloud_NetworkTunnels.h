@@ -19,7 +19,7 @@ namespace NMib::NCloud
 			EProtocolVersion_Min = 0x101
 
 			, EProtocolVersion_SupportSubscribeTunnels = 0x102
-			, EProtocolVersion_SupportConnectionID = 0x103
+			, EProtocolVersion_SupportConnectionID     = 0x103
 
 			, EProtocolVersion_Current = 0x103
 		};
@@ -106,7 +106,7 @@ namespace NMib::NCloud
 }
 
 #ifndef DMibPNoShortCuts
-	using namespace NMib::NCloud;
+using namespace NMib::NCloud;
 #endif
 
 #include "Malterlib_Cloud_NetworkTunnels.hpp"

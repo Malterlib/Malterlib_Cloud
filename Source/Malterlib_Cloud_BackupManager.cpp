@@ -112,8 +112,7 @@ namespace NMib::NCloud
 				return CBackupManagerBackup::fs_ManifestFileValid(_FileName, Change.m_ManifestFile, o_Error);
 			}
 			break;
-		case EManifestChange_Remove:
-			break;
+		case EManifestChange_Remove: break;
 		}
 		return true;
 	}
@@ -140,8 +139,7 @@ namespace NMib::NCloud
 				return Change.m_ManifestFile;
 			}
 			break;
-		case EManifestChange_Remove:
-			break;
+		case EManifestChange_Remove: break;
 		}
 		DMibError("Invalid change type");
 	}
@@ -324,19 +322,8 @@ namespace NMib::NCloud
 		if (nCharsParsed != _String.f_GetLen() || nParsed != 7)
 			return false;
 
-		if
-			(
-				!Year.f_IsNumeric()
-				|| !Month.f_IsNumeric()
-				|| !Day.f_IsNumeric()
-				|| !Hour.f_IsNumeric()
-				|| !Minute.f_IsNumeric()
-				|| !Second.f_IsNumeric()
-				|| !Millisecond.f_IsNumeric()
-			)
-		{
+		if (!Year.f_IsNumeric() || !Month.f_IsNumeric() || !Day.f_IsNumeric() || !Hour.f_IsNumeric() || !Minute.f_IsNumeric() || !Second.f_IsNumeric() || !Millisecond.f_IsNumeric())
 			return false;
-		}
 		if (o_pTime)
 		{
 			*o_pTime = NTime::CTimeConvert::fs_CreateTime
@@ -380,19 +367,8 @@ namespace NMib::NCloud
 			if (nCharsParsed != _String.f_GetLen() || nParsed != 8)
 				return false;
 		}
-		if
-			(
-				!Year.f_IsNumeric()
-				|| !Month.f_IsNumeric()
-				|| !Day.f_IsNumeric()
-				|| !Hour.f_IsNumeric()
-				|| !Minute.f_IsNumeric()
-				|| !Second.f_IsNumeric()
-				|| !Millisecond.f_IsNumeric()
-			)
-		{
+		if (!Year.f_IsNumeric() || !Month.f_IsNumeric() || !Day.f_IsNumeric() || !Hour.f_IsNumeric() || !Minute.f_IsNumeric() || !Second.f_IsNumeric() || !Millisecond.f_IsNumeric())
 			return false;
-		}
 		if (!fs_IsValidHostname(BackupID))
 			return false;
 
@@ -563,13 +539,7 @@ namespace NMib::NCloud
 
 	NStr::CStr CBackupManager::CStartDownloadBackup::f_GetDesc() const
 	{
-		return fg_Format
-			(
-				"{}/{}"
-				, m_BackupSource
-				, m_BackupID
-			)
-		;
+		return fg_Format("{}/{}", m_BackupSource, m_BackupID);
 	}
 
 	template <typename tf_CStream>

@@ -33,7 +33,7 @@ namespace NMib::NCloud
 				mp_State.m_DateTime = CTimeConvert(mp_State.m_Time).f_ExtractDateTime();
 			}
 
-			CTimeConvert::CDateTime *operator ->()
+			CTimeConvert::CDateTime *operator -> ()
 			{
 				return &mp_State.m_DateTime;
 			}
@@ -54,7 +54,7 @@ namespace NMib::NCloud
 				mp_State.m_DateTime = CTimeConvert(mp_State.m_Time).f_ExtractDateTime();
 			}
 
-			CTime &operator *()
+			CTime &operator * ()
 			{
 				return mp_State.m_Time;
 			}

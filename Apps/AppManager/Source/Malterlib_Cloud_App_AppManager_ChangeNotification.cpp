@@ -65,8 +65,11 @@ namespace NMib::NCloud::NAppManager
 			NamedPermissionsQueries["/App/" + Application.m_Name] = {{"AppManager/AppAll", "AppManager/App/{}"_f << Application.m_Name}};
 		}
 
-		auto Permissions = co_await mp_Permissions.f_HasPermissions("Initial send change notifications", fg_Move(NamedPermissionsQueries), pSubscription->m_CallingHostInfo)
-			.f_Timeout(60.0, "Timed out waiting for permission in send initial change notifications {}"_f << pSubscription->m_CallingHostInfo.f_GetRealHostID())
+		auto Permissions = co_await mp_Permissions.f_HasPermissions("Initial send change notifications", fg_Move(NamedPermissionsQueries), pSubscription->m_CallingHostInfo).f_Timeout
+			(
+				60.0
+				, "Timed out waiting for permission in send initial change notifications {}"_f << pSubscription->m_CallingHostInfo.f_GetRealHostID()
+			)
 		;
 
 		pSubscription = mp_ChangeNotificationSubscriptions.f_FindEqual(_SubscriptionID);
@@ -219,12 +222,13 @@ namespace NMib::NCloud::NAppManager
 					auto &Subscription = *pSubscription;
 
 					TCPromiseFuturePair<void> OnChangePromisePair;
-					mp_Permissions.f_HasPermission("AppManager Change Event", {"AppManager/AppAll", AppPermission}, Subscription.m_CallingHostInfo)
-						.f_Timeout(60.0, "Timed out waiting for permission in OnChange callback to {}"_f << Subscription.m_CallingHostInfo.f_GetRealHostID())
-						> fg_Move(OnChangePromisePair.m_Promise) / [=, OnChangePromise = OnChangePromisePair.m_Promise, this, NotificationParams = fg_Move(NotificationParams)]
+					mp_Permissions.f_HasPermission("AppManager Change Event", {"AppManager/AppAll", AppPermission}, Subscription.m_CallingHostInfo).f_Timeout
 						(
-							bool _bHasPermission
-						) mutable
+							60.0
+							, "Timed out waiting for permission in OnChange callback to {}"_f << Subscription.m_CallingHostInfo.f_GetRealHostID()
+						)
+						> fg_Move(OnChangePromisePair.m_Promise) / [=, OnChangePromise = OnChangePromisePair.m_Promise, this, NotificationParams = fg_Move(NotificationParams)]
+						(bool _bHasPermission) mutable
 						{
 							auto pSubscription = mp_ChangeNotificationSubscriptions.f_FindEqual(SubscriptionID);
 							if (!pSubscription)
@@ -258,8 +262,11 @@ namespace NMib::NCloud::NAppManager
 							if (!_bHasPermission && bWasFiltered == NotificationParams.m_bFiltered)
 								return OnChangePromise.f_SetResult();
 
-							pSubscription->m_fOnChange(fg_Move(NotificationParams))
-								.f_Timeout(60.0, "Timed out waiting for OnChange callback to {}"_f << pSubscription->m_CallingHostInfo.f_GetRealHostID())
+							pSubscription->m_fOnChange(fg_Move(NotificationParams)).f_Timeout
+								(
+									60.0
+									, "Timed out waiting for OnChange callback to {}"_f << pSubscription->m_CallingHostInfo.f_GetRealHostID()
+								)
 								> fg_Move(OnChangePromise)
 							;
 						}
@@ -290,16 +297,7 @@ namespace NMib::NCloud::NAppManager
 		auto Result = co_await fg_AllDone(OnChangeResultsVector).f_Wrap();
 
 		if (!Result)
-		{
-			DMibLogWithCategory
-				(
-					Malterlib/Cloud/AppManager
-					, Warning
-					, "Failed to send change notification: {}"
-					, Result.f_GetExceptionStr()
-				)
-			;
-		}
+			DMibLogWithCategory(Malterlib/Cloud/AppManager, Warning, "Failed to send change notification: {}", Result.f_GetExceptionStr());
 
 		co_return {};
 	}

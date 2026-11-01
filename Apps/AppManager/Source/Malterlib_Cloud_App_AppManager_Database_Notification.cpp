@@ -31,8 +31,8 @@ namespace NMib::NCloud::NAppManager
 
 					auto SizeStats = WriteTransaction.m_Transaction.f_SizeStatistics();
 					smint BatchLimit = fg_Min(SizeStats.m_MapSize / (20 * 3), 4 * 1024 * 1024);
-					auto SizeLimit = smint(SizeStats.m_MapSize)
-						- fg_Min(fg_Max(smint(SizeStats.m_MapSize) / 20, BatchLimit * 3, 32 * smint(SizeStats.m_PageSize)), smint(SizeStats.m_MapSize) / 3)
+					auto SizeLimit
+						= smint(SizeStats.m_MapSize) - fg_Min(fg_Max(smint(SizeStats.m_MapSize) / 20, BatchLimit * 3, 32 * smint(SizeStats.m_PageSize)), smint(SizeStats.m_MapSize) / 3)
 					;
 					smint nBytesLimit = smint(SizeLimit) - smint(SizeStats.m_UsedBytes);
 

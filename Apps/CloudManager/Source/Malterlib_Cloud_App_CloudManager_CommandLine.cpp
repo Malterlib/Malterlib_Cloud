@@ -15,12 +15,7 @@ namespace NMib::NCloud::NCloudManager
 	{
 		CDistributedAppActor::fp_BuildCommandLine(o_CommandLine);
 
-		o_CommandLine.f_SetProgramDescription
-			(
-				"Malterlib Cloud Manager"
-				, "Manages cloud applications."
-			)
-		;
+		o_CommandLine.f_SetProgramDescription("Malterlib Cloud Manager", "Manages cloud applications.");
 
 		auto DefaultSection = o_CommandLine.f_GetDefaultSection();
 

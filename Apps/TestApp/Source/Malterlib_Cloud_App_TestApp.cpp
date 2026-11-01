@@ -20,12 +20,7 @@ namespace NMib::NCloud::NTest
 	void CTestAppActor::fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine)
 	{
 		CDistributedAppActor::fp_BuildCommandLine(o_CommandLine);
-		o_CommandLine.f_SetProgramDescription
-			(
-				"Test App"
-				, "Test App."
-			)
-		;
+		o_CommandLine.f_SetProgramDescription("Test App", "Test App.");
 
 		o_CommandLine.f_RegisterGlobalOptions
 			(
@@ -33,7 +28,7 @@ namespace NMib::NCloud::NTest
 					"UpdateType?"_o=
 					{
 						"Names"_o= _o["--update-type"]
-						,"Type"_o= COneOf{"Independent", "OneAtATime", "AllAtOnce"}
+						, "Type"_o= COneOf{"Independent", "OneAtATime", "AllAtOnce"}
 						, "Description"_o= "Override the update type for the application."
 					}
 				}
@@ -121,7 +116,7 @@ namespace NMib::NCloud::NTest
 						else
 						{
 							if (bRandomValues)
-								SensorReading.m_Data = fg_GetRandomFloat().f_Pow(10)*1024.0*1024.0*1024.0*1024.0*1024.0;
+								SensorReading.m_Data = fg_GetRandomFloat().f_Pow(10) * 1024.0 * 1024.0 * 1024.0 * 1024.0 * 1024.0;
 							else
 								SensorReading.m_Data = fp64(i);
 						}

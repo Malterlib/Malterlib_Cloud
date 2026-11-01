@@ -87,12 +87,7 @@ namespace NMib::NCloud::NCloudManager
 		co_return {};
 	}
 
-	TCFuture<TCMap<CStr, CStr>> CNotifications::f_PostSlackMessage
-		(
-			EType _TypeFlags
-			, CSlackActor::CMessage _Message
-			, TCMap<CStr, CStr> _Timestamps
-		)
+	TCFuture<TCMap<CStr, CStr>> CNotifications::f_PostSlackMessage(EType _TypeFlags, CSlackActor::CMessage _Message, TCMap<CStr, CStr> _Timestamps)
 	{
 		if (mp_SlackChannels.f_IsEmpty())
 			co_return {};
@@ -187,11 +182,7 @@ namespace NMib::NCloud::NCloudManager
 					{
 						{
 							"Version"
-							, "{}.{}.{}.{}"_f
-							<< VersionInfo.m_Major
-							<< VersionInfo.m_Minor
-							<< VersionInfo.m_Revision
-							<< VersionInfo.m_MinorRevision
+							, "{}.{}.{}.{}"_f << VersionInfo.m_Major << VersionInfo.m_Minor << VersionInfo.m_Revision << VersionInfo.m_MinorRevision
 							, true
 						}
 						,

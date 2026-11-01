@@ -66,7 +66,6 @@ namespace NMib::NCloud::NAppDistributionManager
 				<< (DateTime.m_Fraction * 1000.0).f_ToInt()
 			;
 		}
-
 	}
 
 	TCFuture<void> CDeployDestination_FileSystem::f_Deploy(CDeployInfo _DeployInfo)
@@ -113,12 +112,11 @@ namespace NMib::NCloud::NAppDistributionManager
 								,
 								{
 									"--no-same-owner"
-	#if !defined(DPlatformFamily_macOS)
+#if !defined(DPlatformFamily_macOS)
 									, "--pax-option=delete=SCHILY.*,delete=LIBARCHIVE.*"
-	#endif
+#endif
 									, "-xf"
 									, _DeployInfo.m_SourceFile
-
 								}
 								, LaunchParams
 							)
@@ -198,7 +196,8 @@ namespace NMib::NCloud::NAppDistributionManager
 								ReleaseNotes = pReleaseNotes->f_String();
 						}
 
-						CStr VersionString = "{}.{}.{}"_f
+						CStr VersionString
+							= "{}.{}.{}"_f
 							<< _DeployInfo.m_Version.m_VersionID.m_VersionID.m_Major
 							<< _DeployInfo.m_Version.m_VersionID.m_VersionID.m_Minor
 							<< _DeployInfo.m_Version.m_VersionID.m_VersionID.m_Revision

@@ -104,13 +104,14 @@ namespace NMib::NCloud
 
 		TCFuture<void> f_ConfigFile_Changed(CStr _ConfigID, CStr _FileName);
 		TCFuture<void> f_ConfigFile_ValueChanged(CStr _ConfigID, CStr _FileName, NHostMonitorDatabase::CConfigFileHistoryEntryValue _Value);
-		TCFuture<void> f_ConfigFile_LogChanges
+		auto f_ConfigFile_LogChanges
 			(
 				CStr _ConfigID
 				, CStr _FileName
 				, NHostMonitorDatabase::CConfigFileHistoryEntryValue _PreviousValue
 				, NHostMonitorDatabase::CConfigFileHistoryEntryValue _NewValue
 			)
+			-> TCFuture<void>
 		;
 
 		TCFuture<void> f_OpenConfigLogReporter();
@@ -121,7 +122,7 @@ namespace NMib::NCloud
 				, TCActor<CDistributedAppSensorStoreLocal> const &_SensorStore
 				, TCActor<CDistributedAppLogStoreLocal> const &_LogStore
 				, TCActor<CDatabaseActor> const &_Database
- 				, TCMap<CStr, CEJsonSorted> const &_SensorMetadata
+				, TCMap<CStr, CEJsonSorted> const &_SensorMetadata
 				, TCMap<CStr, CEJsonSorted> const &_LogMetadata
 			)
 		;

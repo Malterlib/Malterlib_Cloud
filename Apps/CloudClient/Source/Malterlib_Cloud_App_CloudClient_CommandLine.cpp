@@ -14,12 +14,7 @@ namespace NMib::NCloud::NCloudClient
 	{
 		CDistributedAppActor::fp_BuildCommandLine(o_CommandLine);
 
-		o_CommandLine.f_SetProgramDescription
-			(
-				"Malterlib Cloud Client"
-				, "Runs commands on remote servers."
-			)
-		;
+		o_CommandLine.f_SetProgramDescription("Malterlib Cloud Client", "Runs commands on remote servers.");
 
 		o_CommandLine.f_RegisterGlobalOptions
 			(

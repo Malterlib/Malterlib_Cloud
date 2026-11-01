@@ -18,12 +18,7 @@ namespace NMib::NCloud::NVersionManager
 	{
 		CDistributedAppActor::fp_BuildCommandLine(o_CommandLine);
 
-		o_CommandLine.f_SetProgramDescription
-			(
-				"Malterlib Cloud Version Manager"
-				, "Manages updates for Malterlib cloud apps."
-			)
-		;
+		o_CommandLine.f_SetProgramDescription("Malterlib Cloud Version Manager", "Manages updates for Malterlib cloud apps.");
 
 		auto DefaultSection = o_CommandLine.f_GetDefaultSection();
 

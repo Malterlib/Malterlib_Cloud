@@ -238,7 +238,7 @@ namespace NMib::NCloud::NCloudManager
 
 		auto &GlobalState = mp_This.mp_GlobalState;
 
- 		NTime::CTime Now = NTime::CTime::fs_NowUTC();
+		NTime::CTime Now = NTime::CTime::fs_NowUTC();
 
 		TCVector<CSlackActor::CAttachment> ProblemAttachments;
 		TCVector<CSlackActor::CAttachment> FixedAttachments;
@@ -364,11 +364,11 @@ namespace NMib::NCloud::NCloudManager
 					}
 
 					if
-						(
-							CombinedStatus >= CDistributedAppSensorReporter::EStatusSeverity_Error
-							&& Sensor.m_State.m_TimeInProblemState > mp_SensorAlertThreshold
-							&& !Sensor.m_State.m_bSentAlert
-						)
+					(
+						CombinedStatus >= CDistributedAppSensorReporter::EStatusSeverity_Error
+						&& Sensor.m_State.m_TimeInProblemState > mp_SensorAlertThreshold
+						&& !Sensor.m_State.m_bSentAlert
+					)
 					{
 						Sensor.m_State.m_bSentAlert = true;
 						NotificationFlags |= CNotifications::EType_Alert;
@@ -440,10 +440,7 @@ namespace NMib::NCloud::NCloudManager
 				auto fAddField = [&](CSensorNotificationStateNotificationStatus &_Status, bool _bShort)
 					{
 						auto &Field = SlackAttachment.m_Fields.f_Insert();
-						Field.m_Value = "*{}*\n```{}```"_f
-							<< CDistributedAppSensorReporter::fs_StatusSeverityToString(_Status.m_Severity)
-							<< fEscape(_Status.m_Message)
-						;
+						Field.m_Value = "*{}*\n```{}```"_f << CDistributedAppSensorReporter::fs_StatusSeverityToString(_Status.m_Severity) << fEscape(_Status.m_Message);
 						Field.m_bShort = _bShort;
 					}
 				;
@@ -563,13 +560,7 @@ namespace NMib::NCloud::NCloudManager
 			mp_LastSentProblemMessage.m_Attachments.f_Clear();
 			mp_ProblemNotificationFlags = CNotifications::EType_None;
 
-			co_await mp_This.mp_Notifications.f_PostSlackMessage
-				(
-					CNotifications::EType_Sensor
-					, AllResolvedMessage
-					, fg_Move(GlobalState.m_SensorProblemsSlackThread)
-				)
-			;
+			co_await mp_This.mp_Notifications.f_PostSlackMessage(CNotifications::EType_Sensor, AllResolvedMessage, fg_Move(GlobalState.m_SensorProblemsSlackThread));
 		}
 		else
 			GlobalState.m_SensorProblemsSlackThread.f_Clear();

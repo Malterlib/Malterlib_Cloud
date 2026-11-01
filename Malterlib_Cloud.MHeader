@@ -142,7 +142,6 @@ Repository
 	{
 		Dependency.Indirect true
 	}
-
 }
 
 Property
@@ -242,7 +241,10 @@ Repository
 				, { Source: "../../External/curl/COPYING"->MakeAbsolute(), Name: "curl (https://github.com/Malterlib/curl, https://github.com/curl/curl)" }
 				, { Source: "../../External/hidapi/LICENSE-bsd.txt"->MakeAbsolute(), Name: "HIDAPI (https://github.com/Malterlib/hidapi, https://github.com/libusb/hidapi)" }
 				, { Source: "../../External/libarchive/COPYING"->MakeAbsolute(), Name: "libarchive (https://github.com/Malterlib/libarchive, https://github.com/libarchive/libarchive)" }
-				, { Source: "../../External/libjpeg-turbo/LICENSE.md"->MakeAbsolute(), Name: "libjpeg-turbo (https://github.com/Malterlib/libjpeg-turbo, https://github.com/libjpeg-turbo/libjpeg-turbo)" }
+				, {
+					Source: "../../External/libjpeg-turbo/LICENSE.md"->MakeAbsolute()
+					, Name: "libjpeg-turbo (https://github.com/Malterlib/libjpeg-turbo, https://github.com/libjpeg-turbo/libjpeg-turbo)"
+				}
 				, { Source: "../../External/libpng/LICENSE"->MakeAbsolute(), Name: "libpng (https://github.com/Malterlib/libpng, https://github.com/glennrp/libpng)" }
 				, { Source: "../../External/llvm-project/LICENSE.TXT"->MakeAbsolute(), Name: "LLVM (https://github.com/Malterlib/llvm-project, https://github.com/llvm/llvm-project)" }
 				, { Source: "../../External/zlib/LICENSE"->MakeAbsolute(), Name: "zlib (https://github.com/Malterlib/zlib, https://github.com/madler/zlib)" }
@@ -361,7 +363,6 @@ Property
 
 	MalterlibCloudVersionInfo_Backup_RemoveSyncFlagsWildcards: [type(CMalterlibCloudBackupSyncFlags)]?
 
-
 	MalterlibCloudVersionInfo_Backup_ExcludeWildcards: [string]
 	MalterlibCloudVersionInfo_Backup_ExcludeWildcards =+ "*/.tmp"
 	MalterlibCloudVersionInfo_Backup_ExcludeWildcards =+ "*/.DS_Store"
@@ -390,7 +391,9 @@ Property
 	}
 
 	MalterlibCloudVersionInfo_Backup_IncludeWildcards_Contents: {...: one_of(string, null)}
-	MalterlibCloudVersionInfo_Backup_IncludeWildcards_Contents MalterlibCloudVersionInfo_Backup_IncludeWildcards->ForEach(&MalterlibCloudVersionInfo_Backup_IncludeWildcards_Contents_Template)
+	MalterlibCloudVersionInfo_Backup_IncludeWildcards_Contents MalterlibCloudVersionInfo_Backup_IncludeWildcards->ForEach(
+		&MalterlibCloudVersionInfo_Backup_IncludeWildcards_Contents_Template
+	)
 }
 
 Property
@@ -399,7 +402,9 @@ Property
 	MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards_Contents_Template =+ {`@(_AddFlags<Pattern>)`: _AddFlags<Flags>}
 
 	MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards_Contents: {...: [string]}
-	MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards_Contents MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards->ForEach(&MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards_Contents_Template)
+	MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards_Contents MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards->ForEach(
+		&MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards_Contents_Template
+	)
 }
 
 Property
@@ -408,7 +413,9 @@ Property
 	MalterlibCloudVersionInfo_Backup_RemoveSyncFlagsWildcards_Contents_Template =+ {`@(_RemoveFlags<Pattern>)`: _RemoveFlags<Flags>}
 
 	MalterlibCloudVersionInfo_Backup_RemoveSyncFlagsWildcards_Contents: {...: [string]}
-	MalterlibCloudVersionInfo_Backup_RemoveSyncFlagsWildcards_Contents MalterlibCloudVersionInfo_Backup_RemoveSyncFlagsWildcards->ForEach(&MalterlibCloudVersionInfo_Backup_RemoveSyncFlagsWildcards_Contents_Template)
+	MalterlibCloudVersionInfo_Backup_RemoveSyncFlagsWildcards_Contents MalterlibCloudVersionInfo_Backup_RemoveSyncFlagsWildcards->ForEach(
+		&MalterlibCloudVersionInfo_Backup_RemoveSyncFlagsWildcards_Contents_Template
+	)
 }
 
 Property
@@ -431,20 +438,20 @@ Property
 
 	MalterlibCloudVersionInfo: {...: any}
 	MalterlibCloudVersionInfo	{
-									Application: MalterlibCloudVersionInfo_Application
-									, Version: MalterlibCloudVersionInfo_Version
-									, Platform: MalterlibCloudPlatform
-									, Configuration: MalterlibCloudVersionInfo_Configuration
-									, ExtraInfo: {
-										GitBranch: (MalterlibGitBranch || "")
-										, GitCommit: MalterlibGitCommit
-										, RunAsUserHasShell: MalterlibCloudVersionInfo_RunAsUserHasShell
-										, DistributedApp: MalterlibCloudVersionInfo_DistributedApp
-										, AppDistribution: {}
-										, Backup: {}
-										, UpdateScriptEnvironment: MalterlibCloudVersionInfo_UpdateScriptEnvironment->ForEach(&MalterlibCloudVersionInfo_UpdateScriptEnvironment_Contents)
-									}
-								}
+		Application: MalterlibCloudVersionInfo_Application
+		, Version: MalterlibCloudVersionInfo_Version
+		, Platform: MalterlibCloudPlatform
+		, Configuration: MalterlibCloudVersionInfo_Configuration
+		, ExtraInfo: {
+			GitBranch: (MalterlibGitBranch || "")
+			, GitCommit: MalterlibGitCommit
+			, RunAsUserHasShell: MalterlibCloudVersionInfo_RunAsUserHasShell
+			, DistributedApp: MalterlibCloudVersionInfo_DistributedApp
+			, AppDistribution: {}
+			, Backup: {}
+			, UpdateScriptEnvironment: MalterlibCloudVersionInfo_UpdateScriptEnvironment->ForEach(&MalterlibCloudVersionInfo_UpdateScriptEnvironment_Contents)
+		}
+	}
 
 	MalterlibCloudVersionInfo #<ExtraInfo> =+ {Executable: MalterlibCloudVersionInfo_Executable}
 	{
@@ -592,8 +599,7 @@ Property
 				, Dependency.Link: false
 				, Dependency.Stage: "Runtime"
 			}
-		}
-		, {
+		}, {
 			Name: "Com_Malterlib_Cloud_CloudClient"
 			, Properties: {
 				Dependency.Target: "Malterlib_Cloud_CloudClient"
@@ -603,8 +609,7 @@ Property
 				, Dependency.Link: false
 				, Dependency.Stage: "Runtime"
 			}
-		}
-		, {
+		}, {
 			Name: "Com_Malterlib_Cloud_CloudManager"
 			, Properties: {
 				Dependency.Target: "Malterlib_Cloud_CloudManager"
@@ -614,8 +619,7 @@ Property
 				, Dependency.Link: false
 				, Dependency.Stage: "Runtime"
 			}
-		}
-		, {
+		}, {
 			Name: "Com_Malterlib_Cloud_KeyManager"
 			, Properties: {
 				Dependency.Target: "Malterlib_Cloud_KeyManager"
@@ -625,8 +629,7 @@ Property
 				, Dependency.Link: false
 				, Dependency.Stage: "Runtime"
 			}
-		}
-		, {
+		}, {
 			Name: "Com_Malterlib_Cloud_Test"
 			, Properties: {
 				Dependency.Target: "Malterlib_Cloud_Test"
@@ -636,8 +639,7 @@ Property
 				, Dependency.Link: false
 				, Dependency.Stage: "Runtime"
 			}
-		}
-		, {
+		}, {
 			Name: "Com_Malterlib_Cloud_VersionManager"
 			, Properties: {
 				Dependency.Target: "Malterlib_Cloud_VersionManager"
@@ -880,6 +882,9 @@ Property
 
 	Property
 	{
-		MalterlibCloud_VersionUploadSources =+ GetProperty(&MalterlibBuildServerPutSources, `Group:ExternalBinaries.Group:@(BsdTarUniqueName).Target:Com_libarchive_bsdtar.Import:*.Target:Com_libarchive_bsdtar`)->f_AddDestinationPrefixToCopyOptions(MalterlibCloudTarBinDirectory)
+		MalterlibCloud_VersionUploadSources =+ GetProperty(
+			&MalterlibBuildServerPutSources
+			, `Group:ExternalBinaries.Group:@(BsdTarUniqueName).Target:Com_libarchive_bsdtar.Import:*.Target:Com_libarchive_bsdtar`
+		)->f_AddDestinationPrefixToCopyOptions(MalterlibCloudTarBinDirectory)
 	}
 }

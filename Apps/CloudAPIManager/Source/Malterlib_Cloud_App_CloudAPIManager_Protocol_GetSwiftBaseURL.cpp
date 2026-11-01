@@ -23,13 +23,7 @@ namespace NMib::NCloud::NCloudAPIManager
 
 		TCVector<CStr> Permissions = {"ObjectStorage/GetSwiftBaseURLAll", "ObjectStorage/GetSwiftBaseURL/{}"_f << _Params.m_CloudContext};
 
-		bool bHasPermission = co_await
-			(
-				pThis->mp_Permissions.f_HasPermission("Get swift base URL", Permissions)
-				% "Permission denied getting swift base URL"
-				% Auditor
-			)
-		;
+		bool bHasPermission = co_await (pThis->mp_Permissions.f_HasPermission("Get swift base URL", Permissions) % "Permission denied getting swift base URL" % Auditor);
 		if (!bHasPermission)
 			co_return Auditor.f_AccessDenied("(Get Swift base URL)", Permissions);
 

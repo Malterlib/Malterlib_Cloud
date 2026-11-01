@@ -6,7 +6,7 @@
 
 namespace NMib::NCloud::NAppManager
 {
-	bool CAppManagerActor::fp_VersionIsNewer
+	auto CAppManagerActor::fp_VersionIsNewer
 		(
 			CVersionManager::CVersionIDAndPlatform const &_LeftVersion
 			, CVersionManager::CVersionInformation const &_LeftVersionInfo
@@ -15,6 +15,7 @@ namespace NMib::NCloud::NAppManager
 			, TCSet<CStr> const &_RequiredTags
 			, TCSet<CStr> const &_AllowedBranches
 		)
+		-> bool
 	{
 		if (!_AllowedBranches.f_IsEmpty() && !_AllowedBranches.f_FindEqual(_LeftVersion.m_VersionID.m_Branch))
 		{
@@ -44,18 +45,10 @@ namespace NMib::NCloud::NAppManager
 			return false;
 
 		if
-			(
-				_LeftVersion.m_VersionID.m_Branch == _RightVersion.m_VersionID.m_Branch
-				&&
-				(
-					_LeftVersion < _RightVersion
-					||
-					(
-						_LeftVersion == _RightVersion
-						&& _LeftVersionInfo.m_Time == _RightVersionInfo.m_Time
-					)
-				)
-			 )
+		(
+			_LeftVersion.m_VersionID.m_Branch == _RightVersion.m_VersionID.m_Branch
+			&& (_LeftVersion < _RightVersion || (_LeftVersion == _RightVersion && _LeftVersionInfo.m_Time == _RightVersionInfo.m_Time))
+		)
 		{
 			return false;
 		}
@@ -66,7 +59,7 @@ namespace NMib::NCloud::NAppManager
 		return true;
 	}
 
-	CVersionManager::CVersionIDAndPlatform CAppManagerActor::fp_FindVersion
+	auto CAppManagerActor::fp_FindVersion
 		(
 			TCSharedPointer<CApplication> const &_pApplication
 			, TCSet<CStr> const &_RequiredTags
@@ -79,6 +72,7 @@ namespace NMib::NCloud::NAppManager
 			, CVersionManager::CVersionInformation &o_NewestUnconditionalVersionInfo
 			, bool &o_bNewestUnconditionalVersionChanged
 		)
+		-> CVersionManager::CVersionIDAndPlatform
 	{
 		auto *pVersionManagerApp = mp_VersionManagerApplications.f_FindEqual(_pApplication->m_Settings.m_VersionManagerApplication);
 		if (!pVersionManagerApp)
@@ -118,7 +112,11 @@ namespace NMib::NCloud::NAppManager
 				bool bBranchAllowed = false;
 				for (auto &AllowedBranch : _AllowedBranches)
 				{
-					if (NStr::fg_StrMatchWildcard(RemoteVersion.f_GetVersionID().m_VersionID.m_Branch.f_GetStr(), AllowedBranch.f_GetStr()) == EMatchWildcardResult_WholeStringMatchedAndPatternExhausted)
+					if
+					(
+						NStr::fg_StrMatchWildcard(RemoteVersion.f_GetVersionID().m_VersionID.m_Branch.f_GetStr(), AllowedBranch.f_GetStr())
+						== EMatchWildcardResult_WholeStringMatchedAndPatternExhausted
+					)
 					{
 						bBranchAllowed = true;
 						break;
@@ -176,18 +174,10 @@ namespace NMib::NCloud::NAppManager
 			return VersionID;
 
 		if
-			(
-				VersionID.m_VersionID.m_Branch == CurrentVersionID.m_VersionID.m_Branch
-				&&
-				(
-					VersionID < CurrentVersionID
-					||
-					(
-						VersionID == CurrentVersionID
-						&& o_VersionInfo.m_Time == CurrentVersionInfo.m_Time
-					)
-				)
-			 )
+		(
+			VersionID.m_VersionID.m_Branch == CurrentVersionID.m_VersionID.m_Branch
+			&& (VersionID < CurrentVersionID || (VersionID == CurrentVersionID && o_VersionInfo.m_Time == CurrentVersionInfo.m_Time))
+		)
 		{
 			if (_RequiredTags.f_IsEmpty())
 				o_Error = "No newer version in the same branch as the currently installed version was found";
@@ -197,14 +187,14 @@ namespace NMib::NCloud::NAppManager
 		}
 
 		if
-			(
-				! (_Flags & EFindVersionFlag_RetryFailed)
-				&& _pApplication->m_LastTriedInstalledVersion.f_IsValid()
-				&& VersionID == _pApplication->m_LastTriedInstalledVersion
-				&& o_VersionInfo.m_Time == _pApplication->m_LastTriedInstalledVersionInfo.m_Time
-				&& o_VersionInfo.m_RetrySequence == _pApplication->m_LastTriedInstalledVersionInfo.m_RetrySequence
-				&& LastFailedInstalledVersionFailureStage > EUpdateStage::EUpdateStage_DownloadVersion
-			)
+		(
+			!(_Flags & EFindVersionFlag_RetryFailed)
+			&& _pApplication->m_LastTriedInstalledVersion.f_IsValid()
+			&& VersionID == _pApplication->m_LastTriedInstalledVersion
+			&& o_VersionInfo.m_Time == _pApplication->m_LastTriedInstalledVersionInfo.m_Time
+			&& o_VersionInfo.m_RetrySequence == _pApplication->m_LastTriedInstalledVersionInfo.m_RetrySequence
+			&& LastFailedInstalledVersionFailureStage > EUpdateStage::EUpdateStage_DownloadVersion
+		)
 		{
 			o_Error = "Already tried and failed to install this version";
 			return {};

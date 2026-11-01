@@ -32,13 +32,7 @@ namespace NMib::NCloud::NSecretsManager
 			TCFuture<void> f_SetMetadata(CSetMetadata _Metadata) override;
 			TCFuture<void> f_RemoveMetadata(CSecretID _ID, CStrSecure _MetadataKey) override;
 			TCFuture<void> f_RemoveSecret(CSecretID _ID) override;
-			TCFuture<TCActorFunctorWithID<TCFuture<void> ()>> f_UploadFile
-				(
-					CSecretID _ID
-					, CStrSecure _FileName
-					, TCDistributedActorInterfaceWithID<CDirectorySyncClient> _Uploader
-				) override
-			;
+			TCFuture<TCActorFunctorWithID<TCFuture<void> ()>> f_UploadFile(CSecretID _ID, CStrSecure _FileName, TCDistributedActorInterfaceWithID<CDirectorySyncClient> _Uploader) override;
 			TCFuture<TCActorSubscriptionWithID<>> f_SubscribeToChanges(CSubscribeToChanges _Params) override;
 
 			DMibDelegatedActorImplementation(CServer);
@@ -93,13 +87,14 @@ namespace NMib::NCloud::NSecretsManager
 #if DMibConfig_Tests_Enable
 		TCFuture<CEJsonSorted> f_Test_Command(CStr _Command, CEJsonSorted const _Params);
 #endif
-		static bool fs_MatchSecret
+		static auto fs_MatchSecret
 			(
 				CSecretPropertiesInternal const &_SecretProperties
 				, TCOptional<CStrSecure> const &_SemanticID
 				, TCOptional<CStrSecure> const &_Name
 				, TCSet<CStrSecure> const &_TagsExclusive
 			)
+			-> bool
 		;
 
 	private:
@@ -134,7 +129,7 @@ namespace NMib::NCloud::NSecretsManager
 				, TCMap<CStr, TCVector<CPermissionQuery>> &o_Permissions
 			)
 		;
-		void fp_UpdateTags(TCSet<CStrSecure> const &_TagsToRemove,TCSet<CStrSecure> const &_TagsToAdd);
+		void fp_UpdateTags(TCSet<CStrSecure> const &_TagsToRemove, TCSet<CStrSecure> const &_TagsToAdd);
 		void fp_UpdateSemanticIDs(CStr const &_SemanticIDToRemove, CStr const &_SemanticIDToAdd);
 		TCFuture<void> fp_RemoveFile(CStr _FileName, CDistributedAppAuditor _Auditor);
 		CActorSubscription fp_ReserveFile(CStr const &_FileName);

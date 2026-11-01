@@ -33,12 +33,13 @@ namespace NMib::NCloud::NAppManager
 		return nullptr;
 	}
 
-	NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> CAppManagerActor::CDistributedAppInterfaceServerImplementation::f_RegisterDistributedApp
+	auto CAppManagerActor::CDistributedAppInterfaceServerImplementation::f_RegisterDistributedApp
 		(
 			NConcurrency::TCDistributedActorInterfaceWithID<CDistributedAppInterfaceClient> _ClientInterface
 			, NConcurrency::TCDistributedActorInterfaceWithID<CDistributedActorTrustManagerInterface> _TrustInterface
 			, CRegisterInfo _RegisterInfo
 		)
+		-> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>>
 	{
 		if (!_ClientInterface)
 			co_return DMibErrorInstance("Invalid client interface");

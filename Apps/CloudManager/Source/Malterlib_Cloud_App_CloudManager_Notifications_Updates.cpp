@@ -148,11 +148,7 @@ namespace NMib::NCloud::NCloudManager
 			{
 				// Flush any old updates out
 				for (auto &Update : AppManager.m_Updates)
-				{
-					co_await fp_ReportApplicationUpdateToSlack(_AppManagerID, Update.m_LastUpdateState).f_Wrap()
-						> fg_LogError("CloudManager", "Error sending deferred sensor notification")
-					;
-				}
+					co_await fp_ReportApplicationUpdateToSlack(_AppManagerID, Update.m_LastUpdateState).f_Wrap() > fg_LogError("CloudManager", "Error sending deferred sensor notification");
 
 				AppManager.m_Updates.f_Clear();
 			}
@@ -163,8 +159,7 @@ namespace NMib::NCloud::NCloudManager
 			auto WriteResult = co_await mp_This.mp_DatabaseActor
 				(
 					&CDatabaseActor::f_WriteWithCompaction
-					, g_ActorFunctorWeak
-					/
+					, g_ActorFunctorWeak /
 					[
 						CloudManagerServer = fg_ThisActor(&mp_This)
 						, Notification = _Notification
@@ -239,11 +234,7 @@ namespace NMib::NCloud::NCloudManager
 		auto UpdateState = co_await fg_Move(StateValuePromise.m_Future);
 
 		if (!_Notification.m_UpdateID)
-		{
-			co_await fp_ReportApplicationUpdateToSlack(_AppManagerID, UpdateState).f_Wrap()
-				> fg_LogError("CloudManager", "Error sending immediate sensor notification")
-			;
-		}
+			co_await fp_ReportApplicationUpdateToSlack(_AppManagerID, UpdateState).f_Wrap() > fg_LogError("CloudManager", "Error sending immediate sensor notification");
 		else
 		{
 			auto Mapping = mp_DeferredUpdates.m_AppManagers[_AppManagerID].m_Updates(_Notification.m_UpdateID);
@@ -259,11 +250,7 @@ namespace NMib::NCloud::NCloudManager
 		co_return {};
 	}
 
-	TCFuture<TCMap<CStr, CStr>> CUpdateNotifications::fp_ReportApplicationUpdateToSlack
-		(
-			CStr _AppManagerID
-			, CApplicationUpdateStateValue _UpdateState
-		)
+	TCFuture<TCMap<CStr, CStr>> CUpdateNotifications::fp_ReportApplicationUpdateToSlack(CStr _AppManagerID, CApplicationUpdateStateValue _UpdateState)
 	{
 		auto pAppManager = mp_This.mp_AppManagers.f_FindEqual(_AppManagerID);
 
@@ -308,14 +295,8 @@ namespace NMib::NCloud::NCloudManager
 			auto &Stage = _UpdateState.m_Stages.fs_GetKey(StageState);
 
 			fp64 PreviousStageTime = (StageState.m_Time - PreviousTime);
-			if
-				(
-					(PreviousStage != CAppManagerInterface::EUpdateStage_None)
-					&& ((PreviousStageTime > mp_UpdateStageNotificationThreshold) || (!bFinished && Stage == Notification.m_Stage))
-				)
-			{
+			if ((PreviousStage != CAppManagerInterface::EUpdateStage_None) && ((PreviousStageTime > mp_UpdateStageNotificationThreshold) || (!bFinished && Stage == Notification.m_Stage)))
 				TimingString += "{cc,sj30,a-}{}\n"_f << CAppManagerInterface::fs_UpdateStageToStr(PreviousStage) << fg_SecondsDurationToHumanReadable(PreviousStageTime);
-			}
 			PreviousTime = StageState.m_Time;
 			PreviousStage = Stage;
 		}
@@ -346,9 +327,7 @@ namespace NMib::NCloud::NCloudManager
 					,
 					{
 						"Server"
-						, "{}\n{}"_f
-						<< CSlackActor::CMessage::fs_EscapeString(AppManagerInfo.m_HostName)
-						<< CSlackActor::CMessage::fs_EscapeString(AppManagerInfo.m_ProgramDirectory)
+						, "{}\n{}"_f << CSlackActor::CMessage::fs_EscapeString(AppManagerInfo.m_HostName) << CSlackActor::CMessage::fs_EscapeString(AppManagerInfo.m_ProgramDirectory)
 						, true
 					}
 					,
@@ -371,8 +350,7 @@ namespace NMib::NCloud::NCloudManager
 					,
 					{
 						"Version Time"
-						, "{tc5}"_f
-						<< Notification.m_VersionTime
+						, "{tc5}"_f << Notification.m_VersionTime
 						, true
 					}
 				}
@@ -387,7 +365,8 @@ namespace NMib::NCloud::NCloudManager
 		if (bFinished && Notification.m_UpdateTime > mp_UpdateLongRunningThreshold)
 		{
 			CSlackActor::CMessage LongRunningMessage;
-			LongRunningMessage.m_Text = "Long running update of `{}` on `{}` finished"_f
+			LongRunningMessage.m_Text
+				= "Long running update of `{}` on `{}` finished"_f
 				<< CSlackActor::CMessage::fs_EscapeString(Notification.m_Application)
 				<< CSlackActor::CMessage::fs_EscapeString(AppManagerInfo.m_HostName)
 			;

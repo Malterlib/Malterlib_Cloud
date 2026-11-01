@@ -19,38 +19,38 @@ namespace NMib::NCloud
 	{
 		ECloudManagerProtocolVersion_Min = 0x101
 
-		, ECloudManagerProtocolVersion_AddEnvironment = 0x102
-		, ECloudManagerProtocolVersion_AddVersionInfo = 0x103
-		, ECloudManagerProtocolVersion_AddVersionDate = 0x105
-		, ECloudManagerProtocolVersion_AddOtherErrors = 0x106
-		, ECloudManagerProtocolVersion_AppManagerVersionIncreased1 = 0x109
-		, ECloudManagerProtocolVersion_AppManagerVersionIncreased2 = 0x110
-		, ECloudManagerProtocolVersion_SupportLogs = 0x111
-		, ECloudManagerProtocolVersion_AppManagerVersionIncreased3 = 0x112
-		, ECloudManagerProtocolVersion_AppManagerVersionIncreased4 = 0x113
-		, ECloudManagerProtocolVersion_AddLastSeenUpdateNotificationSequence = 0x114
-		, ECloudManagerProtocolVersion_AddLastSeenLogTimestamp = 0x115
-		, ECloudManagerProtocolVersion_SupportExpectedOsVersions = 0x116
-		, ECloudManagerProtocolVersion_SupportDeferredUpdateNotification = 0x117
-		, ECloudManagerProtocolVersion_SupportFilterInRemoveSensorAndLog = 0x118
-		, ECloudManagerProtocolVersion_SupportAppManagerCloudManagerInterface = 0x119
+		, ECloudManagerProtocolVersion_AddEnvironment                           = 0x102
+		, ECloudManagerProtocolVersion_AddVersionInfo                           = 0x103
+		, ECloudManagerProtocolVersion_AddVersionDate                           = 0x105
+		, ECloudManagerProtocolVersion_AddOtherErrors                           = 0x106
+		, ECloudManagerProtocolVersion_AppManagerVersionIncreased1              = 0x109
+		, ECloudManagerProtocolVersion_AppManagerVersionIncreased2              = 0x110
+		, ECloudManagerProtocolVersion_SupportLogs                              = 0x111
+		, ECloudManagerProtocolVersion_AppManagerVersionIncreased3              = 0x112
+		, ECloudManagerProtocolVersion_AppManagerVersionIncreased4              = 0x113
+		, ECloudManagerProtocolVersion_AddLastSeenUpdateNotificationSequence    = 0x114
+		, ECloudManagerProtocolVersion_AddLastSeenLogTimestamp                  = 0x115
+		, ECloudManagerProtocolVersion_SupportExpectedOsVersions                = 0x116
+		, ECloudManagerProtocolVersion_SupportDeferredUpdateNotification        = 0x117
+		, ECloudManagerProtocolVersion_SupportFilterInRemoveSensorAndLog        = 0x118
+		, ECloudManagerProtocolVersion_SupportAppManagerCloudManagerInterface   = 0x119
 		, ECloudManagerProtocolVersion_DistinguishReportedAndActualProblemState = 0x120
-		, ECloudManagerProtocolVersion_StatisticsInAppManagerRemove = 0x121
+		, ECloudManagerProtocolVersion_StatisticsInAppManagerRemove             = 0x121
 
 		, ECloudManagerProtocolVersion_Current = 0x121
 	};
 
-#	if defined(DMibCloudCloudManagerDebug)
-#		define DMibCloudCloudManagerDebugOut DMibConOut
-#	else
-#		define DMibCloudCloudManagerDebugOut(...)  (void)0
-#	endif
+#if defined(DMibCloudCloudManagerDebug)
+#	define DMibCloudCloudManagerDebugOut DMibConOut
+#else
+#	define DMibCloudCloudManagerDebugOut(...)  (void)0
+#endif
 
 	struct CAppManagerCloudManagerInterface : public NConcurrency::CActor
 	{
 		enum : uint32
 		{
-			EProtocolVersion_Min = ECloudManagerProtocolVersion_Min
+			EProtocolVersion_Min       = ECloudManagerProtocolVersion_Min
 			, EProtocolVersion_Current = ECloudManagerProtocolVersion_Current
 		};
 
@@ -65,7 +65,7 @@ namespace NMib::NCloud
 
 		enum : uint32
 		{
-			EProtocolVersion_Min = ECloudManagerProtocolVersion_Min
+			EProtocolVersion_Min       = ECloudManagerProtocolVersion_Min
 			, EProtocolVersion_Current = ECloudManagerProtocolVersion_Current
 		};
 
@@ -243,12 +243,8 @@ namespace NMib::NCloud
 			uint32 m_nRemovedHostIDs = 0;
 		};
 
-		virtual NConcurrency::TCFuture<CRegisterAppManagerResult> f_RegisterAppManager
-			(
-				NConcurrency::TCDistributedActorInterfaceWithID<CAppManagerInterface> _AppManager
-				, CAppManagerInfo _AppManagerInfo
-			)
-			= 0
+		virtual auto f_RegisterAppManager(NConcurrency::TCDistributedActorInterfaceWithID<CAppManagerInterface> _AppManager, CAppManagerInfo _AppManagerInfo)
+			-> NConcurrency::TCFuture<CRegisterAppManagerResult> = 0
 		;
 		virtual NConcurrency::TCFuture<NContainer::TCMap<NStr::CStr, CAppManagerDynamicInfo>> f_EnumAppManagers() = 0;
 		virtual NConcurrency::TCFuture<NContainer::TCMap<CApplicationKey, CApplicationInfo>> f_EnumApplications() = 0;
@@ -261,8 +257,8 @@ namespace NMib::NCloud
 		virtual NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<NConcurrency::CDistributedAppLogReporter>> f_GetLogReporter() = 0;
 		virtual NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<NConcurrency::CDistributedAppLogReader>> f_GetLogReader() = 0;
 		virtual NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> f_SubscribeExpectedOsVersions(CSubscribeExpectedOsVersions _Params) = 0;
- 		virtual NConcurrency::TCFuture<NContainer::TCMap<NStr::CStr, CExpectedVersions>> f_EnumExpectedOsVersions() = 0;
- 		virtual NConcurrency::TCFuture<void> f_SetExpectedOsVersions(NStr::CStr _OsName, CCurrentVersion _CurrentVersion, CExpectedVersionRange _ExpectedRange) = 0;
+		virtual NConcurrency::TCFuture<NContainer::TCMap<NStr::CStr, CExpectedVersions>> f_EnumExpectedOsVersions() = 0;
+		virtual NConcurrency::TCFuture<void> f_SetExpectedOsVersions(NStr::CStr _OsName, CCurrentVersion _CurrentVersion, CExpectedVersionRange _ExpectedRange) = 0;
 
 		CCloudManager();
 		~CCloudManager();
@@ -270,7 +266,7 @@ namespace NMib::NCloud
 }
 
 #ifndef DMibPNoShortCuts
-	using namespace NMib::NCloud;
+using namespace NMib::NCloud;
 #endif
 
 #include "Malterlib_Cloud_CloudManager.hpp"

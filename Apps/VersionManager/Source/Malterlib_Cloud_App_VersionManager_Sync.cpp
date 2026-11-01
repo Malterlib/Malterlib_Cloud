@@ -281,16 +281,7 @@ namespace NMib::NCloud::NVersionManager
 
 				auto StartSyncDate = fg_TryParseDateTimeStr(StartSyncDateStr);
 				if (!StartSyncDate)
-				{
-					co_return DMibErrorInstance
-						(
-							"Invalid StartSyncDate '{}' in sync source '{}': {}"_f
-							<< StartSyncDateStr
-							<< ConfigName
-							<< StartSyncDate
-						)
-					;
-				}
+					co_return DMibErrorInstance("Invalid StartSyncDate '{}' in sync source '{}': {}"_f << StartSyncDateStr << ConfigName << StartSyncDate);
 
 				Config.m_StartSyncDate = *StartSyncDate;
 			}
@@ -409,23 +400,18 @@ namespace NMib::NCloud::NVersionManager
 
 		if (OldSubscription)
 		{
-			DMibLogWithCategory(Malterlib/Cloud/VersionManager/Sync, Info,
-				"Re-subscribing to version manager from host '{}' (reconnected)", HostID);
+			DMibLogWithCategory(Malterlib/Cloud/VersionManager/Sync, Info, "Re-subscribing to version manager from host '{}' (reconnected)", HostID);
 			fg_Move(OldSubscription)->f_Destroy() > fg_LogWarning("VersionManager/Sync", "Failed to destroy old subscription");
 		}
 		else
-		{
-			DMibLogWithCategory(Malterlib/Cloud/VersionManager/Sync, Info,
-				"Subscribing to version manager from host '{}'", HostID);
-		}
+			DMibLogWithCategory(Malterlib/Cloud/VersionManager/Sync, Info, "Subscribing to version manager from host '{}'", HostID);
 
 		CVersionManager::CSubscribeToUpdates SubscriptionParams;
 		SubscriptionParams.m_Application = CStr(); // All applications (filter locally for security)
 		SubscriptionParams.m_nInitial = TCLimitsInt<uint32>::mc_Max;
 
 		SubscriptionParams.m_fOnNewVersions = g_ActorFunctor / [this, HostID, WeakManager, AllowDestroy = g_AllowWrongThreadDestroy]
-			(CVersionManager::CNewVersionNotifications _Notifications)
-			-> NConcurrency::TCFuture<CVersionManager::CNewVersionNotifications::CResult>
+			(CVersionManager::CNewVersionNotifications _Notifications) -> NConcurrency::TCFuture<CVersionManager::CNewVersionNotifications::CResult>
 			{
 				co_await fp_SyncOnNewVersions(HostID, WeakManager, fg_Move(_Notifications));
 				co_return {};
@@ -435,15 +421,7 @@ namespace NMib::NCloud::NVersionManager
 		auto SubscriptionResult = co_await _Manager.f_CallActor(&CVersionManager::f_SubscribeToUpdates)(fg_Move(SubscriptionParams)).f_Wrap();
 		if (!SubscriptionResult)
 		{
-			DMibLogWithCategory
-				(
-					Malterlib/Cloud/VersionManager/Sync
-					, Error
-					, "Failed to subscribe to version manager from host '{}': {}"
-					, HostID
-					, SubscriptionResult.f_GetExceptionStr()
-				)
-			;
+			DMibLogWithCategory(Malterlib/Cloud/VersionManager/Sync, Error, "Failed to subscribe to version manager from host '{}': {}", HostID, SubscriptionResult.f_GetExceptionStr());
 			co_return {};
 		}
 
@@ -466,8 +444,7 @@ namespace NMib::NCloud::NVersionManager
 		auto *pHostSubscription = mp_SyncHostSubscriptions.f_FindEqual(HostID);
 		if (pHostSubscription && pHostSubscription->m_Manager == _Manager)
 		{
-			DMibLogWithCategory(Malterlib/Cloud/VersionManager/Sync, Info,
-				"Version manager from host '{}' disconnected", HostID);
+			DMibLogWithCategory(Malterlib/Cloud/VersionManager/Sync, Info, "Version manager from host '{}' disconnected", HostID);
 
 			fg_Move(pHostSubscription->m_Subscription)->f_Destroy() > fg_LogWarning("VersionManager/Sync", "Failed to destroy subscription on removal");
 			mp_SyncHostSubscriptions.f_Remove(HostID);
@@ -485,12 +462,8 @@ namespace NMib::NCloud::NVersionManager
 		co_return {};
 	}
 
-	TCFuture<void> CVersionManagerDaemonActor::CServer::fp_SyncOnNewVersions
-		(
-			CStr _HostID
-			, TCWeakDistributedActor<CVersionManager> _Manager
-			, CVersionManager::CNewVersionNotifications _Notifications
-		)
+	auto CVersionManagerDaemonActor::CServer::fp_SyncOnNewVersions(CStr _HostID, TCWeakDistributedActor<CVersionManager> _Manager, CVersionManager::CNewVersionNotifications _Notifications)
+		-> TCFuture<void>
 	{
 		auto StrongManager = _Manager.f_Lock();
 		if (!StrongManager)
@@ -602,12 +575,13 @@ namespace NMib::NCloud::NVersionManager
 		co_return {};
 	}
 
-	TCVector<CVersionManagerDaemonActor::CServer::CMatchingConfig> CVersionManagerDaemonActor::CServer::fp_SyncGetMatchingConfigs
+	auto CVersionManagerDaemonActor::CServer::fp_SyncGetMatchingConfigs
 		(
 			CStr const &_HostID
 			, CVersionManager::CNewVersionNotification const &_Notification
 			, TCMap<CStr, TCSet<CSyncVersionKey>> const &_DateBypassByConfig
 		)
+		-> TCVector<CVersionManagerDaemonActor::CServer::CMatchingConfig>
 	{
 		CSyncVersionKey VersionKey{_Notification.m_Application, _Notification.m_VersionIDAndPlatform};
 
@@ -639,7 +613,7 @@ namespace NMib::NCloud::NVersionManager
 		return MatchingConfigs;
 	}
 
-	TCFuture<void> CVersionManagerDaemonActor::CServer::fp_SyncProcessVersion
+	auto CVersionManagerDaemonActor::CServer::fp_SyncProcessVersion
 		(
 			CStr _HostID
 			, TCDistributedActor<CVersionManager> _SourceManager
@@ -647,6 +621,7 @@ namespace NMib::NCloud::NVersionManager
 			, TCVector<CMatchingConfig> _MatchingConfigs
 			, CStr _OriginID
 		)
+		-> TCFuture<void>
 	{
 		if (_MatchingConfigs.f_IsEmpty())
 			co_return {};
@@ -700,7 +675,6 @@ namespace NMib::NCloud::NVersionManager
 			if (bTagsAlreadyCorrect && bRetrySequenceAlreadyCorrect)
 				co_return {};
 		}
-
 
 		if (_OriginID && VersionState.m_CurrentOriginID == _OriginID)
 		{
@@ -813,7 +787,7 @@ namespace NMib::NCloud::NVersionManager
 		co_return {};
 	}
 
-	TCFuture<void> CVersionManagerDaemonActor::CServer::fp_SyncDownloadAndStoreVersion
+	auto CVersionManagerDaemonActor::CServer::fp_SyncDownloadAndStoreVersion
 		(
 			CStr _SyncSourceName
 			, CSyncSourceConfig _Config
@@ -825,6 +799,7 @@ namespace NMib::NCloud::NVersionManager
 			, bool _bSyncRetrySequence
 			, CStr _OriginID
 		)
+		-> TCFuture<void>
 	{
 		CStr TempDir = mp_AppState.m_RootDirectory / "SyncTemp" / fg_RandomID();
 
@@ -832,7 +807,8 @@ namespace NMib::NCloud::NVersionManager
 			auto BlockingActorCheckout = fg_BlockingActor();
 			co_await
 				(
-					g_Dispatch(BlockingActorCheckout) / [TempDir]
+					g_Dispatch(BlockingActorCheckout)
+					/ [TempDir]
 					{
 						NFile::CFile::fs_CreateDirectory(TempDir);
 					}
@@ -881,15 +857,7 @@ namespace NMib::NCloud::NVersionManager
 		CVersionManagerHelper Helper(mp_AppState.m_RootDirectory, _Config.m_QueueSize, 60.0);
 		auto DownloadResult = co_await
 			(
-				Helper.f_Download
-				(
-					_SourceManager
-					, _Application
-					, _VersionID
-					, TempDir
-					, CFileTransferReceive::EReceiveFlag_None
-					, _Config.m_QueueSize
-				)
+				Helper.f_Download(_SourceManager, _Application, _VersionID, TempDir, CFileTransferReceive::EReceiveFlag_None, _Config.m_QueueSize)
 				% ("Failed to sync {} {} ({}) from '{}'"_f << _Application << _VersionID.m_VersionID << _VersionID.m_Platform << _SyncSourceName)
 			)
 		;
@@ -908,7 +876,8 @@ namespace NMib::NCloud::NVersionManager
 			auto BlockingActorCheckout = fg_BlockingActor();
 			co_await
 				(
-					g_Dispatch(BlockingActorCheckout) / [TempDir, VersionPath]
+					g_Dispatch(BlockingActorCheckout)
+					/ [TempDir, VersionPath]
 					{
 						NFile::CFile::fs_CreateDirectoryForFile(VersionPath);
 						NFile::CFile::fs_RenameFile(TempDir, VersionPath);
@@ -964,7 +933,7 @@ namespace NMib::NCloud::NVersionManager
 		co_return {};
 	}
 
-	TCFuture<void> CVersionManagerDaemonActor::CServer::fp_SyncUpdateLocalTags
+	auto CVersionManagerDaemonActor::CServer::fp_SyncUpdateLocalTags
 		(
 			CStr _Application
 			, CVersionManager::CVersionIDAndPlatform _VersionID
@@ -973,6 +942,7 @@ namespace NMib::NCloud::NVersionManager
 			, uint32 _RemoteRetrySequence
 			, CStr _OriginID
 		)
+		-> TCFuture<void>
 	{
 		auto *pApp = mp_Applications.f_FindEqual(_Application);
 		if (!pApp)

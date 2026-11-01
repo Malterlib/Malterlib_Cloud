@@ -172,7 +172,7 @@ namespace NMib::NCloud::NAppManager
 		;
 	}
 
-	constexpr static double c_InProgressWaitTimeout = 120_seconds;
+	static constexpr double c_InProgressWaitTimeout = 120_seconds;
 
 	TCFuture<CActorSubscription> CAppManagerActor::fp_SetInProgressWithWait(TCSharedPointer<CApplication> _pApplication, CStr _Description)
 	{
@@ -203,7 +203,8 @@ namespace NMib::NCloud::NAppManager
 		if (!pApplication || !(*pApplication)->f_IsInProgress())
 			return;
 
-		*_pCommandLine %= "Application has an operation '{}' that has been in progress for {}. Will wait for operation to finish for {} before timing out.\n"_f
+		*_pCommandLine
+			%= "Application has an operation '{}' that has been in progress for {}. Will wait for operation to finish for {} before timing out.\n"_f
 			<< (*pApplication)->f_InProgressDescription()
 			<< NTime::fg_SecondsDurationToHumanReadable((*pApplication)->f_InProgressTime())
 			<< NTime::fg_SecondsDurationToHumanReadable(c_InProgressWaitTimeout)
@@ -333,17 +334,7 @@ namespace NMib::NCloud::NAppManager
 							else
 							{
 								if (*StopResult)
-								{
-									DMibLogWithCategory
-										(
-											Malterlib/Cloud/AppManager
-											, Error
-											, "Application '{}' exited with non 0 status: {}"
-											, pApplication->m_Name
-											, *StopResult
-										)
-									;
-								}
+									DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Application '{}' exited with non 0 status: {}", pApplication->m_Name, *StopResult);
 								else
 									DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Application '{}' exited cleanly", pApplication->m_Name);
 								pApplication->f_Clear();

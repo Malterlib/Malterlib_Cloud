@@ -14,8 +14,8 @@ namespace NMib::NCloud
 {
 	enum : uint32
 	{
-		EKeyManagerProtocolVersion_Min = 0x101
-		, EKeyManagerProtocolVersion_SupportServerSync = 0x102
+		EKeyManagerProtocolVersion_Min                           = 0x101
+		, EKeyManagerProtocolVersion_SupportServerSync           = 0x102
 		, EKeyManagerProtocolVersion_SupportRemovePreCreatedKeys = 0x103
 
 		, EKeyManagerProtocolVersion_Current = 0x103
@@ -27,7 +27,7 @@ namespace NMib::NCloud
 
 		enum : uint32
 		{
-			EProtocolVersion_Min = EKeyManagerProtocolVersion_Min
+			EProtocolVersion_Min       = EKeyManagerProtocolVersion_Min
 			, EProtocolVersion_Current = EKeyManagerProtocolVersion_Current
 		};
 
@@ -131,7 +131,7 @@ namespace NMib::NCloud
 
 		enum : uint32
 		{
-			EProtocolVersion_Min = EKeyManagerProtocolVersion_Min
+			EProtocolVersion_Min       = EKeyManagerProtocolVersion_Min
 			, EProtocolVersion_Current = EKeyManagerProtocolVersion_Current
 		};
 
@@ -140,11 +140,11 @@ namespace NMib::NCloud
 
 		virtual NConcurrency::TCFuture<CSymmetricKey> f_RequestKey(NStr::CStr _Identifier, uint32 _KeySize) = 0;
 		virtual auto f_GetServerSyncInterface(NConcurrency::TCActorSubscriptionWithID<> _Subscription)
-			-> NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<CKeyManagerServerSync>>
-		= 0;
+			-> NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<CKeyManagerServerSync>> = 0
+		;
 	};
 }
 
 #ifndef DMibPNoShortCuts
-	using namespace NMib::NCloud;
+using namespace NMib::NCloud;
 #endif

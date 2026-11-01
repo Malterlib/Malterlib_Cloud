@@ -7,9 +7,9 @@
 namespace NMib::NCloud::NAppManager
 {
 #ifndef DPlatformFamily_Windows
-	constexpr static ch8 const gc_pLimitsSetupScript[] =
+	static constexpr ch8 const gc_pLimitsSetupScript[] =
 		{
-			#embed "Malterlib_Cloud_App_AppManager_Limits_Setup.sh"
+#	embed "Malterlib_Cloud_App_AppManager_Limits_Setup.sh"
 			, '\0'
 		}
 	;
@@ -26,7 +26,7 @@ namespace NMib::NCloud::NAppManager
 			co_return {};
 		}
 
-		uint32 nFiles = mp_State.m_ConfigDatabase.m_Data.f_GetMemberValue("ResourcesExtraFiles", 256*1024).f_Integer();
+		uint32 nFiles = mp_State.m_ConfigDatabase.m_Data.f_GetMemberValue("ResourcesExtraFiles", 256 * 1024).f_Integer();
 		uint32 nMaxFilesPerProc = mp_State.m_ConfigDatabase.m_Data.f_GetMemberValue("ResourcesMaxFilesPerProcess", 10240).f_Integer();
 		uint32 nThreads = mp_State.m_ConfigDatabase.m_Data.f_GetMemberValue("ResourcesExtraThreads", 65536).f_Integer();
 		uint32 nProceses = mp_State.m_ConfigDatabase.m_Data.f_GetMemberValue("ResourcesExtraProcesses", 32768).f_Integer();
@@ -60,19 +60,7 @@ namespace NMib::NCloud::NAppManager
 		Environment["MaxMapCount"] = CStr::fs_ToStr(nMaxMapCount);
 		Environment["PlatformFamily"] = DMibStringize(DPlatformFamily);
 
-		co_await
-			(
-				fp_RunBashScript
-				(
-					gc_pLimitsSetupScript
-					, "SetupLimits"
-					, fg_Move(Environment)
-					, nullptr
-					, 2
-				)
-				% "Failed to setup limits"
-			)
-		;
+		co_await (fp_RunBashScript(gc_pLimitsSetupScript, "SetupLimits", fg_Move(Environment), nullptr, 2) % "Failed to setup limits");
 
 		co_return {};
 #endif

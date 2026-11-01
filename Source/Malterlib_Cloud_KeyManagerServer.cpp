@@ -37,7 +37,6 @@ namespace NMib::NCloud
 		: m_pThis(_pThis)
 		, m_Config(fg_Move(_Config))
 	{
-
 	}
 
 	CKeyManagerServer::CKeyManagerServer(CKeyManagerServerConfig &&_Config)

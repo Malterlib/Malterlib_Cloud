@@ -83,11 +83,7 @@ namespace NMib::NCloud::NAppDistributionManager
 		co_return 0;
 	}
 
-	TCFuture<uint32> CAppDistributionManagerActor::fp_CommandLine_ApplicationListAvailableVersions
-		(
-			CEJsonSorted const _Params
-			, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine
-		)
+	TCFuture<uint32> CAppDistributionManagerActor::fp_CommandLine_ApplicationListAvailableVersions(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		bool bVerbose = _Params["Verbose"].f_Boolean();
 		auto Results = co_await fp_GetAvailableVersions(_Params["Application"].f_String());

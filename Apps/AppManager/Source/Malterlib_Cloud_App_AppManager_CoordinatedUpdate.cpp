@@ -19,8 +19,8 @@ namespace NMib::NCloud::NAppManager
 
 		for (auto &RemoteAppManager : mp_RemoteAppManagerState)
 		{
-			 if (!RemoteAppManager.m_Actor)
-				 continue;
+			if (!RemoteAppManager.m_Actor)
+				continue;
 			RemoteAppManager.m_Actor.f_CallActor(&CAppManagerCoordinationInterface::f_RemoveKnownHost)(Group, Application, HostID) > ResultsVector;
 		}
 
@@ -31,13 +31,7 @@ namespace NMib::NCloud::NAppManager
 		co_return 0;
 	}
 
-	static bool fg_IsSameVersion
-		(
-			CVersionManager::CVersionIDAndPlatform const &_Left
-			, CTime const &_LeftTime
-			, CVersionManager::CVersionIDAndPlatform const &_Right
-			, CTime const &_RightTime
-		)
+	static bool fg_IsSameVersion(CVersionManager::CVersionIDAndPlatform const &_Left, CTime const &_LeftTime, CVersionManager::CVersionIDAndPlatform const &_Right, CTime const &_RightTime)
 	{
 		if (_Left.m_VersionID != _Right.m_VersionID)
 			return false;
@@ -54,12 +48,7 @@ namespace NMib::NCloud::NAppManager
 
 		void f_AddApplication(EUpdateStage _WantUpdateState, uint64 _UpdateStartSequence, CRemoteApplicationWithTypeKey const &_RemoteKey)
 		{
-			if
-				(
-					_WantUpdateState >= EUpdateStage::EUpdateStage_SyncStart
-					&& _WantUpdateState != EUpdateStage::EUpdateStage_Failed
-					&& _WantUpdateState != EUpdateStage::EUpdateStage_Finished
-				)
+			if (_WantUpdateState >= EUpdateStage::EUpdateStage_SyncStart && _WantUpdateState != EUpdateStage::EUpdateStage_Failed && _WantUpdateState != EUpdateStage::EUpdateStage_Finished)
 			{
 				bool bInProgress = _WantUpdateState > EUpdateStage::EUpdateStage_SyncStart;
 				if ((!m_bInProgress && _UpdateStartSequence < m_UpdateStartSequence) || bInProgress)
@@ -89,7 +78,7 @@ namespace NMib::NCloud::NAppManager
 			(
 				_pState
 				, EUpdateStage::EUpdateStage_SyncStart
-				, 60.0*60.0
+				, 60.0 * 60.0
 				, EWaitStageFlag_None
 				, [=, this]() -> bool
 				{
@@ -218,7 +207,7 @@ namespace NMib::NCloud::NAppManager
 		co_return {};
 	}
 
-	TCFuture<void> CAppManagerActor::fp_Coordination_WaitForAllToReachWantUpdateStage
+	auto CAppManagerActor::fp_Coordination_WaitForAllToReachWantUpdateStage
 		(
 			TCSharedPointerSupportWeak<CUpdateApplicationState> _pState
 			, EUpdateStage _Stage
@@ -226,6 +215,7 @@ namespace NMib::NCloud::NAppManager
 			, EWaitStageFlag _Flags
 			, TCFunctionMutable<bool ()> _fEvalState
 		)
+		-> TCFuture<void>
 	{
 		CRemoteApplicationWithTypeKey RemoteKey(*_pState->m_pApplication, _pState->m_bBypassCoordination);
 
@@ -242,12 +232,7 @@ namespace NMib::NCloud::NAppManager
 
 					if (RemoteKey.m_UpdateType != EDistributedAppUpdateType_Independent)
 					{
-						auto fCheckStageCondition = [&]
-							(
-								EUpdateStage _CurrentStage
-								, CVersionManager::CVersionIDAndPlatform const &_CurrentVersionID
-								, CTime const &_CurrentVersionTime
-							)
+						auto fCheckStageCondition = [&](EUpdateStage _CurrentStage, CVersionManager::CVersionIDAndPlatform const &_CurrentVersionID, CTime const &_CurrentVersionTime)
 							{
 								if (fg_IsSameVersion(_CurrentVersionID, _CurrentVersionTime, _pState->m_VersionID, _pState->m_VersionTime))
 									return true; // Already installed this version
@@ -317,22 +302,14 @@ namespace NMib::NCloud::NAppManager
 		CRemoteApplicationWithTypeKey RemoteKey(*_pState->m_pApplication, _pState->m_bBypassCoordination);
 
 		// First wait for all applications to be fully ready for doing update without being dependent on version manager
-		co_await fp_Coordination_WaitForAllToReachWantUpdateStage
-			(
-				_pState
-				, EUpdateStage::EUpdateStage_StopOldApp
-				, 30.0*60.0
-				, EWaitStageFlag_None
-				, TCFunctionMutable<bool ()>{}
-			)
-		;
+		co_await fp_Coordination_WaitForAllToReachWantUpdateStage(_pState, EUpdateStage::EUpdateStage_StopOldApp, 30.0 * 60.0, EWaitStageFlag_None, TCFunctionMutable<bool ()>{});
 
 		_pState->m_fOnInfo("Waiting for our turn to update");
 
 		co_await fp_Coordination_WaitForState
 			(
 				_pState
-				, 60.0*60.0
+				, 60.0 * 60.0
 				, [=, this](TCPromise<void> &o_Promise) -> bool
 				{
 					CStr SmallestHostID = mp_State.m_HostID;
@@ -375,15 +352,15 @@ namespace NMib::NCloud::NAppManager
 								continue;
 
 							if
+							(
+								fg_IsSameVersion
 								(
-									fg_IsSameVersion
-									(
-										Application.m_LastInstalledVersionFinished
-										, Application.m_LastInstalledVersionInfoFinished.m_Time
-										, _pState->m_VersionID
-										, _pState->m_VersionTime
-									)
+									Application.m_LastInstalledVersionFinished
+									, Application.m_LastInstalledVersionInfoFinished.m_Time
+									, _pState->m_VersionID
+									, _pState->m_VersionTime
 								)
+							)
 							{
 								continue; // Already installed this version
 							}
@@ -423,7 +400,7 @@ namespace NMib::NCloud::NAppManager
 		co_return {};
 	}
 
-	TCFuture<void> CAppManagerActor::fp_Coordination_WaitForState
+	auto CAppManagerActor::fp_Coordination_WaitForState
 		(
 			TCSharedPointerSupportWeak<CUpdateApplicationState> _pState
 			, fp64 _Timeout
@@ -433,6 +410,7 @@ namespace NMib::NCloud::NAppManager
 			, CStr _DisconnectedError
 			, bool _bIgnoreFailed
 		)
+		-> TCFuture<void>
 	{
 		TCPromise<void> Promise;
 
@@ -500,11 +478,11 @@ namespace NMib::NCloud::NAppManager
 							continue; // Already installed this version
 
 						if
-							(
-								fg_IsSameVersion(AppInfo.m_AppInfo.m_FailedVersionID, AppInfo.m_AppInfo.m_FailedVersionTime, _pState->m_VersionID, _pState->m_VersionTime)
-								&& AppInfo.m_AppInfo.m_FailedVersionRetrySequence == _pState->m_VersionRetrySequence
-								&& !_pState->m_bBypassCoordination
-							)
+						(
+							fg_IsSameVersion(AppInfo.m_AppInfo.m_FailedVersionID, AppInfo.m_AppInfo.m_FailedVersionTime, _pState->m_VersionID, _pState->m_VersionTime)
+							&& AppInfo.m_AppInfo.m_FailedVersionRetrySequence == _pState->m_VersionRetrySequence
+							&& !_pState->m_bBypassCoordination
+						)
 						{
 							bFailed = true;
 							break;
@@ -529,11 +507,11 @@ namespace NMib::NCloud::NAppManager
 						continue; // Already installed this version
 
 					if
-						(
-							fg_IsSameVersion(Application.m_LastFailedInstalledVersion, Application.m_LastFailedInstalledVersionTime, _pState->m_VersionID, _pState->m_VersionTime)
-							&& Application.m_LastFailedInstalledVersionRetrySequence == _pState->m_VersionRetrySequence
-							&& !_pState->m_bBypassCoordination
-						)
+					(
+						fg_IsSameVersion(Application.m_LastFailedInstalledVersion, Application.m_LastFailedInstalledVersionTime, _pState->m_VersionID, _pState->m_VersionTime)
+						&& Application.m_LastFailedInstalledVersionRetrySequence == _pState->m_VersionRetrySequence
+						&& !_pState->m_bBypassCoordination
+					)
 					{
 						bFailed = true;
 						break;
@@ -574,13 +552,13 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 
-		fp64 DisconnectTimeout = 5.0*60.0;
+		fp64 DisconnectTimeout = 5.0 * 60.0;
 		if (_Timeout <= DisconnectTimeout)
 			DisconnectTimeout = _Timeout / 2.0;
 
 		fg_RegisterTimer
 			(
-				1.0*60.0
+				1.0 * 60.0
 				, [=, this, pOnAppUpdateInfoChangeWeak = pOnAppUpdateInfoChange.f_Weak()]() -> TCFuture<void>
 				{
 					if (pState->m_bWasDisconnected && pState->m_DisconnectStopwatch.f_GetTime() >= DisconnectTimeout)

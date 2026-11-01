@@ -62,7 +62,7 @@ namespace NMib::NCloud::NVersionManager
 
 			struct CCompareTime
 			{
-				COrdering_Partial operator()(CVersion const &_Left, CVersion const &_Right) const
+				COrdering_Partial operator () (CVersion const &_Left, CVersion const &_Right) const
 				{
 					if (auto Result = _Left.m_VersionInfo.m_Time.f_IsValid() <=> _Right.m_VersionInfo.m_Time.f_IsValid(); Result != 0)
 						return Result;
@@ -103,6 +103,7 @@ namespace NMib::NCloud::NVersionManager
 			{
 				return TCMap<CStr, CSubscription>::fs_GetKey(*this);
 			}
+
 			uint32 m_nInitial = 0;
 			CCallingHostInfo m_CallingHostInfo;
 			TCSet<CStr> m_Platforms;
@@ -184,14 +185,10 @@ namespace NMib::NCloud::NVersionManager
 		TCFuture<void> fp_SyncOnNewVersions(CStr _HostID, TCWeakDistributedActor<CVersionManager> _Manager, CVersionManager::CNewVersionNotifications _Notifications);
 
 		// Sync operations
-		TCVector<CMatchingConfig> fp_SyncGetMatchingConfigs
-			(
-				CStr const &_HostID
-				, CVersionManager::CNewVersionNotification const &_Notification
-				, TCMap<CStr, TCSet<CSyncVersionKey>> const &_DateBypassByConfig
-			)
+		auto fp_SyncGetMatchingConfigs(CStr const &_HostID, CVersionManager::CNewVersionNotification const &_Notification, TCMap<CStr, TCSet<CSyncVersionKey>> const &_DateBypassByConfig)
+			-> TCVector<CMatchingConfig>
 		;
-		TCFuture<void> fp_SyncProcessVersion
+		auto fp_SyncProcessVersion
 			(
 				CStr _HostID
 				, TCDistributedActor<CVersionManager> _SourceManager
@@ -199,8 +196,9 @@ namespace NMib::NCloud::NVersionManager
 				, TCVector<CMatchingConfig> _MatchingConfigs
 				, CStr _OriginID
 			)
+			-> TCFuture<void>
 		;
-		TCFuture<void> fp_SyncDownloadAndStoreVersion
+		auto fp_SyncDownloadAndStoreVersion
 			(
 				CStr _SyncSourceName
 				, CSyncSourceConfig _Config
@@ -212,8 +210,9 @@ namespace NMib::NCloud::NVersionManager
 				, bool _bSyncRetrySequence
 				, CStr _OriginID
 			)
+			-> TCFuture<void>
 		;
-		TCFuture<void> fp_SyncUpdateLocalTags
+		auto fp_SyncUpdateLocalTags
 			(
 				CStr _Application
 				, CVersionManager::CVersionIDAndPlatform _VersionID
@@ -222,6 +221,7 @@ namespace NMib::NCloud::NVersionManager
 				, uint32 _RemoteRetrySequence
 				, CStr _OriginID
 			)
+			-> TCFuture<void>
 		;
 
 		// Sync helpers
@@ -231,7 +231,7 @@ namespace NMib::NCloud::NVersionManager
 		static TCSet<CStr> fs_SyncGetConfigOwnedTags(TCMap<CStr, CStr> const &_CopyTagMappings);
 		static TCSet<CStr> fs_SyncGetPresentTags(TCSet<CStr> const &_SourceTags, TCMap<CStr, CStr> const &_CopyTagMappings);
 
-		constexpr static uint32 mcp_MaxQueueSize = NFile::gc_IdealNetworkQueueSize;
+		static constexpr uint32 mcp_MaxQueueSize = NFile::gc_IdealNetworkQueueSize;
 
 		TCDistributedActorInstance<CVersionManagerImplementation> mp_ProtocolInterface;
 

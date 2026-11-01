@@ -14,12 +14,8 @@ namespace NMib::NCloud
 	using namespace NConcurrency::NPrivate;
 	using namespace NStr;
 
-	NConcurrency::TCFuture<NStorage::TCOptional<CSymmetricKey>> CKeyManagerServer::CInternal::f_TryUseAvailableKey
-		(
-			CStr _Identifier
-			, uint32 _KeySize
-			, NConcurrency::CDistributedAppAuditor _AppAuditor
-		)
+	auto CKeyManagerServer::CInternal::f_TryUseAvailableKey(CStr _Identifier, uint32 _KeySize, NConcurrency::CDistributedAppAuditor _AppAuditor)
+		-> NConcurrency::TCFuture<NStorage::TCOptional<CSymmetricKey>>
 	{
 		auto CheckDestroy = co_await m_pThis->f_CheckDestroyedOnResume();
 

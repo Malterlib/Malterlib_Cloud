@@ -22,17 +22,7 @@ namespace NMib::NCloud::NAppManager
 	{
 		mp_DatabaseActor = fg_Construct();
 		auto MaxDatabaseSize = mp_State.m_ConfigDatabase.m_Data.f_GetMemberValue("MaxDatabaseSize", gc_MaxDatabaseSize).f_Integer();
-		co_await
-			(
-				mp_DatabaseActor
-				(
-					&CDatabaseActor::f_OpenDatabase
-					, mp_State.m_RootDirectory / "AppManagerDatabase"
-					, MaxDatabaseSize
-				)
-				% "Failed to open database"
-			)
-		;
+		co_await (mp_DatabaseActor(&CDatabaseActor::f_OpenDatabase, mp_State.m_RootDirectory / "AppManagerDatabase", MaxDatabaseSize) % "Failed to open database");
 		auto Stats = co_await (mp_DatabaseActor(&CDatabaseActor::f_GetAggregateStatistics));
 		auto TotalSizeUsed = Stats.f_GetTotalUsedSize();
 		DMibLogWithCategory

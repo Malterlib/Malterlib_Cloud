@@ -59,7 +59,7 @@ namespace NMib::NCloud::NCloudAPIManager
 					if (_Params.m_TempURLKey.f_IsEmpty())
 						DErrorCloudAPI("Parameter tempURLKey is empty");
 
-					aint ValidTimeInSeconds = 60*60;
+					aint ValidTimeInSeconds = 60 * 60;
 
 					NTime::CTime EpochStart = NTime::CTimeConvert::fs_CreateTime(1970, 1, 1);
 					NTime::CTimeSpan TimeSinceEpoch = CTime::fs_NowUTC() - EpochStart;
@@ -72,10 +72,10 @@ namespace NMib::NCloud::NCloudAPIManager
 					CStr HMAC_Body = fg_Format("{}\n{}\n{}", _Params.m_Method, Expires, URL.f_GetFullPath());
 
 					CByteVector Data;
-					Data.f_Insert((uint8*)HMAC_Body.f_GetStr(), HMAC_Body.f_GetLen());
+					Data.f_Insert((uint8 *)HMAC_Body.f_GetStr(), HMAC_Body.f_GetLen());
 
 					CSecureByteVector Key;
-					Key.f_Insert((uint8*)_Params.m_TempURLKey.f_GetStr(), _Params.m_TempURLKey.f_GetLen());
+					Key.f_Insert((uint8 *)_Params.m_TempURLKey.f_GetStr(), _Params.m_TempURLKey.f_GetLen());
 
 					auto Digest = fg_MessageAuthenication_HMAC_SHA1(Data, Key);
 
@@ -83,7 +83,7 @@ namespace NMib::NCloud::NCloudAPIManager
 					return SignedURL;
 				}
 			)
-			.f_Wrap();
+			.f_Wrap()
 		;
 
 		if (!Value)

@@ -138,7 +138,16 @@ namespace NMib::NCloud
 
 								UpdatedDirectory.m_ManifestFile.m_Attributes = CFile::fs_GetAttributes(CFile::fs_AppendPath(Config.m_ManifestConfig.m_Root, OriginalFileName));
 
-								CDirectoryManifest::fs_UpdateManifestFile(Config.m_ManifestConfig, Directory, UpdatedDirectory.m_ManifestFile, OriginalFileName, nullptr, gc_ChecksumFileFlags);
+								CDirectoryManifest::fs_UpdateManifestFile
+									(
+										Config.m_ManifestConfig
+										, Directory
+										, UpdatedDirectory.m_ManifestFile
+										, OriginalFileName
+										, nullptr
+										, gc_ChecksumFileFlags
+									)
+								;
 								Directory = CFile::fs_GetPath(Directory);
 							}
 
@@ -171,9 +180,7 @@ namespace NMib::NCloud
 		;
 
 		if (Result.m_bChecksumValid)
-		{
 			m_ChecksumState[_FileName] = Result.m_ChecksumState;
-		}
 		else
 			m_ChecksumState.f_Remove(_FileName);
 

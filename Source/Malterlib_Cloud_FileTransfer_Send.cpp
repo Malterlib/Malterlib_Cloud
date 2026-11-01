@@ -139,7 +139,6 @@ namespace NMib::NCloud
 		co_return {};
 	}
 
-
 	void CFileTransferSend::CInternal::CDeprecated::f_ReportError(CStr const &_Error)
 	{
 		CFileTransferContextDeprecated::CInternal::CStateChange StateChange{m_Version};
@@ -296,8 +295,8 @@ namespace NMib::NCloud
 
 			auto Result = co_await
 				(
-					g_Dispatch(BlockingActorCheckout) / [FileName, RelativeFileName, Position, nBytes, pFileState = m_pFileState, bFinished]()
-					-> CFileTransferContextDeprecated::CInternal::CSendPart
+					g_Dispatch(BlockingActorCheckout) / [FileName, RelativeFileName, Position, nBytes, pFileState = m_pFileState, bFinished]
+					() -> CFileTransferContextDeprecated::CInternal::CSendPart
 					{
 						if (pFileState->m_FileName != FileName)
 						{
@@ -425,8 +424,8 @@ namespace NMib::NCloud
 		auto BlockingActorCheckout = fg_BlockingActor();
 		co_return co_await
 			(
-				g_Dispatch(BlockingActorCheckout) / [BasePaths = m_BasePaths, bIncludeRootDirectoryName = m_Options.m_bIncludeRootDirectoryName]() mutable
-				-> TCFuture<TCVector<CUploadQueueEntry>>
+				g_Dispatch(BlockingActorCheckout) / [BasePaths = m_BasePaths, bIncludeRootDirectoryName = m_Options.m_bIncludeRootDirectoryName]
+				() mutable -> TCFuture<TCVector<CUploadQueueEntry>>
 				{
 					auto CaptureExceptinos = co_await (g_CaptureExceptions % "Failed to determine what to send");
 
@@ -467,7 +466,7 @@ namespace NMib::NCloud
 						auto FoundFiles = CFile::fs_FindFiles(FindOptions);
 						for (auto &File : FoundFiles)
 						{
-							CStr RelativePath  = RelativeRoot / File.m_Path.f_Extract(BasePath.m_Path.f_GetLen() + 1);
+							CStr RelativePath = RelativeRoot / File.m_Path.f_Extract(BasePath.m_Path.f_GetLen() + 1);
 							fAddEntry(RelativePath, File.m_Path, File.m_Attribs);
 						}
 
@@ -480,13 +479,8 @@ namespace NMib::NCloud
 		;
 	}
 
-	TCFuture<CFileTransferSendDownloadFileContents> CFileTransferSend::CInternal::f_SendFileContents
-		(
-			CStr _FileName
-			, uint64 _StartPosition
-			, NCryptography::CHashDigest_SHA256 _StartDigest
-			, uint64 _FileSize
-		)
+	auto CFileTransferSend::CInternal::f_SendFileContents(CStr _FileName, uint64 _StartPosition, NCryptography::CHashDigest_SHA256 _StartDigest, uint64 _FileSize)
+		-> TCFuture<CFileTransferSendDownloadFileContents>
 	{
 		if (_StartPosition != 0)
 		{
@@ -545,7 +539,8 @@ namespace NMib::NCloud
 
 		co_return CFileTransferSendDownloadFileContents
 			{
-				.m_DataGenerator = m_Options.m_bCompressZstandard
+				.m_DataGenerator
+				= m_Options.m_bCompressZstandard
 				? fg_CompressZstandardAsync(fg_Move(ReadFileGenerator), CZStandardCompressionOptions{.m_KnownSize = _FileSize, .m_CompressionLevel = m_Options.m_ZstandardLevel})
 				: fg_Move(ReadFileGenerator)
 				, .m_Subscription = g_ActorSubscription / [this]
@@ -583,12 +578,7 @@ namespace NMib::NCloud
 				(
 					g_Dispatch(BlockingActorCheckout) / [FileName = _UploadEntry.m_FileName]() mutable
 					{
-						return fg_Tuple
-							(
-								(uint64)CFile::fs_GetFileSize(FileName)
-								, CFile::fs_GetWriteTime(FileName)
-							)
-						;
+						return fg_Tuple((uint64)CFile::fs_GetFileSize(FileName), CFile::fs_GetWriteTime(FileName));
 					}
 				)
 			;
@@ -619,8 +609,7 @@ namespace NMib::NCloud
 					}
 				)
 				/ [this, FileName = _UploadEntry.m_FileName, FileSize, AllowDestroy = NConcurrency::g_AllowWrongThreadDestroy, FileAttributes = _UploadEntry.m_FileAttributes]
-				(uint64 _StartPosition, NCryptography::CHashDigest_SHA256 _StartDigest) mutable
-				-> NConcurrency::TCFuture<CFileTransferSendDownloadFileContents>
+				(uint64 _StartPosition, NCryptography::CHashDigest_SHA256 _StartDigest) mutable -> NConcurrency::TCFuture<CFileTransferSendDownloadFileContents>
 				{
 					if ((FileAttributes & EFileAttrib_Link) || !(FileAttributes & EFileAttrib_File))
 						co_return DMibErrorInstance("File has no contents");

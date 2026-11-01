@@ -16,9 +16,7 @@ struct CAppManager_DistributedLog_Tests : public NMib::NTest::CTest
 		DMibTestSuite("General") -> TCFuture<void>
 		{
 			CAppManagerTestHelper::EOption Options
-				= CAppManagerTestHelper::EOption_LaunchTestAppInApp
-				| CAppManagerTestHelper::EOption_EnableVersionManager
-				| CAppManagerTestHelper::EOption_DisablePatchMonitoring
+				= CAppManagerTestHelper::EOption_LaunchTestAppInApp | CAppManagerTestHelper::EOption_EnableVersionManager | CAppManagerTestHelper::EOption_DisablePatchMonitoring
 			;
 
 			if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
@@ -220,7 +218,8 @@ struct CAppManager_DistributedLog_Tests : public NMib::NTest::CTest
 						auto Result = co_await AppManagerTestHelper.f_LaunchTool
 							(
 								TestAppDirectory / "TestApp"
-								, {"--log-list", "--identifier", "org.malterlib.log.test", "--json"}, TestAppDirectory
+								, {"--log-list", "--identifier", "org.malterlib.log.test", "--json"}
+								, TestAppDirectory
 							)
 						;
 						co_return CEJsonSorted::fs_FromString(Result);
@@ -350,27 +349,24 @@ struct CAppManager_DistributedLog_Tests : public NMib::NTest::CTest
 				;
 
 				DMibExpect(co_await fReadLogs(), ==, fSortLogs(fSetHostInfo(ExpectedLogs)));
-				DMibExpect
-					(
-						fMakeComparable(co_await fReadLogEntries())
-						, ==
-						, fSetHostInfo(ExpectedLogEntries)
-					)
-				;
+				DMibExpect(fMakeComparable(co_await fReadLogEntries()), ==, fSetHostInfo(ExpectedLogEntries));
 			}
 
 			co_return {};
 		};
 	}
 
-	TCFuture<void> fp_TestLimitsImpl
+	auto fp_TestLimitsImpl
 		(
 			CStr _Name
 			, TCSharedPointer<TCActorFunctor<TCFuture<void> (CStr _Root, CAppManagerTestHelper *_pAppManagerTestHelper)>> _pGenerateEntries
-			, TCFunction<void (CEJsonSorted const &_Entries)> _fCheckEntries, bool _bStopCloudManager
+			, TCFunction<void (CEJsonSorted const &_Entries)> _fCheckEntries
+			, bool _bStopCloudManager
 		)
+		-> TCFuture<void>
 	{
-		CAppManagerTestHelper::EOption Options = CAppManagerTestHelper::EOption_LaunchTestAppInApp
+		CAppManagerTestHelper::EOption Options
+			= CAppManagerTestHelper::EOption_LaunchTestAppInApp
 			| CAppManagerTestHelper::EOption_EnableVersionManager
 			| CAppManagerTestHelper::EOption_DisablePatchMonitoring
 			| CAppManagerTestHelper::EOption_DisableDiskMonitoring
@@ -436,16 +432,7 @@ struct CAppManager_DistributedLog_Tests : public NMib::NTest::CTest
 			{
 				try
 				{
-					auto ReportDepth =
-						(
-							co_await AppManagerTestHelper.f_LaunchTool
-							(
-								TestAppDirectory / "TestApp"
-								, {"--get-log-report-depth"}
-								, TestAppDirectory
-							)
-						).f_Trim().f_ToInt(uint32(0))
-					;
+					auto ReportDepth = (co_await AppManagerTestHelper.f_LaunchTool(TestAppDirectory / "TestApp", {"--get-log-report-depth"}, TestAppDirectory)).f_Trim().f_ToInt(uint32(0));
 
 					if (ReportDepth == 3)
 						break;
@@ -483,12 +470,13 @@ struct CAppManager_DistributedLog_Tests : public NMib::NTest::CTest
 		co_return {};
 	}
 
-	TCFuture<void> fp_TestLimitsImpl
+	auto fp_TestLimitsImpl
 		(
 			CStr _Name
 			, TCActorFunctor<TCFuture<void> (CStr _Root, CAppManagerTestHelper *_pAppManagerTestHelper)> _fGenerateEntries
 			, TCFunction<void (CEJsonSorted const &_Entries)> _fCheckEntries
 		)
+		-> TCFuture<void>
 	{
 		TCSharedPointer<TCActorFunctor<TCFuture<void> (CStr _Root, CAppManagerTestHelper *_pAppManagerTestHelper)>> pGenerateEntries = fg_Construct(fg_Move(_fGenerateEntries));
 		{

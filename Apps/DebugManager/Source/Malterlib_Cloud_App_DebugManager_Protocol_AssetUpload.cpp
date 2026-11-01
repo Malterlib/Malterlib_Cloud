@@ -230,13 +230,7 @@ namespace NMib::NCloud::NDebugManager
 					AssetAdd.m_FileName = RootFile.m_FileName;
 					AssetAdd.m_Path = RootFile.m_Path;
 
-					auto AssetAddResult = co_await pThis->mp_DebugDatabase
-						(
-							&CDebugDatabase::f_Asset_Add
-							, fg_Move(AssetAdd)
-						)
-						.f_Wrap()
-					;
+					auto AssetAddResult = co_await pThis->mp_DebugDatabase(&CDebugDatabase::f_Asset_Add, fg_Move(AssetAdd)).f_Wrap();
 
 					if (!AssetAddResult)
 					{
@@ -252,7 +246,7 @@ namespace NMib::NCloud::NDebugManager
 
 				co_return {};
 			}
-			> fg_LogError("AssetUpload", "Failed to transfer asset (upload)");
+			> fg_LogError("AssetUpload", "Failed to transfer asset (upload)")
 		;
 
 		Auditor.f_Info("Starting upload of asset");

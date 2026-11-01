@@ -320,7 +320,7 @@ namespace NMib::NCloud::NBackupManager
 							CFile::fs_RenameFile(FullSourcePath, FullDestinationPath);
 							break;
 						}
-						catch (CExceptionFile const&)
+						catch (CExceptionFile const &)
 						{
 							if (i == 199)
 								throw;
@@ -625,14 +625,7 @@ namespace NMib::NCloud::NBackupManager
 			Backup.m_AppendFiles.f_Remove(_FileName);
 	}
 
-	TCFuture<void> CBackupSource::f_CommitAppend
-		(
-			CStr _BackupID
-			, CStr _File
-			, uint64 _Position
-			, CIOByteVector _Data
-			, CBackupManagerBackup::CManifestChange _ManifestChange
-		)
+	TCFuture<void> CBackupSource::f_CommitAppend(CStr _BackupID, CStr _File, uint64 _Position, CIOByteVector _Data, CBackupManagerBackup::CManifestChange _ManifestChange)
 	{
 		CStr ManifestError;
 		if (!CBackupManagerBackup::fs_ManifestChangeValid(_File, _ManifestChange, ManifestError))

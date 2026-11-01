@@ -18,7 +18,7 @@ namespace NMib::NCloud
 
 	CFileTransferContextDeprecated::~CFileTransferContextDeprecated() = default;
 	CFileTransferContextDeprecated::CFileTransferContextDeprecated(CFileTransferContextDeprecated &&_Other) = default;
-	CFileTransferContextDeprecated &CFileTransferContextDeprecated::operator =(CFileTransferContextDeprecated &&_Other) = default;
+	CFileTransferContextDeprecated &CFileTransferContextDeprecated::operator = (CFileTransferContextDeprecated &&_Other) = default;
 
 	void CFileTransferContextDeprecated::f_Feed(CDistributedActorWriteStream &_Stream) const
 	{
@@ -56,7 +56,6 @@ namespace NMib::NCloud
 		_Stream >> m_fStateChange;
 	}
 
-
 	void CFileTransferContextDeprecated::CInternal::CFileInfo::f_Feed(CDistributedActorWriteStream &_Stream) const
 	{
 		_Stream << m_FileSize;
@@ -81,7 +80,6 @@ namespace NMib::NCloud
 	{
 		_Stream >> m_Files;
 	}
-
 
 	// CSendPart
 

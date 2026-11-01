@@ -8,12 +8,7 @@
 
 namespace NMib::NCloud::NBackupManager
 {
-	TCFuture<TCActorSubscriptionWithID<>> CBackupInstance::f_StartManifestRSync
-		(
-			FRunRSyncProtocol _fRunProtocol
-			, uint64 _ManifestSize
-			, NCryptography::CHashDigest_SHA256 _ExpectedDigest
-		)
+	TCFuture<TCActorSubscriptionWithID<>> CBackupInstance::f_StartManifestRSync(FRunRSyncProtocol _fRunProtocol, uint64 _ManifestSize, NCryptography::CHashDigest_SHA256 _ExpectedDigest)
 	{
 		auto ProtocolVersion = fg_GetCallingHostInfo().f_GetProtocolVersion();
 

@@ -101,7 +101,8 @@ namespace NMib::NCloud
 						AppendStates.f_Clear();
 					}
 				)
-				.f_Wrap() > LogError.f_Warning("Failed to destroy file append states")
+				.f_Wrap()
+				> LogError.f_Warning("Failed to destroy file append states")
 			;
 		}
 		co_await Internal.m_BackupInterface.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy backup interface");
@@ -150,12 +151,22 @@ namespace NMib::NCloud
 				auto BlockingActorCheckout = fg_BlockingActor();
 				auto BlockingActor = BlockingActorCheckout.f_Actor();
 
-				g_Dispatch(BlockingActor) / [Config = m_Config.m_ManifestConfig, pDestroyed = m_pDestroyed]()
-					-> TCTuple<CDirectoryManifest, TCMap<CStr, CUniqueFileIdentifier>, TCMap<CStr, TCSharedPointer<CAppendFileState>>>
+				g_Dispatch(BlockingActor) / [Config = m_Config.m_ManifestConfig, pDestroyed = m_pDestroyed]
+					() -> TCTuple<CDirectoryManifest, TCMap<CStr, CUniqueFileIdentifier>, TCMap<CStr, TCSharedPointer<CAppendFileState>>>
 					{
 						TCMap<CStr, CFile::CFileChecksumState_SHA256> SourceAppendStates;
 
-						auto Manifest = CDirectoryManifest::fs_GetManifest(Config, [&]{ fs_CheckDestroy(pDestroyed); }, &SourceAppendStates, gc_ChecksumFileFlags);
+						auto Manifest = CDirectoryManifest::fs_GetManifest
+							(
+								Config
+								, [&]
+								{
+									fs_CheckDestroy(pDestroyed);
+								}
+								, &SourceAppendStates
+								, gc_ChecksumFileFlags
+							)
+						;
 						Manifest.m_Files.f_Remove("");
 						TCMap<CStr, CUniqueFileIdentifier> FileIDs;
 						TCMap<CStr, TCSharedPointer<CAppendFileState>> AppendStates;
@@ -240,7 +251,7 @@ namespace NMib::NCloud
 	auto CBackupManagerClient::CConfig::f_Validate() const -> CConfig const &
 	{
 		m_ManifestConfig.f_Validate();
-		if (m_MaxSendQueue < 16*1024)
+		if (m_MaxSendQueue < 16 * 1024)
 			DMibError("Send queue needs to be at least 16 KiB");
 		return *this;
 	}

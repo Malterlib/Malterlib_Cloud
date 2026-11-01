@@ -6,30 +6,30 @@
 namespace NMib::NCloud::NAppManager
 {
 #ifdef DPlatformFamily_Linux
-	constexpr static ch8 const gc_pSetupEncryptionScript[] =
+	static constexpr ch8 const gc_pSetupEncryptionScript[] =
 		{
-			#embed "Malterlib_Cloud_App_AppManager_Encryption_Common.sh"
+#	embed "Malterlib_Cloud_App_AppManager_Encryption_Common.sh"
 			,
-			#embed "Malterlib_Cloud_App_AppManager_Encryption_SetupLinux.sh"
+#	embed "Malterlib_Cloud_App_AppManager_Encryption_SetupLinux.sh"
 			, '\0'
 		}
 	;
-	constexpr static ch8 const gc_pOpenEncryptionScript[] =
+	static constexpr ch8 const gc_pOpenEncryptionScript[] =
 		{
-			#embed "Malterlib_Cloud_App_AppManager_Encryption_Common.sh"
+#	embed "Malterlib_Cloud_App_AppManager_Encryption_Common.sh"
 			,
-			#embed "Malterlib_Cloud_App_AppManager_Encryption_OpenLinux.sh"
+#	embed "Malterlib_Cloud_App_AppManager_Encryption_OpenLinux.sh"
 			, '\0'
 		}
 	;
-	constexpr static ch8 const gc_pCloseEncryptionScript[] =
+	static constexpr ch8 const gc_pCloseEncryptionScript[] =
 		{
-			#embed "Malterlib_Cloud_App_AppManager_Encryption_Common.sh"
+#	embed "Malterlib_Cloud_App_AppManager_Encryption_Common.sh"
 			,
-			#embed "Malterlib_Cloud_App_AppManager_Encryption_CloseLinux.sh"
+#	embed "Malterlib_Cloud_App_AppManager_Encryption_CloseLinux.sh"
 			, '\0'
 		}
-	;	
+	;
 #endif
 
 	void CAppManagerActor::fp_AppEncryptionStateChanged(TCSharedPointer<CApplication> const &_pApplication, bool _bEncrypted)
@@ -77,7 +77,7 @@ namespace NMib::NCloud::NAppManager
 				co_return DMibErrorInstance("No key managers are connected, so key cannot be generated");
 
 			auto &KeyManagerInfo = *mp_KeyManagerSubscription.m_Actors.f_FindAny();
-			static const umint c_KeyBits = 512;
+			static umint const c_KeyBits = 512;
 			Key = co_await KeyManagerInfo.m_Actor.f_CallActor(&CKeyManager::f_RequestKey)(pEncryptionApplication->m_Name, c_KeyBits / 8);
 		}
 
@@ -121,9 +121,7 @@ namespace NMib::NCloud::NAppManager
 			pScript = gc_pCloseEncryptionScript;
 			pDesc = "CloseEncryption";
 			break;
-		default:
-			DNeverGetHere;
-			break;
+		default: DNeverGetHere; break;
 		}
 
 		co_await

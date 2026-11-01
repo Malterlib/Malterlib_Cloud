@@ -85,11 +85,21 @@ namespace NMib::NCloud
 		auto BlockingActorCheckout = fg_BlockingActor();
 		auto Manifest = co_await
 			(
-				g_Dispatch(BlockingActorCheckout) / [NewConfig = fg_Move(NewConfig), pDestroyed = Internal.m_pDestroyed]()
-				-> TCTuple<CDirectoryManifest, TCMap<CStr, CUniqueFileIdentifier>, TCMap<CStr, TCSharedPointer<CAppendFileState>>>
+				g_Dispatch(BlockingActorCheckout) / [NewConfig = fg_Move(NewConfig), pDestroyed = Internal.m_pDestroyed]
+				() -> TCTuple<CDirectoryManifest, TCMap<CStr, CUniqueFileIdentifier>, TCMap<CStr, TCSharedPointer<CAppendFileState>>>
 				{
 					TCMap<CStr, CFile::CFileChecksumState_SHA256> SourceAppendStates;
-					auto Manifest = CDirectoryManifest::fs_GetManifest(NewConfig, [&]{ fs_CheckDestroy(pDestroyed); }, &SourceAppendStates, gc_ChecksumFileFlags);
+					auto Manifest = CDirectoryManifest::fs_GetManifest
+						(
+							NewConfig
+							, [&]
+							{
+								fs_CheckDestroy(pDestroyed);
+							}
+							, &SourceAppendStates
+							, gc_ChecksumFileFlags
+						)
+					;
 					Manifest.m_Files.f_Remove("");
 					TCMap<CStr, CUniqueFileIdentifier> FileIDs;
 					TCMap<CStr, TCSharedPointer<CAppendFileState>> AppendStates;
@@ -185,12 +195,7 @@ namespace NMib::NCloud
 		TCFutureVector<void> ManifestChangedResults;
 
 		auto fSendManifestChange = [&]
-			(
-				CStr const &_Path
-				, CBackupManagerBackup::CManifestChange const &_ManifestChange
-				, bool _bDirty
-				, CBackupManagerClient_ChecksumState const &_ChecksumState
-			)
+			(CStr const &_Path, CBackupManagerBackup::CManifestChange const &_ManifestChange, bool _bDirty, CBackupManagerClient_ChecksumState const &_ChecksumState)
 			{
 #if defined DMibContractConfigure_CheckEnabled
 				CStr ManifestError;
@@ -216,14 +221,7 @@ namespace NMib::NCloud
 
 			auto pChecksumState = Internal.m_ChecksumState.f_FindEqual(NewFileName);
 
-			fSendManifestChange
-				(
-					NewFileName
-					, CBackupManagerBackup::CManifestChange_Add{fg_Move(NewFile)}
-					, false
-					, pChecksumState ? *pChecksumState : CBackupManagerClient_ChecksumState{}
-				)
-			;
+			fSendManifestChange(NewFileName, CBackupManagerBackup::CManifestChange_Add{fg_Move(NewFile)}, false, pChecksumState ? *pChecksumState : CBackupManagerClient_ChecksumState{});
 		}
 
 		Internal.m_ManifestFileIDs += NewManifestFileIDs;

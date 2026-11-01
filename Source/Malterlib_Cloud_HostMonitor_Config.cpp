@@ -363,7 +363,15 @@ namespace NMib::NCloud
 
 	namespace
 	{
-		void fg_FindJsonDiffsRecursive(CEJsonSorted const &_Old, CEJsonSorted const &_New, TCVector<CStr> &o_Changed, TCVector<CStr> &o_Added, TCVector<CStr> &o_Deleted, CStr const &_Context)
+		void fg_FindJsonDiffsRecursive
+			(
+				CEJsonSorted const &_Old
+				, CEJsonSorted const &_New
+				, TCVector<CStr> &o_Changed
+				, TCVector<CStr> &o_Added
+				, TCVector<CStr> &o_Deleted
+				, CStr const &_Context
+			)
 		{
 			if (_Old == _New)
 				return;
@@ -419,12 +427,12 @@ namespace NMib::NCloud
 					auto iOld = _Old.f_Array().f_GetIterator();
 					auto iNew = _New.f_Array().f_GetIterator();
 					umint iArray = 0;
-					for (;iOld && iNew; ++iOld, ++iNew, ++iArray)
+					for (; iOld && iNew; ++iOld, ++iNew, ++iArray)
 						fg_FindJsonDiffsRecursive(*iOld, *iNew, o_Changed, o_Added, o_Deleted, "{}.[{}]"_f << _Context << iArray);
 
-					for (;iOld ; ++iOld, ++iArray)
+					for (; iOld; ++iOld, ++iArray)
 						o_Deleted.f_Insert("{}.[{}]"_f << _Context << iArray);
-					for (;iNew ; ++iNew, ++iArray)
+					for (; iNew; ++iNew, ++iArray)
 						o_Added.f_Insert("{}.[{}]"_f << _Context << iArray);
 				}
 				break;
@@ -437,13 +445,14 @@ namespace NMib::NCloud
 		}
 	}
 
-	TCFuture<void> CHostMonitor::CInternal::f_ConfigFile_LogChanges
+	auto CHostMonitor::CInternal::f_ConfigFile_LogChanges
 		(
 			CStr _ConfigID
 			, CStr _FileName
 			, NHostMonitorDatabase::CConfigFileHistoryEntryValue _OldValue
 			, NHostMonitorDatabase::CConfigFileHistoryEntryValue _NewValue
 		)
+		-> TCFuture<void>
 	{
 		CMonitoredConfigFile *pConfigFile = nullptr;
 		auto OnResume = co_await fg_OnResume

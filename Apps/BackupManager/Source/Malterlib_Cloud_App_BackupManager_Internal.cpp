@@ -121,7 +121,7 @@ namespace NMib::NCloud::NBackupManager
 		for (auto &Download : mp_BackupDownloads)
 			Download.f_Destroy() > Destroys;
 
-		co_await fg_AllDone(Destroys).f_Wrap() > LogError.f_Warning("Failed to destroy backup manager server");;
+		co_await fg_AllDone(Destroys).f_Wrap() > LogError.f_Warning("Failed to destroy backup manager server");
 
 		co_await mp_ProtocolInterface.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy protocol interface");
 

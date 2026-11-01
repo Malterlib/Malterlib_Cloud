@@ -10,7 +10,7 @@
 
 namespace NMib::NCloud
 {
-	NConcurrency::TCFuture<NFile::CDirectorySyncReceive::CSyncResult> fg_DownloadBackup
+	auto fg_DownloadBackup
 		(
 			NConcurrency::TCDistributedActor<CBackupManager> _BackupManager
 			, NStr::CStr _BackupSource
@@ -18,9 +18,10 @@ namespace NMib::NCloud
 			, NFile::CDirectorySyncReceive::CConfig _SyncConfig
 			, NStorage::NReference::TCReference<NConcurrency::CActorSubscription> o_Subscription
 		)
+		-> NConcurrency::TCFuture<NFile::CDirectorySyncReceive::CSyncResult>
 	;
 }
 
 #ifndef DMibPNoShortCuts
-	using namespace NMib::NCloud;
+using namespace NMib::NCloud;
 #endif

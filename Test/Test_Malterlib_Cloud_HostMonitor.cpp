@@ -43,7 +43,7 @@ struct CHostMonitor_Tests : public NMib::NTest::CTest
 		DMibExpect(f_Next({}, fs_Time("2024-10-07 11:22:20")), ==, fs_Time("2024-10-07 11:22"));
 
 		// Minute
-		DMibExpect(f_Next({.m_Minute = uint8(0)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-07 12:00"));
+		DMibExpect(f_Next({.m_Minute = uint8(0)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-07 12:00"));
 		DMibExpect(f_Next({.m_Minute = uint8(22)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-07 11:22"));
 		DMibExpect(f_Next({.m_Minute = uint8(40)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-07 11:40"));
 
@@ -70,12 +70,12 @@ struct CHostMonitor_Tests : public NMib::NTest::CTest
 		DMibExpect(f_Next({.m_DayOfWeek = uint8(1)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-08 00:00"));
 
 		// Month
-		DMibExpect(f_Next({.m_Month = uint8(9)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-01 00:00"));
+		DMibExpect(f_Next({.m_Month = uint8(9)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-01 00:00"));
 		DMibExpect(f_Next({.m_Month = uint8(10)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-07 11:22"));
 		DMibExpect(f_Next({.m_Month = uint8(11)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-11-01 00:00"));
 
 		// Month Hour
-		DMibExpect(f_Next({.m_Month = uint8(9),  .m_Hour = uint8(10)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-01 10:00"));
+		DMibExpect(f_Next({.m_Month = uint8(9), .m_Hour = uint8(10)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-01 10:00"));
 		DMibExpect(f_Next({.m_Month = uint8(10), .m_Hour = uint8(10)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-08 10:00"));
 		DMibExpect(f_Next({.m_Month = uint8(10), .m_Hour = uint8(11)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-07 11:22"));
 		DMibExpect(f_Next({.m_Month = uint8(10), .m_Hour = uint8(12)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-07 12:00"));
@@ -83,20 +83,20 @@ struct CHostMonitor_Tests : public NMib::NTest::CTest
 		DMibExpect(f_Next({.m_Month = uint8(10), .m_Hour = uint8(10)}, fs_Time("2024-10-31 11:22")), ==, fs_Time("2025-10-01 10:00"));
 
 		// Month Minute
-		DMibExpect(f_Next({.m_Month = uint8(9), .m_Minute = uint8(30)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-01 00:30"));
+		DMibExpect(f_Next({.m_Month = uint8(9), .m_Minute = uint8(30)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-01 00:30"));
 		DMibExpect(f_Next({.m_Month = uint8(10), .m_Minute = uint8(22)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-07 11:22"));
 		DMibExpect(f_Next({.m_Month = uint8(10), .m_Minute = uint8(30)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-07 11:30"));
 		DMibExpect(f_Next({.m_Month = uint8(11), .m_Minute = uint8(30)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-11-01 00:30"));
 
 		// Month DayOfMonth
-		DMibExpect(f_Next({.m_Month = uint8(9), .m_DayOfMonth = uint8(22)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-22 00:00"));
-		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfMonth = uint8(7)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-07 11:22"));
+		DMibExpect(f_Next({.m_Month = uint8(9), .m_DayOfMonth = uint8(22)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-22 00:00"));
+		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfMonth = uint8(7)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-07 11:22"));
 		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfMonth = uint8(22)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-22 00:00"));
 		DMibExpect(f_Next({.m_Month = uint8(11), .m_DayOfMonth = uint8(22)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-11-22 00:00"));
-		DMibExpect(f_Next({.m_Month = uint8(2), .m_DayOfMonth = uint8(29)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2028-02-29 00:00"));
+		DMibExpect(f_Next({.m_Month = uint8(2), .m_DayOfMonth = uint8(29)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2028-02-29 00:00"));
 
 		// Month DayOfWeek
-		DMibExpect(f_Next({.m_Month = uint8(9), .m_DayOfWeek = uint8(5)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-06 00:00"));
+		DMibExpect(f_Next({.m_Month = uint8(9), .m_DayOfWeek = uint8(5)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-06 00:00"));
 		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfWeek = uint8(0)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-07 11:22"));
 		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfWeek = uint8(1)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-08 00:00"));
 		DMibExpect(f_Next({.m_Month = uint8(11), .m_DayOfWeek = uint8(0)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-11-04 00:00"));
@@ -116,12 +116,12 @@ struct CHostMonitor_Tests : public NMib::NTest::CTest
 		DMibExpect(f_Next({.m_DayOfWeek = uint8(1), .m_Hour = uint8(10)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-08 10:00"));
 
 		// DayOfMonth Minute
-		DMibExpect(f_Next({.m_DayOfMonth = uint8(6), .m_Minute = uint8(20)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-11-06 00:20"));
-		DMibExpect(f_Next({.m_DayOfMonth = uint8(7), .m_Minute = uint8(20)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-07 12:20"));
-		DMibExpect(f_Next({.m_DayOfMonth = uint8(7), .m_Minute = uint8(22)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-07 11:22"));
-		DMibExpect(f_Next({.m_DayOfMonth = uint8(7), .m_Minute = uint8(24)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-07 11:24"));
-		DMibExpect(f_Next({.m_DayOfMonth = uint8(7), .m_Minute = uint8(20)},  fs_Time("2024-10-07 23:22")), ==, fs_Time("2024-11-07 00:20"));
-		DMibExpect(f_Next({.m_DayOfMonth = uint8(8), .m_Minute = uint8(20)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-08 00:20"));
+		DMibExpect(f_Next({.m_DayOfMonth = uint8(6), .m_Minute = uint8(20)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-11-06 00:20"));
+		DMibExpect(f_Next({.m_DayOfMonth = uint8(7), .m_Minute = uint8(20)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-07 12:20"));
+		DMibExpect(f_Next({.m_DayOfMonth = uint8(7), .m_Minute = uint8(22)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-07 11:22"));
+		DMibExpect(f_Next({.m_DayOfMonth = uint8(7), .m_Minute = uint8(24)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-07 11:24"));
+		DMibExpect(f_Next({.m_DayOfMonth = uint8(7), .m_Minute = uint8(20)}, fs_Time("2024-10-07 23:22")), ==, fs_Time("2024-11-07 00:20"));
+		DMibExpect(f_Next({.m_DayOfMonth = uint8(8), .m_Minute = uint8(20)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-08 00:20"));
 		DMibExpect(f_Next({.m_DayOfMonth = uint8(31), .m_Minute = uint8(20)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-31 00:20"));
 		DMibExpect(f_Next({.m_DayOfMonth = uint8(31), .m_Minute = uint8(20)}, fs_Time("2024-11-07 11:22")), ==, fs_Time("2024-12-31 00:20"));
 
@@ -140,27 +140,27 @@ struct CHostMonitor_Tests : public NMib::NTest::CTest
 		DMibExpect(f_Next({.m_Hour = uint8(11), .m_Minute = uint8(30)}, fs_Time("2024-10-07 11:59")), ==, fs_Time("2024-10-08 11:30"));
 
 		// Month Hour Minute
-		DMibExpect(f_Next({.m_Month = uint8(9),  .m_Hour = uint8(10), .m_Minute = uint8(40)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-01 10:40"));
+		DMibExpect(f_Next({.m_Month = uint8(9), .m_Hour = uint8(10), .m_Minute = uint8(40)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-01 10:40"));
 		DMibExpect(f_Next({.m_Month = uint8(10), .m_Hour = uint8(10), .m_Minute = uint8(40)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-08 10:40"));
 		DMibExpect(f_Next({.m_Month = uint8(11), .m_Hour = uint8(10), .m_Minute = uint8(40)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-11-01 10:40"));
 		DMibExpect(f_Next({.m_Month = uint8(10), .m_Hour = uint8(10), .m_Minute = uint8(40)}, fs_Time("2024-10-31 11:22")), ==, fs_Time("2025-10-01 10:40"));
 
 		// Month DayOfMonth Hour
-		DMibExpect(f_Next({.m_Month = uint8(9), .m_DayOfMonth = uint8(22), .m_Hour = uint8(12)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-22 12:00"));
-		DMibExpect(f_Next({.m_Month = uint8(9), .m_DayOfMonth = uint8(22), .m_Hour = uint8(10)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-22 10:00"));
-		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfMonth = uint8(7), .m_Hour = uint8(11)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-07 11:22"));
-		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfMonth = uint8(7), .m_Hour = uint8(12)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-07 12:00"));
-		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfMonth = uint8(7), .m_Hour = uint8(10)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-10-07 10:00"));
+		DMibExpect(f_Next({.m_Month = uint8(9), .m_DayOfMonth = uint8(22), .m_Hour = uint8(12)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-22 12:00"));
+		DMibExpect(f_Next({.m_Month = uint8(9), .m_DayOfMonth = uint8(22), .m_Hour = uint8(10)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-22 10:00"));
+		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfMonth = uint8(7), .m_Hour = uint8(11)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-07 11:22"));
+		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfMonth = uint8(7), .m_Hour = uint8(12)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-07 12:00"));
+		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfMonth = uint8(7), .m_Hour = uint8(10)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-10-07 10:00"));
 		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfMonth = uint8(22), .m_Hour = uint8(12)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-22 12:00"));
 		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfMonth = uint8(22), .m_Hour = uint8(10)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-22 10:00"));
 		DMibExpect(f_Next({.m_Month = uint8(11), .m_DayOfMonth = uint8(22), .m_Hour = uint8(12)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-11-22 12:00"));
 		DMibExpect(f_Next({.m_Month = uint8(11), .m_DayOfMonth = uint8(22), .m_Hour = uint8(10)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-11-22 10:00"));
-		DMibExpect(f_Next({.m_Month = uint8(2), .m_DayOfMonth = uint8(29), .m_Hour = uint8(12)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2028-02-29 12:00"));
-		DMibExpect(f_Next({.m_Month = uint8(2), .m_DayOfMonth = uint8(29), .m_Hour = uint8(10)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2028-02-29 10:00"));
+		DMibExpect(f_Next({.m_Month = uint8(2), .m_DayOfMonth = uint8(29), .m_Hour = uint8(12)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2028-02-29 12:00"));
+		DMibExpect(f_Next({.m_Month = uint8(2), .m_DayOfMonth = uint8(29), .m_Hour = uint8(10)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2028-02-29 10:00"));
 
 		// Month DayOfWeek Hour
-		DMibExpect(f_Next({.m_Month = uint8(9), .m_DayOfWeek = uint8(5), .m_Hour = uint32(12)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-06 12:00"));
-		DMibExpect(f_Next({.m_Month = uint8(9), .m_DayOfWeek = uint8(5), .m_Hour = uint32(10)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-06 10:00"));
+		DMibExpect(f_Next({.m_Month = uint8(9), .m_DayOfWeek = uint8(5), .m_Hour = uint32(12)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-06 12:00"));
+		DMibExpect(f_Next({.m_Month = uint8(9), .m_DayOfWeek = uint8(5), .m_Hour = uint32(10)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-06 10:00"));
 		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfWeek = uint8(0), .m_Hour = uint32(11)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-07 11:22"));
 		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfWeek = uint8(0), .m_Hour = uint32(12)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-07 12:00"));
 		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfWeek = uint8(0), .m_Hour = uint32(10)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-14 10:00"));
@@ -170,22 +170,22 @@ struct CHostMonitor_Tests : public NMib::NTest::CTest
 		DMibExpect(f_Next({.m_Month = uint8(11), .m_DayOfWeek = uint8(0), .m_Hour = uint32(10)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-11-04 10:00"));
 
 		// Month DayOfMonth Minute
-		DMibExpect(f_Next({.m_Month = uint8(9), .m_DayOfMonth = uint8(22), .m_Minute = uint8(23)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-22 00:23"));
-		DMibExpect(f_Next({.m_Month = uint8(9), .m_DayOfMonth = uint8(22), .m_Minute = uint8(21)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-22 00:21"));
-		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfMonth = uint8(7), .m_Minute = uint8(22)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-07 11:22"));
-		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfMonth = uint8(7), .m_Minute = uint8(23)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-07 11:23"));
-		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfMonth = uint8(7), .m_Minute = uint8(21)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-07 12:21"));
-		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfMonth = uint8(7), .m_Minute = uint8(21)},  fs_Time("2024-10-07 23:22")), ==, fs_Time("2025-10-07 00:21"));
+		DMibExpect(f_Next({.m_Month = uint8(9), .m_DayOfMonth = uint8(22), .m_Minute = uint8(23)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-22 00:23"));
+		DMibExpect(f_Next({.m_Month = uint8(9), .m_DayOfMonth = uint8(22), .m_Minute = uint8(21)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-22 00:21"));
+		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfMonth = uint8(7), .m_Minute = uint8(22)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-07 11:22"));
+		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfMonth = uint8(7), .m_Minute = uint8(23)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-07 11:23"));
+		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfMonth = uint8(7), .m_Minute = uint8(21)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-07 12:21"));
+		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfMonth = uint8(7), .m_Minute = uint8(21)}, fs_Time("2024-10-07 23:22")), ==, fs_Time("2025-10-07 00:21"));
 		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfMonth = uint8(22), .m_Minute = uint8(23)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-22 00:23"));
 		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfMonth = uint8(22), .m_Minute = uint8(21)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-22 00:21"));
 		DMibExpect(f_Next({.m_Month = uint8(11), .m_DayOfMonth = uint8(22), .m_Minute = uint8(23)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-11-22 00:23"));
 		DMibExpect(f_Next({.m_Month = uint8(11), .m_DayOfMonth = uint8(22), .m_Minute = uint8(21)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-11-22 00:21"));
-		DMibExpect(f_Next({.m_Month = uint8(2), .m_DayOfMonth = uint8(29), .m_Minute = uint8(23)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2028-02-29 00:23"));
-		DMibExpect(f_Next({.m_Month = uint8(2), .m_DayOfMonth = uint8(29), .m_Minute = uint8(21)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2028-02-29 00:21"));
+		DMibExpect(f_Next({.m_Month = uint8(2), .m_DayOfMonth = uint8(29), .m_Minute = uint8(23)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2028-02-29 00:23"));
+		DMibExpect(f_Next({.m_Month = uint8(2), .m_DayOfMonth = uint8(29), .m_Minute = uint8(21)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2028-02-29 00:21"));
 
 		// Month DayOfWeek Minute
-		DMibExpect(f_Next({.m_Month = uint8(9), .m_DayOfWeek = uint8(5), .m_Minute = uint32(23)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-06 00:23"));
-		DMibExpect(f_Next({.m_Month = uint8(9), .m_DayOfWeek = uint8(5), .m_Minute = uint32(21)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-06 00:21"));
+		DMibExpect(f_Next({.m_Month = uint8(9), .m_DayOfWeek = uint8(5), .m_Minute = uint32(23)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-06 00:23"));
+		DMibExpect(f_Next({.m_Month = uint8(9), .m_DayOfWeek = uint8(5), .m_Minute = uint32(21)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-06 00:21"));
 		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfWeek = uint8(0), .m_Minute = uint32(22)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-07 11:22"));
 		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfWeek = uint8(0), .m_Minute = uint32(23)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-07 11:23"));
 		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfWeek = uint8(0), .m_Minute = uint32(21)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-07 12:21"));
@@ -222,10 +222,10 @@ struct CHostMonitor_Tests : public NMib::NTest::CTest
 		DMibExpect(f_Next({.m_DayOfMonth = uint8(8), .m_Hour = uint8(10), .m_Minute = uint32(23)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-08 10:23"));
 
 		// Month DayOfWeek Hour Minute
-		DMibExpect(f_Next({.m_Month = uint8(9), .m_DayOfWeek = uint8(5), .m_Hour = uint32(12), .m_Minute = uint32(21)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-06 12:21"));
-		DMibExpect(f_Next({.m_Month = uint8(9), .m_DayOfWeek = uint8(5), .m_Hour = uint32(12), .m_Minute = uint32(23)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-06 12:23"));
-		DMibExpect(f_Next({.m_Month = uint8(9), .m_DayOfWeek = uint8(5), .m_Hour = uint32(10), .m_Minute = uint32(21)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-06 10:21"));
-		DMibExpect(f_Next({.m_Month = uint8(9), .m_DayOfWeek = uint8(5), .m_Hour = uint32(10), .m_Minute = uint32(23)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-06 10:23"));
+		DMibExpect(f_Next({.m_Month = uint8(9), .m_DayOfWeek = uint8(5), .m_Hour = uint32(12), .m_Minute = uint32(21)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-06 12:21"));
+		DMibExpect(f_Next({.m_Month = uint8(9), .m_DayOfWeek = uint8(5), .m_Hour = uint32(12), .m_Minute = uint32(23)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-06 12:23"));
+		DMibExpect(f_Next({.m_Month = uint8(9), .m_DayOfWeek = uint8(5), .m_Hour = uint32(10), .m_Minute = uint32(21)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-06 10:21"));
+		DMibExpect(f_Next({.m_Month = uint8(9), .m_DayOfWeek = uint8(5), .m_Hour = uint32(10), .m_Minute = uint32(23)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-06 10:23"));
 		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfWeek = uint8(0), .m_Hour = uint32(11), .m_Minute = uint32(21)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-14 11:21"));
 		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfWeek = uint8(0), .m_Hour = uint32(11), .m_Minute = uint32(22)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-07 11:22"));
 		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfWeek = uint8(0), .m_Hour = uint32(11), .m_Minute = uint32(23)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-07 11:23"));
@@ -242,19 +242,18 @@ struct CHostMonitor_Tests : public NMib::NTest::CTest
 		DMibExpect(f_Next({.m_Month = uint8(11), .m_DayOfWeek = uint8(0), .m_Hour = uint32(10), .m_Minute = uint32(21)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-11-04 10:21"));
 		DMibExpect(f_Next({.m_Month = uint8(11), .m_DayOfWeek = uint8(0), .m_Hour = uint32(10), .m_Minute = uint32(23)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-11-04 10:23"));
 
-
 		// Month DayOfMonth Hour Minute
-		DMibExpect(f_Next({.m_Month = uint8(9), .m_DayOfMonth = uint8(22), .m_Hour = uint8(12), .m_Minute = uint32(21)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-22 12:21"));
-		DMibExpect(f_Next({.m_Month = uint8(9), .m_DayOfMonth = uint8(22), .m_Hour = uint8(12), .m_Minute = uint32(23)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-22 12:23"));
-		DMibExpect(f_Next({.m_Month = uint8(9), .m_DayOfMonth = uint8(22), .m_Hour = uint8(10), .m_Minute = uint32(21)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-22 10:21"));
-		DMibExpect(f_Next({.m_Month = uint8(9), .m_DayOfMonth = uint8(22), .m_Hour = uint8(10), .m_Minute = uint32(23)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-22 10:23"));
-		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfMonth = uint8(7), .m_Hour = uint8(11), .m_Minute = uint32(21)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-10-07 11:21"));
-		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfMonth = uint8(7), .m_Hour = uint8(11), .m_Minute = uint32(22)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-07 11:22"));
-		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfMonth = uint8(7), .m_Hour = uint8(11), .m_Minute = uint32(23)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-07 11:23"));
-		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfMonth = uint8(7), .m_Hour = uint8(12), .m_Minute = uint32(21)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-07 12:21"));
-		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfMonth = uint8(7), .m_Hour = uint8(12), .m_Minute = uint32(23)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-07 12:23"));
-		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfMonth = uint8(7), .m_Hour = uint8(10), .m_Minute = uint32(21)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-10-07 10:21"));
-		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfMonth = uint8(7), .m_Hour = uint8(10), .m_Minute = uint32(23)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-10-07 10:23"));
+		DMibExpect(f_Next({.m_Month = uint8(9), .m_DayOfMonth = uint8(22), .m_Hour = uint8(12), .m_Minute = uint32(21)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-22 12:21"));
+		DMibExpect(f_Next({.m_Month = uint8(9), .m_DayOfMonth = uint8(22), .m_Hour = uint8(12), .m_Minute = uint32(23)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-22 12:23"));
+		DMibExpect(f_Next({.m_Month = uint8(9), .m_DayOfMonth = uint8(22), .m_Hour = uint8(10), .m_Minute = uint32(21)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-22 10:21"));
+		DMibExpect(f_Next({.m_Month = uint8(9), .m_DayOfMonth = uint8(22), .m_Hour = uint8(10), .m_Minute = uint32(23)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-09-22 10:23"));
+		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfMonth = uint8(7), .m_Hour = uint8(11), .m_Minute = uint32(21)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-10-07 11:21"));
+		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfMonth = uint8(7), .m_Hour = uint8(11), .m_Minute = uint32(22)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-07 11:22"));
+		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfMonth = uint8(7), .m_Hour = uint8(11), .m_Minute = uint32(23)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-07 11:23"));
+		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfMonth = uint8(7), .m_Hour = uint8(12), .m_Minute = uint32(21)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-07 12:21"));
+		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfMonth = uint8(7), .m_Hour = uint8(12), .m_Minute = uint32(23)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-07 12:23"));
+		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfMonth = uint8(7), .m_Hour = uint8(10), .m_Minute = uint32(21)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-10-07 10:21"));
+		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfMonth = uint8(7), .m_Hour = uint8(10), .m_Minute = uint32(23)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2025-10-07 10:23"));
 		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfMonth = uint8(22), .m_Hour = uint8(12), .m_Minute = uint32(21)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-22 12:21"));
 		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfMonth = uint8(22), .m_Hour = uint8(12), .m_Minute = uint32(23)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-22 12:23"));
 		DMibExpect(f_Next({.m_Month = uint8(10), .m_DayOfMonth = uint8(22), .m_Hour = uint8(10), .m_Minute = uint32(21)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-10-22 10:21"));
@@ -263,10 +262,10 @@ struct CHostMonitor_Tests : public NMib::NTest::CTest
 		DMibExpect(f_Next({.m_Month = uint8(11), .m_DayOfMonth = uint8(22), .m_Hour = uint8(12), .m_Minute = uint32(23)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-11-22 12:23"));
 		DMibExpect(f_Next({.m_Month = uint8(11), .m_DayOfMonth = uint8(22), .m_Hour = uint8(10), .m_Minute = uint32(21)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-11-22 10:21"));
 		DMibExpect(f_Next({.m_Month = uint8(11), .m_DayOfMonth = uint8(22), .m_Hour = uint8(10), .m_Minute = uint32(23)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2024-11-22 10:23"));
-		DMibExpect(f_Next({.m_Month = uint8(2), .m_DayOfMonth = uint8(29), .m_Hour = uint8(12), .m_Minute = uint32(21)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2028-02-29 12:21"));
-		DMibExpect(f_Next({.m_Month = uint8(2), .m_DayOfMonth = uint8(29), .m_Hour = uint8(12), .m_Minute = uint32(23)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2028-02-29 12:23"));
-		DMibExpect(f_Next({.m_Month = uint8(2), .m_DayOfMonth = uint8(29), .m_Hour = uint8(10), .m_Minute = uint32(21)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2028-02-29 10:21"));
-		DMibExpect(f_Next({.m_Month = uint8(2), .m_DayOfMonth = uint8(29), .m_Hour = uint8(10), .m_Minute = uint32(23)},  fs_Time("2024-10-07 11:22")), ==, fs_Time("2028-02-29 10:23"));
+		DMibExpect(f_Next({.m_Month = uint8(2), .m_DayOfMonth = uint8(29), .m_Hour = uint8(12), .m_Minute = uint32(21)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2028-02-29 12:21"));
+		DMibExpect(f_Next({.m_Month = uint8(2), .m_DayOfMonth = uint8(29), .m_Hour = uint8(12), .m_Minute = uint32(23)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2028-02-29 12:23"));
+		DMibExpect(f_Next({.m_Month = uint8(2), .m_DayOfMonth = uint8(29), .m_Hour = uint8(10), .m_Minute = uint32(21)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2028-02-29 10:21"));
+		DMibExpect(f_Next({.m_Month = uint8(2), .m_DayOfMonth = uint8(29), .m_Hour = uint8(10), .m_Minute = uint32(23)}, fs_Time("2024-10-07 11:22")), ==, fs_Time("2028-02-29 10:23"));
 	}
 
 	void f_DoTests()

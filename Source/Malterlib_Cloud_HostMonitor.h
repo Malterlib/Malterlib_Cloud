@@ -29,7 +29,6 @@ namespace NMib::NCloud::NHostMonitor
 		void f_Stream(tf_CStream &_Stream);
 
 		auto operator <=> (CConfigFileContents_GeneralBinary const &_Right) const noexcept = default;
-
 	};
 
 	struct CConfigFileContents_Registry
@@ -128,15 +127,15 @@ namespace NMib::NCloud
 	{
 		enum EInitFlag
 		{
-			EInitFlag_None = 0
+			EInitFlag_None               = 0
 			, EInitFlag_MonitorAllMounts = DMibBit(0)
 		};
 
 		enum class EAutomaticUpdatesFlag : uint32
 		{
-			mc_None = 0
+			mc_None              = 0
 			, mc_SecurityUpdates = DMibBit(0)
-			, mc_NormalUpdates = DMibBit(1)
+			, mc_NormalUpdates   = DMibBit(1)
 			, mc_AutomaticReboot = DMibBit(2)
 		};
 
@@ -147,7 +146,7 @@ namespace NMib::NCloud
 			NStr::CStr m_Path;
 			uint64 m_WarnFree = TCLimitsInt<uint64>::mc_Max;
 			uint64 m_CriticalFree = TCLimitsInt<uint64>::mc_Max;
-			fp32 m_WarnFreePercent = 5.0; ///< Set to fp32::fs_Inf() to disable
+			fp32 m_WarnFreePercent = 5.0;     ///< Set to fp32::fs_Inf() to disable
 			fp32 m_CriticalFreePercent = 1.0; ///< Set to fp32::fs_Inf() to disable
 		};
 
@@ -225,7 +224,7 @@ namespace NMib::NCloud
 }
 
 #ifndef DMibPNoShortCuts
-	using namespace NMib::NCloud;
+using namespace NMib::NCloud;
 #endif
 
 #include "Malterlib_Cloud_HostMonitor.hpp"

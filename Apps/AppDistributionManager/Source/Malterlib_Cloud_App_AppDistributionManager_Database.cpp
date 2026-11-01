@@ -10,7 +10,7 @@ namespace NMib::NCloud::NAppDistributionManager
 	{
 		switch (_Type)
 		{
-			case EDeployDestination_FileSystem: return "FileSystem";
+		case EDeployDestination_FileSystem: return "FileSystem";
 		}
 		DMibNeverGetHere;
 		return "";

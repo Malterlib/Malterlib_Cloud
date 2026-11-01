@@ -77,22 +77,24 @@ namespace NMib::NCloud
 		}
 
 		template <typename t_CResult>
-		TCUnsafeFuture<CDebugManagerHelper::CUploadResult> f_Upload
+		auto f_Upload
 			(
 				NConcurrency::TCActorFunctor<TCFuture<t_CResult> (NConcurrency::TCAsyncGeneratorWithID<CDebugManager::CDownloadFile> _FilesGenerator)> _fDoUpload
 				, CStr _Source
 				, int32 _CompressionLevel
 			)
+			-> TCUnsafeFuture<CDebugManagerHelper::CUploadResult>
 		;
 
 		template <typename t_CResult>
-		TCUnsafeFuture<CFileTransferResult> f_Download
+		auto f_Download
 			(
 				NConcurrency::TCActorFunctor<TCFuture<t_CResult> (NConcurrency::CActorSubscription _Subscription)> _fDoDownload
 				, CStr _DestinationDirectory
-	 			, CFileTransferReceive::EReceiveFlag _ReceiveFlags
+				, CFileTransferReceive::EReceiveFlag _ReceiveFlags
 				, uint64 _QueueSize
 			)
+			-> TCUnsafeFuture<CFileTransferResult>
 		;
 
 		CIntrusiveRefCount m_RefCount;
@@ -103,12 +105,7 @@ namespace NMib::NCloud
 		uint64 m_QueueSize = 0;
 	};
 
-	CDebugManagerHelper::CDebugManagerHelper
-		(
-			CStr const &_RootDirectory
-			, uint64 _QueueSize
-			, fp64 _Timeout
-		)
+	CDebugManagerHelper::CDebugManagerHelper(CStr const &_RootDirectory, uint64 _QueueSize, fp64 _Timeout)
 		: mp_pInternal(fg_Construct(_QueueSize, _Timeout, _RootDirectory))
 	{
 	}
@@ -140,12 +137,13 @@ namespace NMib::NCloud
 	}
 
 	template <typename t_CResult>
-	TCUnsafeFuture<CDebugManagerHelper::CUploadResult> CDebugManagerHelperInternal::f_Upload
+	auto CDebugManagerHelperInternal::f_Upload
 		(
 			NConcurrency::TCActorFunctor<TCFuture<t_CResult> (NConcurrency::TCAsyncGeneratorWithID<CDebugManager::CDownloadFile> _FilesGenerator)> _fDoUpload
 			, CStr _Source
 			, int32 _CompressionLevel
 		)
+		-> TCUnsafeFuture<CDebugManagerHelper::CUploadResult>
 	{
 		auto CheckDestroy = co_await fg_CurrentActorCheckDestroyedOnResume();
 
@@ -159,8 +157,10 @@ namespace NMib::NCloud
 			)
 		;
 
-		NConcurrency::TCAsyncGeneratorWithID<CDebugManager::CDownloadFile> FilesGenerator
-			= CFileTransferSendDownloadFile::fs_TranslateGenerator<CDebugManager::CDownloadFile>(fg_Move(SendFilesResult.m_FilesGenerator))
+		NConcurrency::TCAsyncGeneratorWithID<CDebugManager::CDownloadFile> FilesGenerator = CFileTransferSendDownloadFile::fs_TranslateGenerator<CDebugManager::CDownloadFile>
+			(
+				fg_Move(SendFilesResult.m_FilesGenerator)
+			)
 		;
 		FilesGenerator.f_SetSubscription(fg_Move(SendFilesResult.m_Subscription));
 		auto TransferResultFuture = fg_Move(SendFilesResult.m_Result);
@@ -222,13 +222,14 @@ namespace NMib::NCloud
 	}
 
 	template <typename t_CResult>
-	TCUnsafeFuture<CFileTransferResult> CDebugManagerHelperInternal::f_Download
+	auto CDebugManagerHelperInternal::f_Download
 		(
 			NConcurrency::TCActorFunctor<TCFuture<t_CResult> (NConcurrency::CActorSubscription _Subscription)> _fDoDownload
 			, CStr _DestinationDirectory
 			, CFileTransferReceive::EReceiveFlag _ReceiveFlags
 			, uint64 _QueueSize
 		)
+		-> TCUnsafeFuture<CFileTransferResult>
 	{
 		auto CheckDestroy = co_await fg_CurrentActorCheckDestroyedOnResume();
 
@@ -265,13 +266,7 @@ namespace NMib::NCloud
 			)
 		;
 
-		auto Result = co_await
-			(
-				_fDoDownload(fg_Move(Subscription))
-				.f_Timeout(m_Timeout, "Timed out waiting for debug manager to reply")
-				% "Failed to start download on remote server"
-			)
-		;
+		auto Result = co_await (_fDoDownload(fg_Move(Subscription)).f_Timeout(m_Timeout, "Timed out waiting for debug manager to reply") % "Failed to start download on remote server");
 
 		if (!Result.m_FilesGenerator.f_IsValid())
 			co_return DMibErrorInstance("Download missing files generator");
@@ -298,7 +293,7 @@ namespace NMib::NCloud
 		co_return fg_Move(ReceiveResult);
 	}
 
-	TCUnsafeFuture<CDebugManagerHelper::CUploadResult> CDebugManagerHelper::f_Asset_Upload
+	auto CDebugManagerHelper::f_Asset_Upload
 		(
 			NConcurrency::TCDistributedActor<CDebugManager> _DebugManager
 			, NStr::CStr _Source
@@ -307,7 +302,9 @@ namespace NMib::NCloud
 			, CDebugManager::EUploadFlag _Flags
 			, uint64 _QueueSize
 			, int32 _CompressionLevel
-		) const
+		)
+		const
+		-> TCUnsafeFuture<CDebugManagerHelper::CUploadResult>
 	{
 		auto &Internal = *mp_pInternal;
 
@@ -331,14 +328,16 @@ namespace NMib::NCloud
 		;
 	}
 
-	TCUnsafeFuture<CFileTransferResult> CDebugManagerHelper::f_Asset_Download
+	auto CDebugManagerHelper::f_Asset_Download
 		(
 			NConcurrency::TCDistributedActor<CDebugManager> _DebugManager
 			, CDebugManager::CAssetFilter _Filter
 			, NStr::CStr _DestinationDirectory
 			, CFileTransferReceive::EReceiveFlag _ReceiveFlags
 			, uint64 _QueueSize
-		) const
+		)
+		const
+		-> TCUnsafeFuture<CFileTransferResult>
 	{
 		auto &Internal = *mp_pInternal;
 
@@ -359,7 +358,7 @@ namespace NMib::NCloud
 		;
 	}
 
-	TCUnsafeFuture<CDebugManagerHelper::CUploadResult> CDebugManagerHelper::f_CrashDump_Upload
+	auto CDebugManagerHelper::f_CrashDump_Upload
 		(
 			NConcurrency::TCDistributedActor<CDebugManager> _DebugManager
 			, NStr::CStr _Source
@@ -369,7 +368,9 @@ namespace NMib::NCloud
 			, CDebugManager::EUploadFlag _Flags
 			, uint64 _QueueSize
 			, int32 _CompressionLevel
-		) const
+		)
+		const
+		-> TCUnsafeFuture<CDebugManagerHelper::CUploadResult>
 	{
 		auto &Internal = *mp_pInternal;
 
@@ -395,14 +396,16 @@ namespace NMib::NCloud
 		;
 	}
 
-	TCUnsafeFuture<CFileTransferResult> CDebugManagerHelper::f_CrashDump_Download
+	auto CDebugManagerHelper::f_CrashDump_Download
 		(
 			NConcurrency::TCDistributedActor<CDebugManager> _DebugManager
 			, CDebugManager::CCrashDumpFilter _Filter
 			, NStr::CStr _DestinationDirectory
 			, CFileTransferReceive::EReceiveFlag _ReceiveFlags
 			, uint64 _QueueSize
-		) const
+		)
+		const
+		-> TCUnsafeFuture<CFileTransferResult>
 	{
 		auto &Internal = *mp_pInternal;
 

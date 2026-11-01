@@ -43,14 +43,7 @@ namespace NMib::NCloud::NPrivate
 
 		void f_BackupFinishedStarting();
 		void f_MarkActive(bool _bActive);
-		TCFuture<void> f_ManifestChanged
-			(
-				CStr _FileName
-				, CBackupManagerBackup::CManifestChange _ManifestChange
-				, bool _bDirty
-				, CBackupManagerClient_ChecksumState _ChecksumState
-			)
-		;
+		TCFuture<void> f_ManifestChanged(CStr _FileName, CBackupManagerBackup::CManifestChange _ManifestChange, bool _bDirty, CBackupManagerClient_ChecksumState _ChecksumState);
 
 	private:
 		struct CRunningSyncState
@@ -123,6 +116,7 @@ namespace NMib::NCloud::NPrivate
 			{
 				return *this;
 			}
+
 			bool m_bDirty = true;
 		};
 
@@ -173,13 +167,7 @@ namespace NMib::NCloud::NPrivate
 
 		void fp_SequenceWriteSyncs(CStr const &_FileName, TCFunctionMovable<void (COnScopeExitShared &&_pCleanup)> &&_fToRun);
 		void fp_SequenceReadSyncs(CStr const &_FileName, TCFunctionMovable<void (COnScopeExitShared &&_pCleanup)> &&_fToRun);
-		void fp_SequenceMultipleSyncs
-			(
-				TCFunctionMovable<void (COnScopeExitShared &&_pCleanup)> &&_fToRun
-				, TCVector<CStr> const &_WriteFiles
-				, TCVector<CStr> const &_ReadFiles
-			)
-		;
+		void fp_SequenceMultipleSyncs(TCFunctionMovable<void (COnScopeExitShared &&_pCleanup)> &&_fToRun, TCVector<CStr> const &_WriteFiles, TCVector<CStr> const &_ReadFiles);
 		void fp_RunSequencedSyncs(CStr const &_FileName);
 
 		TCSharedPointer<CCanDestroyTracker> mp_pCanDestroyTracker = fg_Construct();

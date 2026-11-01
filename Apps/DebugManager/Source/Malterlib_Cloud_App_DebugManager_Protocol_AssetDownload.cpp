@@ -39,12 +39,9 @@ namespace NMib::NCloud::NDebugManager
 
 		auto AssetGenerator = co_await
 			(
-				pThis->mp_DebugDatabase
-				(
-					&CDebugDatabase::f_Asset_List
-					, fg_ConvertToDebugDatabase<CDebugDatabase::CAssetFilter>(fg_Move(pParams->m_Filter))
-				)
-				% "Failed to list assets when downloading" % Auditor
+				pThis->mp_DebugDatabase(&CDebugDatabase::f_Asset_List, fg_ConvertToDebugDatabase<CDebugDatabase::CAssetFilter>(fg_Move(pParams->m_Filter)))
+				% "Failed to list assets when downloading"
+				% Auditor
 			)
 		;
 
@@ -53,7 +50,6 @@ namespace NMib::NCloud::NDebugManager
 			{
 				CFileTransferSend::CBasePath m_BasePath;
 				CStr m_BuildID;
-
 			};
 
 			struct CUniqueDownload

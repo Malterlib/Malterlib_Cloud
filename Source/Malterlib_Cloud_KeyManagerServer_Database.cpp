@@ -117,12 +117,7 @@ namespace NMib::NCloud
 
 	NConcurrency::TCFuture<NContainer::TCSet<NStr::CStr>> CKeyManagerServer::f_RemoveVerifiedHosts(NContainer::TCSet<NStr::CStr> _HostIDs)
 	{
-		return mp_pInternal->m_KeyManagerServerSyncInstance.m_pActor->f_RemoveVerifiedHosts
-			(
-				_HostIDs
-				, NContainer::TCSet<NStr::CStr>{}
-			)
-		;
+		return mp_pInternal->m_KeyManagerServerSyncInstance.m_pActor->f_RemoveVerifiedHosts(_HostIDs, NContainer::TCSet<NStr::CStr>{});
 	}
 
 	NConcurrency::TCFuture<NContainer::TCSet<NStr::CStr>> CKeyManagerServer::f_GetAllVerifiedHosts()

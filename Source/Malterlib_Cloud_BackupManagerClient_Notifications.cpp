@@ -10,11 +10,12 @@
 
 namespace NMib::NCloud
 {
-	NConcurrency::TCFuture<NConcurrency::CActorSubscription> CBackupManagerClient::f_SubscribeNotifications
+	auto CBackupManagerClient::f_SubscribeNotifications
 		(
 			ENotification _ToSubscribeTo
 			, NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> (NConcurrency::CHostInfo _RemoteHost, CNotification _Notification)> _fOnNotification
 		)
+		-> NConcurrency::TCFuture<NConcurrency::CActorSubscription>
 	{
 		auto &Internal = *mp_pInternal;
 		CStr SubscriptionID = NCryptography::fg_RandomID(Internal.m_NotificationSubscriptions);
@@ -90,10 +91,8 @@ namespace NMib::NCloud
 		m_pThis->fp_OnNotification({}, CBackupManagerClient::CNotification_BackupError{_Error, _bFatal});
 	}
 
-	TCFuture<TCActorSubscriptionWithID<>> CBackupManagerClient::CInternal::CDistributedAppInterfaceBackupImplementation::f_SubscribeInitialFinished
-		(
-			TCActorFunctorWithID<TCFuture<void> ()> _fOnInitialFinished
-		)
+	auto CBackupManagerClient::CInternal::CDistributedAppInterfaceBackupImplementation::f_SubscribeInitialFinished(TCActorFunctorWithID<TCFuture<void> ()> _fOnInitialFinished)
+		-> TCFuture<TCActorSubscriptionWithID<>>
 	{
 		auto &Internal = *m_pThis->mp_pInternal;
 		CStr SubscriptionID = NCryptography::fg_RandomID(Internal.m_OnInitialFinishedSubscriptions);
@@ -122,10 +121,8 @@ namespace NMib::NCloud
 		;
 	}
 
-	TCFuture<TCActorSubscriptionWithID<>> CBackupManagerClient::CInternal::CDistributedAppInterfaceBackupImplementation::f_SubscribeBackupStopped
-		(
-			TCActorFunctorWithID<TCFuture<void> ()> _fOnStopped
-		)
+	auto CBackupManagerClient::CInternal::CDistributedAppInterfaceBackupImplementation::f_SubscribeBackupStopped(TCActorFunctorWithID<TCFuture<void> ()> _fOnStopped)
+		-> TCFuture<TCActorSubscriptionWithID<>>
 	{
 		auto &Internal = *m_pThis->mp_pInternal;
 		CStr SubscriptionID = NCryptography::fg_RandomID(Internal.m_OnBackupStoppedSubscriptions);

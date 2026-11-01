@@ -420,30 +420,16 @@ namespace NMib::NCloud::NCloudClient
 			)
 		;
 
-
 		fp_BuildDefaultCommandLine_Sensor_Customizable
 			(
 				_Section
 				, "cloud-manager-"
 				, g_ActorFunctor / [this]
-				(
-					CEJsonSorted const _Params
-					, TCSharedPointer<CCommandLineControl> _pCommandLine
-					, CDistributedAppSensorReader_SensorFilter _Filter
-					, ESensorOutputFlag _Flags
-					, CStr _TableType
-				)
+				(CEJsonSorted const _Params, TCSharedPointer<CCommandLineControl> _pCommandLine, CDistributedAppSensorReader_SensorFilter _Filter, ESensorOutputFlag _Flags, CStr _TableType)
 				-> TCFuture<uint32>
 				{
 					auto SensorReaders = co_await fp_CommandLine_CloudManager_GetSensorReaders(_Params["Host"].f_String());
-					co_return co_await f_CommandLine_SensorListOutput
-						(
-							_pCommandLine
-							, fp_CommandLine_CloudManager_GetAggregatedSensors(SensorReaders, _Filter)
-							, _Flags
-							, _TableType
-						)
-					;
+					co_return co_await f_CommandLine_SensorListOutput(_pCommandLine, fp_CommandLine_CloudManager_GetAggregatedSensors(SensorReaders, _Filter), _Flags, _TableType);
 				}
 				, g_ActorFunctor / [this]
 				(
@@ -489,17 +475,7 @@ namespace NMib::NCloud::NCloudClient
 					auto SensorsGenerator = fp_CommandLine_CloudManager_GetAggregatedSensors(SensorReaders, _Filter.m_SensorFilter);
 					auto ReadingsGenerator = fp_CommandLine_CloudManager_GetAggregatedSensorReadings(SensorReaders, _Filter);
 
-					co_return co_await f_CommandLine_SensorReadingsOutput
-						(
-							_pCommandLine
-							, fg_Move(ReadingsGenerator)
-							, fg_Move(SensorsGenerator)
-							, _MaxEntries
-							, _Flags
-							, _TableType
-							, _Filter
-						)
-					;
+					co_return co_await f_CommandLine_SensorReadingsOutput(_pCommandLine, fg_Move(ReadingsGenerator), fg_Move(SensorsGenerator), _MaxEntries, _Flags, _TableType, _Filter);
 				}
 				, EDistributedAppCommandFlag_WaitForRemotes
 			)
@@ -521,15 +497,7 @@ namespace NMib::NCloud::NCloudClient
 				-> TCFuture<uint32>
 				{
 					auto LogReaders = co_await fp_CommandLine_CloudManager_GetLogReaders(_Params["Host"].f_String());
-					co_return co_await f_CommandLine_LogListOutput
-						(
-							_pCommandLine
-							, fp_CommandLine_CloudManager_GetAggregatedLogs(LogReaders, _Filter)
-							, _Flags
-							, _Verbosity
-							, _TableType
-						)
-					;
+					co_return co_await f_CommandLine_LogListOutput(_pCommandLine, fp_CommandLine_CloudManager_GetAggregatedLogs(LogReaders, _Filter), _Flags, _Verbosity, _TableType);
 				}
 				, g_ActorFunctor / [this]
 				(
@@ -547,18 +515,7 @@ namespace NMib::NCloud::NCloudClient
 					auto LogsGenerator = fp_CommandLine_CloudManager_GetAggregatedLogs(LogReaders, _Filter.m_LogFilter);
 					auto EntriesGenerator = fp_CommandLine_CloudManager_GetAggregatedLogEntries(LogReaders, _Filter);
 
-					co_return co_await f_CommandLine_LogEntriesOutput
-						(
-							_pCommandLine
-							, fg_Move(EntriesGenerator)
-							, fg_Move(LogsGenerator)
-							, _MaxEntries
-							, _Flags
-							, _Verbosity
-							, _TableType
-							, _Filter
-						)
-					;
+					co_return co_await f_CommandLine_LogEntriesOutput(_pCommandLine, fg_Move(EntriesGenerator), fg_Move(LogsGenerator), _MaxEntries, _Flags, _Verbosity, _TableType, _Filter);
 				}
 				, EDistributedAppCommandFlag_WaitForRemotes
 			)
@@ -596,13 +553,7 @@ namespace NMib::NCloud::NCloudClient
 			if (TimespanConvert.f_GetSeconds() < 10)
 				return "{}Now{}"_f << _AnsiEncoding.f_StatusNormal() << _AnsiEncoding.f_Default();
 			else if (TimespanConvert.f_GetSeconds() < 60)
-			{
-				return "{}{} seconds ago{}"_f
-					<< _AnsiEncoding.f_StatusNormal()
-					<< TimespanConvert.f_GetSeconds()
-					<< _AnsiEncoding.f_Default()
-				;
-			}
+				return "{}{} seconds ago{}"_f << _AnsiEncoding.f_StatusNormal() << TimespanConvert.f_GetSeconds() << _AnsiEncoding.f_Default();
 			else if (TimespanConvert.f_GetMinutes() < 2)
 			{
 				return "{}{}:{sj2,sf0} minutes ago{}"_f
@@ -617,22 +568,9 @@ namespace NMib::NCloud::NCloudClient
 			else if (TimespanConvert.f_GetMinutes() < 60)
 				return "{}{} minutes ago{}"_f << _AnsiEncoding.f_StatusWarning() << TimespanConvert.f_GetMinutes() << _AnsiEncoding.f_Default();
 			else if (TimespanConvert.f_GetHours() < 2)
-			{
-				return "{}{}:{sj2,sf0} hours ago{}"_f
-					<< _AnsiEncoding.f_StatusError()
-					<< TimespanConvert.f_GetHours()
-					<< TimespanConvert.f_GetMinuteOfHour()
-					<< _AnsiEncoding.f_Default()
-				;
-			}
+				return "{}{}:{sj2,sf0} hours ago{}"_f << _AnsiEncoding.f_StatusError() << TimespanConvert.f_GetHours() << TimespanConvert.f_GetMinuteOfHour() << _AnsiEncoding.f_Default();
 			else
-			{
-				return "{}{} hours ago{}"_f
-					<< _AnsiEncoding.f_StatusError()
-					<< TimespanConvert.f_GetHours()
-					<< _AnsiEncoding.f_Default()
-				;
-			}
+				return "{}{} hours ago{}"_f << _AnsiEncoding.f_StatusError() << TimespanConvert.f_GetHours() << _AnsiEncoding.f_Default();
 		}
 
 		CStr fg_FormatApplicationStatusSeverity(CStr const &_Status, CAppManagerInterface::EStatusSeverity _Severity, CAnsiEncoding const &_AnsiEncoding)
@@ -664,14 +602,7 @@ namespace NMib::NCloud::NCloudClient
 
 				CStr Status;
 				if (!_Info.m_LastConnectionError.f_IsEmpty())
-				{
-					Status = "{}Not Connected:{} {tc6} {}"_f
-						<< _AnsiEncoding.f_StatusError()
-						<< _AnsiEncoding.f_Default()
-						<< _Info.m_LastConnectionErrorTime
-						<< _Info.m_LastConnectionError
-					;
-				}
+					Status = "{}Not Connected:{} {tc6} {}"_f << _AnsiEncoding.f_StatusError() << _AnsiEncoding.f_Default() << _Info.m_LastConnectionErrorTime << _Info.m_LastConnectionError;
 				else
 					Status = "{}Not Connected{}"_f << _AnsiEncoding.f_StatusError() << _AnsiEncoding.f_Default();
 
@@ -687,7 +618,6 @@ namespace NMib::NCloud::NCloudClient
 
 			return Status;
 		}
-
 	}
 
 	bool CCloudClientAppActor::CCloudManagerAppManagerInfo::f_IsPaused(CTime const &_Now) const
@@ -705,12 +635,13 @@ namespace NMib::NCloud::NCloudClient
 		return !f_IsPaused(_Now) && (!m_bActive || !m_OtherErrors.f_IsEmpty());
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_Status_AppManagers
+	auto CCloudClientAppActor::fp_CommandLine_CloudManager_Status_AppManagers
 		(
 			CEJsonSorted const _Params
 			, TCMap<CHostInfo, TCAsyncResult<TCMap<CStr, CCloudManager::CAppManagerDynamicInfo>>> _AppManagers
 			, TCSharedPointer<CCommandLineControl> _pCommandLine
 		)
+		-> TCFuture<uint32>
 	{
 		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
 
@@ -758,10 +689,10 @@ namespace NMib::NCloud::NCloudClient
 					return true;
 
 				if
-					(
-						FilterEnvironment
-						&& fg_StrMatchWildcard(_AppManagerInfo.m_Environment.f_GetStr(), FilterEnvironment->f_GetStr()) != EMatchWildcardResult_WholeStringMatchedAndPatternExhausted
-					)
+				(
+					FilterEnvironment
+					&& fg_StrMatchWildcard(_AppManagerInfo.m_Environment.f_GetStr(), FilterEnvironment->f_GetStr()) != EMatchWildcardResult_WholeStringMatchedAndPatternExhausted
+				)
 				{
 					return true;
 				}
@@ -776,7 +707,8 @@ namespace NMib::NCloud::NCloudClient
 
 			if (!AppManagersForHost)
 			{
-				*_pCommandLine %= "{}Failed getting app managers for host{} '{}': {}\n"_f
+				*_pCommandLine
+					%= "{}Failed getting app managers for host{} '{}': {}\n"_f
 					<< AnsiEncoding.f_StatusError()
 					<< AnsiEncoding.f_Default()
 					<< HostInfo.f_GetDescColored(_pCommandLine->m_AnsiFlags)
@@ -831,7 +763,8 @@ namespace NMib::NCloud::NCloudClient
 			if (CTimeSpanConvert(LastSeenTimespan).f_GetSeconds() >= 10)
 				LastSeen += "\n{}"_f << AppManagerInfo.m_LastSeen;
 
-			CStr Version = "{}{}{} {}{td}{}"_f
+			CStr Version
+				= "{}{}{} {}{td}{}"_f
 				<< AnsiEncoding.f_Foreground256(221)
 				<< AppManagerInfo.m_Version
 				<< AnsiEncoding.f_Default()
@@ -864,13 +797,14 @@ namespace NMib::NCloud::NCloudClient
 		co_return Return;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_Status_Applications
+	auto CCloudClientAppActor::fp_CommandLine_CloudManager_Status_Applications
 		(
 			CEJsonSorted const _Params
 			, TCMap<CHostInfo, TCAsyncResult<TCMap<CCloudManager::CApplicationKey, CCloudManager::CApplicationInfo>>> _Applications
 			, TCMap<CStr, CCloudManagerAppManagerInfo> _AppManagerInfos
 			, TCSharedPointer<CCommandLineControl> _pCommandLine
 		)
+		-> TCFuture<uint32>
 	{
 		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
 
@@ -979,10 +913,10 @@ namespace NMib::NCloud::NCloudClient
 				}
 
 				if
-					(
-						FilterEnvironment
-						&& fg_StrMatchWildcard(_AppManagerInfo.m_Environment.f_GetStr(), FilterEnvironment->f_GetStr()) != EMatchWildcardResult_WholeStringMatchedAndPatternExhausted
-					)
+				(
+					FilterEnvironment
+					&& fg_StrMatchWildcard(_AppManagerInfo.m_Environment.f_GetStr(), FilterEnvironment->f_GetStr()) != EMatchWildcardResult_WholeStringMatchedAndPatternExhausted
+				)
 				{
 					return true;
 				}
@@ -995,15 +929,8 @@ namespace NMib::NCloud::NCloudClient
 
 				if (FilterOutOfDateVersion && *FilterOutOfDateVersion)
 				{
-					if
-						(
-							!fHasFailedVersion(_ApplicationInfo)
-							&& !fShouldHaveOtherVersion(_ApplicationInfo)
-							&& !fHasNewerVersion(_ApplicationInfo)
-						)
-					{
+					if (!fHasFailedVersion(_ApplicationInfo) && !fShouldHaveOtherVersion(_ApplicationInfo) && !fHasNewerVersion(_ApplicationInfo))
 						return true;
-					}
 				}
 
 				return false;
@@ -1016,7 +943,8 @@ namespace NMib::NCloud::NCloudClient
 
 			if (!ApplicationsForHost)
 			{
-				*_pCommandLine %= "{}Failed getting applications for host{} '{}': {}\n"_f
+				*_pCommandLine
+					%= "{}Failed getting applications for host{} '{}': {}\n"_f
 					<< AnsiEncoding.f_StatusError()
 					<< AnsiEncoding.f_Default()
 					<< HostInfo.f_GetDescColored(_pCommandLine->m_AnsiFlags)
@@ -1082,7 +1010,8 @@ namespace NMib::NCloud::NCloudClient
 			CStr Status;
 			if (AppManagerInfo.f_HasErrors(Now))
 			{
-				Status = "{2}Application Status{3} (potentially outdated)\n{}\n\n{2}App Manager{3}\n{}"_f
+				Status
+					= "{2}Application Status{3} (potentially outdated)\n{}\n\n{2}App Manager{3}\n{}"_f
 					<< ApplicationStatus
 					<< fg_FormatAppManagerStatus(AppManagerInfo, AnsiEncoding, Now)
 					<< AnsiEncoding.f_Bold()
@@ -1092,7 +1021,8 @@ namespace NMib::NCloud::NCloudClient
 			else
 				Status = ApplicationStatus;
 
-			CStr Version = "{}{}{} {}{td}{}"_f
+			CStr Version
+				= "{}{}{} {}{td}{}"_f
 				<< AnsiEncoding.f_Foreground256(221)
 				<< ApplicationInfo.m_Version.m_VersionID
 				<< AnsiEncoding.f_Default()
@@ -1104,7 +1034,8 @@ namespace NMib::NCloud::NCloudClient
 			CStr FailedVersion;
 			if (fHasFailedVersion(ApplicationInfo))
 			{
-				FailedVersion = "{}{}{} {}{td}{}\n{}"_f
+				FailedVersion
+					= "{}{}{} {}{td}{}\n{}"_f
 					<< AnsiEncoding.f_StatusError()
 					<< ApplicationInfo.m_FailedVersion.m_VersionID
 					<< AnsiEncoding.f_Default()
@@ -1120,7 +1051,8 @@ namespace NMib::NCloud::NCloudClient
 			CStr WantVersion;
 			if (fShouldHaveOtherVersion(ApplicationInfo))
 			{
-				WantVersion = "{}{}{} {}{td}{}"_f
+				WantVersion
+					= "{}{}{} {}{td}{}"_f
 					<< AnsiEncoding.f_StatusWarning()
 					<< ApplicationInfo.m_WantVersion.m_VersionID
 					<< AnsiEncoding.f_Default()
@@ -1134,7 +1066,8 @@ namespace NMib::NCloud::NCloudClient
 			CStr NewestVersion;
 			if (fHasNewerVersion(ApplicationInfo))
 			{
-				NewestVersion = "{}{}{} {}{td}{}"_f
+				NewestVersion
+					= "{}{}{} {}{td}{}"_f
 					<< AnsiEncoding.f_Foreground256(208)
 					<< ApplicationInfo.m_NewestUnconditionalVersion.m_VersionID
 					<< AnsiEncoding.f_Default()
@@ -1178,12 +1111,8 @@ namespace NMib::NCloud::NCloudClient
 		co_return Return;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_Status
-		(
-			CEJsonSorted const _Params
-			, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine
-			, ECloudManagerStatusFlag _Flags
-		)
+	auto CCloudClientAppActor::fp_CommandLine_CloudManager_Status(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine, ECloudManagerStatusFlag _Flags)
+		-> TCFuture<uint32>
 	{
 		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
 
@@ -1199,14 +1128,12 @@ namespace NMib::NCloud::NCloudClient
 			if (!Host.f_IsEmpty() && TrustedCloudManager.m_TrustInfo.m_HostInfo.m_HostID != Host)
 				continue;
 			auto &CloudManager = TrustedCloudManager.m_Actor;
-			CloudManager.f_CallActor(&CCloudManager::f_EnumAppManagers)()
-				.f_Timeout(mp_Timeout, "Timed out waiting for cloud manager to reply")
+			CloudManager.f_CallActor(&CCloudManager::f_EnumAppManagers)().f_Timeout(mp_Timeout, "Timed out waiting for cloud manager to reply")
 				> AppManagersResults[TrustedCloudManager.m_TrustInfo.m_HostInfo]
 			;
 			if (_Flags & ECloudManagerStatusFlag_Applications)
 			{
-				CloudManager.f_CallActor(&CCloudManager::f_EnumApplications)()
-					.f_Timeout(mp_Timeout, "Timed out waiting for cloud manager to reply")
+				CloudManager.f_CallActor(&CCloudManager::f_EnumApplications)().f_Timeout(mp_Timeout, "Timed out waiting for cloud manager to reply")
 					> ApplicationsResults[TrustedCloudManager.m_TrustInfo.m_HostInfo]
 				;
 			}
@@ -1489,8 +1416,7 @@ namespace NMib::NCloud::NCloudClient
 				continue;
 
 			auto &CloudManager = TrustedCloudManager.m_Actor;
-			CloudManager.f_CallActor(&CCloudManager::f_EnumExpectedOsVersions)()
-				.f_Timeout(mp_Timeout, "Timed out waiting for cloud manager to reply")
+			CloudManager.f_CallActor(&CCloudManager::f_EnumExpectedOsVersions)().f_Timeout(mp_Timeout, "Timed out waiting for cloud manager to reply")
 				> Results[TrustedCloudManager.m_TrustInfo.m_HostInfo]
 			;
 		}
@@ -1563,10 +1489,10 @@ namespace NMib::NCloud::NCloudClient
 
 		CCloudManager::CCurrentVersion CurrentVersion;
 
-		if (auto *pValue =_Params.f_GetMember("CurrentVersionMajor"))
+		if (auto *pValue = _Params.f_GetMember("CurrentVersionMajor"))
 			CurrentVersion.m_Major = pValue->f_Integer();
 
-		if (auto *pValue =_Params.f_GetMember("CurrentVersionMinor"))
+		if (auto *pValue = _Params.f_GetMember("CurrentVersionMinor"))
 		{
 			if (!CurrentVersion.m_Major)
 				co_return DMibErrorInstance("You have to specify --apply-to-version-major if you specify --apply-to-version-minor");
@@ -1578,14 +1504,14 @@ namespace NMib::NCloud::NCloudClient
 		if (bDeprecated)
 			ExpectedVersion.f_SetDeprecated();
 
-		if (auto *pValue =_Params.f_GetMember("MinVersion"))
+		if (auto *pValue = _Params.f_GetMember("MinVersion"))
 		{
 			if (bDeprecated)
 				co_return DMibErrorInstance("--min-version cannoct be specified when deprecated is set");
 			ExpectedVersion.m_Min = co_await CCloudManager::CVersion::fs_ParseVersion(pValue->f_String());
 		}
 
-		if (auto *pValue =_Params.f_GetMember("MaxVersion"))
+		if (auto *pValue = _Params.f_GetMember("MaxVersion"))
 		{
 			if (bDeprecated)
 				co_return DMibErrorInstance("--max-version cannoct be specified when deprecated is set");
@@ -1600,9 +1526,7 @@ namespace NMib::NCloud::NCloudClient
 				continue;
 
 			auto &CloudManager = TrustedCloudManager.m_Actor;
-			(CloudManager.f_CallActor(&CCloudManager::f_SetExpectedOsVersions)(OsName, CurrentVersion, ExpectedVersion) % ("{}"_f << TrustedCloudManager.m_TrustInfo.m_HostInfo))
-				> Results
-			;
+			(CloudManager.f_CallActor(&CCloudManager::f_SetExpectedOsVersions)(OsName, CurrentVersion, ExpectedVersion) % ("{}"_f << TrustedCloudManager.m_TrustInfo.m_HostInfo)) > Results;
 		}
 
 		co_await fg_AllDone(Results);
@@ -1624,8 +1548,7 @@ namespace NMib::NCloud::NCloudClient
 			if (!_Host.f_IsEmpty() && TrustedCloudManager.m_TrustInfo.m_HostInfo.m_HostID != _Host)
 				continue;
 			auto &CloudManager = TrustedCloudManager.m_Actor;
-			CloudManager.f_CallActor(&CCloudManager::f_GetSensorReader)()
-				.f_Timeout(mp_Timeout, "Timed out waiting for cloud manager to reply")
+			CloudManager.f_CallActor(&CCloudManager::f_GetSensorReader)().f_Timeout(mp_Timeout, "Timed out waiting for cloud manager to reply")
 				> SensorReaders[TrustedCloudManager.m_TrustInfo.m_HostInfo]
 			;
 		}
@@ -1633,11 +1556,12 @@ namespace NMib::NCloud::NCloudClient
 		co_return fg_Construct(co_await fg_AllDone(SensorReaders));
 	}
 
-	TCAsyncGenerator<TCVector<CDistributedAppSensorReporter::CSensorInfo>> CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedSensors
+	auto CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedSensors
 		(
 			TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>>> _pSensorReaders
 			, CDistributedAppSensorReader_SensorFilter _Filter
 		)
+		-> TCAsyncGenerator<TCVector<CDistributedAppSensorReporter::CSensorInfo>>
 	{
 		TCFutureVector<TCAsyncGenerator<TCVector<CDistributedAppSensorReporter::CSensorInfo>>> SensorsResults;
 
@@ -1668,11 +1592,12 @@ namespace NMib::NCloud::NCloudClient
 		co_return {};
 	}
 
-	TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>> CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedSensorStatus
+	auto CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedSensorStatus
 		(
 			TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>>> _pSensorReaders
 			, CDistributedAppSensorReader_SensorStatusFilter _Filter
 		)
+		-> TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>>
 	{
 		TCFutureVector<TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>>> StatusResults;
 
@@ -1708,11 +1633,12 @@ namespace NMib::NCloud::NCloudClient
 		co_return {};
 	}
 
-	TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>> CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedSensorReadings
+	auto CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedSensorReadings
 		(
 			TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>>> _pSensorReaders
 			, CDistributedAppSensorReader_SensorReadingFilter _Filter
 		)
+		-> TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>>
 	{
 		TCFutureVector<TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>>> ReadingsResults;
 
@@ -1755,7 +1681,8 @@ namespace NMib::NCloud::NCloudClient
 								co_return {};
 							}
 						)
-					).f_GetPipelinedIterator()
+					)
+					.f_GetPipelinedIterator()
 				)
 			;
 		}
@@ -1854,8 +1781,7 @@ namespace NMib::NCloud::NCloudClient
 			if (!_Host.f_IsEmpty() && TrustedCloudManager.m_TrustInfo.m_HostInfo.m_HostID != _Host)
 				continue;
 			auto &CloudManager = TrustedCloudManager.m_Actor;
-			CloudManager.f_CallActor(&CCloudManager::f_GetLogReader)()
-				.f_Timeout(mp_Timeout, "Timed out waiting for cloud manager to reply")
+			CloudManager.f_CallActor(&CCloudManager::f_GetLogReader)().f_Timeout(mp_Timeout, "Timed out waiting for cloud manager to reply")
 				> LogReaders[TrustedCloudManager.m_TrustInfo.m_HostInfo]
 			;
 		}
@@ -1863,11 +1789,12 @@ namespace NMib::NCloud::NCloudClient
 		co_return fg_Construct(co_await fg_AllDone(LogReaders));
 	}
 
-	TCAsyncGenerator<TCVector<CDistributedAppLogReporter::CLogInfo>> CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedLogs
+	auto CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedLogs
 		(
 			TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppLogReader>>> _pLogReaders
 			, CDistributedAppLogReader_LogFilter _Filter
 		)
+		-> TCAsyncGenerator<TCVector<CDistributedAppLogReporter::CLogInfo>>
 	{
 		TCFutureVector<TCAsyncGenerator<TCVector<CDistributedAppLogReporter::CLogInfo>>> LogsResults;
 
@@ -1898,11 +1825,12 @@ namespace NMib::NCloud::NCloudClient
 		co_return {};
 	}
 
-	TCAsyncGenerator<TCVector<CDistributedAppLogReader_LogKeyAndEntry>> CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedLogEntries
+	auto CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedLogEntries
 		(
 			TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppLogReader>>> _pLogReaders
 			, CDistributedAppLogReader_LogEntryFilter _Filter
 		)
+		-> TCAsyncGenerator<TCVector<CDistributedAppLogReader_LogKeyAndEntry>>
 	{
 		TCFutureVector<TCAsyncGenerator<TCVector<CDistributedAppLogReader_LogKeyAndEntry>>> EntriesResults;
 
@@ -1945,7 +1873,8 @@ namespace NMib::NCloud::NCloudClient
 								co_return {};
 							}
 						)
-					).f_GetPipelinedIterator()
+					)
+					.f_GetPipelinedIterator()
 				)
 			;
 		}
@@ -1954,17 +1883,9 @@ namespace NMib::NCloud::NCloudClient
 			(CDistributedAppLogReader_LogKeyAndEntry const &_Left, CDistributedAppLogReader_LogKeyAndEntry const &_Right)
 			{
 				if (bNewestFirst)
-				{
-					return fg_TupleReferences(_Right.m_Entry.m_Timestamp, _Right.m_Entry.m_UniqueSequence)
-						< fg_TupleReferences(_Left.m_Entry.m_Timestamp, _Left.m_Entry.m_UniqueSequence)
-					;
-				}
+					return fg_TupleReferences(_Right.m_Entry.m_Timestamp, _Right.m_Entry.m_UniqueSequence) < fg_TupleReferences(_Left.m_Entry.m_Timestamp, _Left.m_Entry.m_UniqueSequence);
 				else
-				{
-					return fg_TupleReferences(_Left.m_Entry.m_Timestamp, _Left.m_Entry.m_UniqueSequence)
-						< fg_TupleReferences(_Right.m_Entry.m_Timestamp, _Right.m_Entry.m_UniqueSequence)
-					;
-				}
+					return fg_TupleReferences(_Left.m_Entry.m_Timestamp, _Left.m_Entry.m_UniqueSequence) < fg_TupleReferences(_Right.m_Entry.m_Timestamp, _Right.m_Entry.m_UniqueSequence);
 			}
 		;
 

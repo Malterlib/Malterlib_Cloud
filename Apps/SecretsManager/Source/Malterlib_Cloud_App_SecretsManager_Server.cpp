@@ -261,7 +261,7 @@ namespace NMib::NCloud::NSecretsManager
 		)
 	{
 		auto &PermissionCollection = o_Permissions[CStr::fs_ToStr(_ID)];
-		CStr SemanticPart{ _SemanticID ? fg_Format("SemanticID/{}", _SemanticID) : CStr("NoSemanticID")};
+		CStr SemanticPart{_SemanticID ? fg_Format("SemanticID/{}", _SemanticID) : CStr("NoSemanticID")};
 		CStr Description = fg_GetPermissionsDescription(_SemanticID, _Tags);
 
 		if (_Tags.f_IsEmpty())
@@ -301,7 +301,7 @@ namespace NMib::NCloud::NSecretsManager
 		}
 	}
 
-	void CSecretsManagerDaemonActor::CServer::fp_UpdateTags(TCSet<CStrSecure> const &_TagsToRemove,TCSet<CStrSecure> const &_TagsToAdd)
+	void CSecretsManagerDaemonActor::CServer::fp_UpdateTags(TCSet<CStrSecure> const &_TagsToRemove, TCSet<CStrSecure> const &_TagsToAdd)
 	{
 		// Filter out tags in both sets to avoid unnecessary permission registrations
 		TCSet<CStr> InBoth;
@@ -383,7 +383,8 @@ namespace NMib::NCloud::NSecretsManager
 					if (CFile::fs_FileExists(FileName))
 						CFile::fs_DeleteFile(FileName);
 				}
-			).f_Wrap()
+			)
+			.f_Wrap()
 		;
 
 		if (!Result)

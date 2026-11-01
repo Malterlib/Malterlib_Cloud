@@ -18,12 +18,7 @@ namespace NMib::NCloud::NCloudAPIManager
 	{
 		CDistributedAppActor::fp_BuildCommandLine(o_CommandLine);
 
-		o_CommandLine.f_SetProgramDescription
-			(
-				"Malterlib Cloud Cloud API Manager"
-				, "Manages updates for Malterlib cloud apps."
-			)
-		;
+		o_CommandLine.f_SetProgramDescription("Malterlib Cloud Cloud API Manager", "Manages updates for Malterlib cloud apps.");
 
 		auto DefaultSection = o_CommandLine.f_GetDefaultSection();
 		(void)DefaultSection;

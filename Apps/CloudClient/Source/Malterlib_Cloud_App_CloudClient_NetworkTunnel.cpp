@@ -12,7 +12,7 @@
 #include "Malterlib_Cloud_App_CloudClient.h"
 
 #ifdef DPlatformFamily_Windows
-#include <Mib/Core/PlatformSpecific/WindowsFilePath>
+#	include <Mib/Core/PlatformSpecific/WindowsFilePath>
 #endif
 
 namespace NMib::NCloud::NCloudClient
@@ -221,7 +221,8 @@ namespace NMib::NCloud::NCloudClient
 								auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
 								ActionString = "{}Connected{}"_f << AnsiEncoding.f_StatusNormal() << AnsiEncoding.f_Default();
 
-								*_pCommandLine += "<{}> ({}) {{{}} {} {}\n"_f
+								*_pCommandLine
+									+= "<{}> ({}) {{{}} {} {}\n"_f
 									<< _CallbackInfo.m_RemoteHostID
 									<< _CallbackInfo.m_ConnectionID
 									<< TunnelName
@@ -241,7 +242,8 @@ namespace NMib::NCloud::NCloudClient
 								auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
 								ActionString = "{}Closed   {}"_f << AnsiEncoding.f_StatusWarning() << AnsiEncoding.f_Default();
 
-								*_pCommandLine += "<{}> ({}) {{{}} {} {} {}\n"_f
+								*_pCommandLine
+									+= "<{}> ({}) {{{}} {} {} {}\n"_f
 									<< _CallbackInfo.m_RemoteHostID
 									<< _CallbackInfo.m_ConnectionID
 									<< TunnelName
@@ -258,7 +260,8 @@ namespace NMib::NCloud::NCloudClient
 								auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
 								ActionString = "{}Error    {}"_f << AnsiEncoding.f_StatusError() << AnsiEncoding.f_Default();
 
-								*_pCommandLine += "<{}> ({}) {{{}} {} {} {}\n"_f
+								*_pCommandLine
+									+= "<{}> ({}) {{{}} {} {} {}\n"_f
 									<< _CallbackInfo.m_RemoteHostID
 									<< _CallbackInfo.m_ConnectionID
 									<< TunnelName

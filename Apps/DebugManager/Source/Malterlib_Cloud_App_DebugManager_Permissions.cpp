@@ -23,7 +23,7 @@ namespace NMib::NCloud::NDebugManager
 		Permissions["DebugManager/DeleteCrashDump"];
 		Permissions["DebugManager/DeleteAsset"];
 
-		co_await mp_State.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, Permissions);;
+		co_await mp_State.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, Permissions);
 
 		TCVector<CStr> SubscribePermissions;
 		SubscribePermissions.f_Insert("DebugManager/*");

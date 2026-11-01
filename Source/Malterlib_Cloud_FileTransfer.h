@@ -28,9 +28,9 @@ namespace NMib::NCloud
 		CFileTransferContextDeprecated();
 		~CFileTransferContextDeprecated();
 		CFileTransferContextDeprecated(CFileTransferContextDeprecated const &_Other) = delete;
-		CFileTransferContextDeprecated &operator =(CFileTransferContextDeprecated const &_Other) = delete;
+		CFileTransferContextDeprecated &operator = (CFileTransferContextDeprecated const &_Other) = delete;
 		CFileTransferContextDeprecated(CFileTransferContextDeprecated &&_Other);
-		CFileTransferContextDeprecated &operator =(CFileTransferContextDeprecated &&_Other);
+		CFileTransferContextDeprecated &operator = (CFileTransferContextDeprecated &&_Other);
 		static bool fs_IsSafeRelativePath(NStr::CStr const &_String, NStr::CStr &o_Error);
 		void f_Feed(NConcurrency::CDistributedActorWriteStream &_Stream) const;
 		void f_Consume(NConcurrency::CDistributedActorReadStream &_Stream);
@@ -113,10 +113,10 @@ namespace NMib::NCloud
 	{
 		enum EReceiveFlag
 		{
-			EReceiveFlag_None = 0
-			, EReceiveFlag_IgnoreExisting = DMibBit(0)
-			, EReceiveFlag_FailOnExisting = DMibBit(1)
-			, EReceiveFlag_DeleteExisting = DMibBit(2)
+			EReceiveFlag_None                  = 0
+			, EReceiveFlag_IgnoreExisting      = DMibBit(0)
+			, EReceiveFlag_FailOnExisting      = DMibBit(1)
+			, EReceiveFlag_DeleteExisting      = DMibBit(2)
 			, EReceiveFlag_DecompressZstandard = DMibBit(3)
 		};
 
@@ -144,7 +144,7 @@ namespace NMib::NCloud
 }
 
 #ifndef DMibPNoShortCuts
-	using namespace NMib::NCloud;
+using namespace NMib::NCloud;
 #endif
 
 #include "Malterlib_Cloud_FileTransfer.hpp"

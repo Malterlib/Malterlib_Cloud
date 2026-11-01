@@ -44,7 +44,7 @@ namespace NMib::NCloud::NCloudClient
 
 		enum ECloudManagerStatusFlag
 		{
-			ECloudManagerStatusFlag_AppManagers = DBit(0)
+			ECloudManagerStatusFlag_AppManagers    = DBit(0)
 			, ECloudManagerStatusFlag_Applications = DBit(1)
 		};
 
@@ -80,24 +80,26 @@ namespace NMib::NCloud::NCloudClient
 		void fp_SecretsManager_RegisterCommands(CDistributedAppCommandLineSpecification::CSection _Section);
 		TCFuture<void> fp_SecretsManager_SubscribeToServers();
 		static bool fsp_SecretsManager_GetID(CEJsonSorted const &_Params, CSecretsManager::CSecretID &o_ID, CStr &o_Error);
-		static NStr::CStr fsp_SecretsManager_CheckExpectedFormat
+		static auto fsp_SecretsManager_CheckExpectedFormat
 			(
 				CSecretsManager::CSecret const &_Secret
 				, NStr::CStr const &_ExpectedFormat
 				, bool _bBinaryAsBase64
 				, TCOptional<CStrSecure> const &_MapKey
 			)
+			-> NStr::CStr
 		;
-		static NStr::CStr fsp_SecretsManager_OutputSecret
+		static auto fsp_SecretsManager_OutputSecret
 			(
 				NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine
 				, CSecretsManager::CSecret const &_Secret
 				, bool _bBinaryAsBase64
 				, TCOptional<CStrSecure> const &_MapKey
 			)
+			-> NStr::CStr
 		;
 
-		template<typename tf_CType>
+		template <typename tf_CType>
 		TCFuture<uint32> fp_CommandLine_SecretsManager_EnumerateImpl
 		(
 			CEJsonSorted const _Params
@@ -126,7 +128,7 @@ namespace NMib::NCloud::NCloudClient
 			> _fOnResult
 		);
 
-		template<typename tf_CType>
+		template <typename tf_CType>
 		TCFuture<uint32> fp_CommandLine_SecretsManager_GetImpl
 			(
 				CEJsonSorted const _Params
@@ -170,20 +172,22 @@ namespace NMib::NCloud::NCloudClient
 		void fp_CloudManager_RegisterCommands(CDistributedAppCommandLineSpecification::CSection _Section);
 		TCFuture<void> fp_CloudManager_SubscribeToServers();
 		TCFuture<uint32> fp_CommandLine_CloudManager_Status(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine, ECloudManagerStatusFlag _Flags);
-		TCFuture<uint32> fp_CommandLine_CloudManager_Status_AppManagers
+		auto fp_CommandLine_CloudManager_Status_AppManagers
 			(
 				CEJsonSorted const _Params
 				, TCMap<CHostInfo, TCAsyncResult<TCMap<CStr, CCloudManager::CAppManagerDynamicInfo>>> _AppManagers
 				, TCSharedPointer<CCommandLineControl> _pCommandLine
 			)
+			-> TCFuture<uint32>
 		;
-		TCFuture<uint32> fp_CommandLine_CloudManager_Status_Applications
+		auto fp_CommandLine_CloudManager_Status_Applications
 			(
 				CEJsonSorted const _Params
 				, TCMap<CHostInfo, TCAsyncResult<TCMap<CCloudManager::CApplicationKey, CCloudManager::CApplicationInfo>>> _Applications
 				, TCMap<CStr, CCloudManagerAppManagerInfo> _AppManagerInfos
 				, TCSharedPointer<CCommandLineControl> _pCommandLine
 			)
+			-> TCFuture<uint32>
 		;
 		TCFuture<uint32> fp_CommandLine_CloudManager_RemoveAppManager(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_CloudManager_RemoveSensor(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
@@ -193,37 +197,42 @@ namespace NMib::NCloud::NCloudClient
 		TCFuture<uint32> fp_CommandLine_CloudManager_ExpectedOsVersionSet(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 
 		TCFuture<TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>>>> fp_CommandLine_CloudManager_GetSensorReaders(CStr _Host);
-		TCAsyncGenerator<TCVector<CDistributedAppSensorReporter::CSensorInfo>> fp_CommandLine_CloudManager_GetAggregatedSensors
+		auto fp_CommandLine_CloudManager_GetAggregatedSensors
 			(
 				TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>>> _pSensorReaders
 				, CDistributedAppSensorReader_SensorFilter _Filter
 			)
+			-> TCAsyncGenerator<TCVector<CDistributedAppSensorReporter::CSensorInfo>>
 		;
-		TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>> fp_CommandLine_CloudManager_GetAggregatedSensorStatus
+		auto fp_CommandLine_CloudManager_GetAggregatedSensorStatus
 			(
 				TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>>> _pSensorReaders
 				, CDistributedAppSensorReader_SensorStatusFilter _Filter
 			)
+			-> TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>>
 		;
-		TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>> fp_CommandLine_CloudManager_GetAggregatedSensorReadings
+		auto fp_CommandLine_CloudManager_GetAggregatedSensorReadings
 			(
 				TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>>> _pSensorReaders
 				, CDistributedAppSensorReader_SensorReadingFilter _Filter
 			)
+			-> TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>>
 		;
 
 		TCFuture<TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppLogReader>>>> fp_CommandLine_CloudManager_GetLogReaders(CStr _Host);
-		TCAsyncGenerator<TCVector<CDistributedAppLogReporter::CLogInfo>> fp_CommandLine_CloudManager_GetAggregatedLogs
+		auto fp_CommandLine_CloudManager_GetAggregatedLogs
 			(
 				TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppLogReader>>> _pLogReaders
 				, CDistributedAppLogReader_LogFilter _Filter
 			)
+			-> TCAsyncGenerator<TCVector<CDistributedAppLogReporter::CLogInfo>>
 		;
-		TCAsyncGenerator<TCVector<CDistributedAppLogReader_LogKeyAndEntry>> fp_CommandLine_CloudManager_GetAggregatedLogEntries
+		auto fp_CommandLine_CloudManager_GetAggregatedLogEntries
 			(
 				TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppLogReader>>> _pLogReaders
 				, CDistributedAppLogReader_LogEntryFilter _Filter
 			)
+			-> TCAsyncGenerator<TCVector<CDistributedAppLogReader_LogKeyAndEntry>>
 		;
 
 		// Debug Manager

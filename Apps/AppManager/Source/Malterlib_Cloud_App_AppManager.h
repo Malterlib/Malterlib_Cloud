@@ -56,36 +56,36 @@ namespace NMib::NCloud::NAppManager
 
 		enum EApplicationSetting
 		{
-			EApplicationSetting_None = 0
-			, EApplicationSetting_Executable = DBit(0)
-			, EApplicationSetting_ExecutableParameters = DBit(1)
-			, EApplicationSetting_RunAsUser = DBit(2)
-			, EApplicationSetting_RunAsGroup = DBit(3)
-			, EApplicationSetting_VersionManagerApplication = DBit(4)
-			, EApplicationSetting_UpdateTags = DBit(5)
-			, EApplicationSetting_UpdateBranches = DBit(6)
-			, EApplicationSetting_UpdateScript_PreUpdate = DBit(7)
-			, EApplicationSetting_UpdateScript_PostUpdate = DBit(8)
-			, EApplicationSetting_UpdateScript_PostLaunch = DBit(9)
-			, EApplicationSetting_UpdateScript_OnError = DBit(10)
-			, EApplicationSetting_SelfUpdateSource = DBit(11)
-			, EApplicationSetting_EncryptionStorage = DBit(12)
-			, EApplicationSetting_ParentApplication = DBit(13)
-			, EApplicationSetting_EncryptionFileSystem = DBit(14)
-			, EApplicationSetting_UpdateGroup = DBit(15)
-			, EApplicationSetting_DistributedApp = DBit(16)
-			, EApplicationSetting_Dependencies = DBit(17)
-			, EApplicationSetting_StopOnDependencyFailure = DBit(18)
-			, EApplicationSetting_BackupIncludeWildcards = DBit(19)
-			, EApplicationSetting_BackupExcludeWildcards = DBit(20)
-			, EApplicationSetting_BackupAddSyncFlagsWildcards = DBit(21)
+			EApplicationSetting_None                             = 0
+			, EApplicationSetting_Executable                     = DBit(0)
+			, EApplicationSetting_ExecutableParameters           = DBit(1)
+			, EApplicationSetting_RunAsUser                      = DBit(2)
+			, EApplicationSetting_RunAsGroup                     = DBit(3)
+			, EApplicationSetting_VersionManagerApplication      = DBit(4)
+			, EApplicationSetting_UpdateTags                     = DBit(5)
+			, EApplicationSetting_UpdateBranches                 = DBit(6)
+			, EApplicationSetting_UpdateScript_PreUpdate         = DBit(7)
+			, EApplicationSetting_UpdateScript_PostUpdate        = DBit(8)
+			, EApplicationSetting_UpdateScript_PostLaunch        = DBit(9)
+			, EApplicationSetting_UpdateScript_OnError           = DBit(10)
+			, EApplicationSetting_SelfUpdateSource               = DBit(11)
+			, EApplicationSetting_EncryptionStorage              = DBit(12)
+			, EApplicationSetting_ParentApplication              = DBit(13)
+			, EApplicationSetting_EncryptionFileSystem           = DBit(14)
+			, EApplicationSetting_UpdateGroup                    = DBit(15)
+			, EApplicationSetting_DistributedApp                 = DBit(16)
+			, EApplicationSetting_Dependencies                   = DBit(17)
+			, EApplicationSetting_StopOnDependencyFailure        = DBit(18)
+			, EApplicationSetting_BackupIncludeWildcards         = DBit(19)
+			, EApplicationSetting_BackupExcludeWildcards         = DBit(20)
+			, EApplicationSetting_BackupAddSyncFlagsWildcards    = DBit(21)
 			, EApplicationSetting_BackupRemoveSyncFlagsWildcards = DBit(22)
-			, EApplicationSetting_BackupNewBackupInterval = DBit(23)
-			, EApplicationSetting_BackupEnabled = DBit(24)
-			, EApplicationSetting_RunAsUserPassword = DBit(25)
-			, EApplicationSetting_RunAsUserHasShell = DBit(26)
-			, EApplicationSetting_AutoUpdate = DBit(27)
-			, EApplicationSetting_LaunchInProcess = DBit(28)
+			, EApplicationSetting_BackupNewBackupInterval        = DBit(23)
+			, EApplicationSetting_BackupEnabled                  = DBit(24)
+			, EApplicationSetting_RunAsUserPassword              = DBit(25)
+			, EApplicationSetting_RunAsUserHasShell              = DBit(26)
+			, EApplicationSetting_AutoUpdate                     = DBit(27)
+			, EApplicationSetting_LaunchInProcess                = DBit(28)
 			, EApplicationSetting_NeedUpdateSettings
 			= EApplicationSetting_Executable
 			| EApplicationSetting_ExecutableParameters
@@ -97,10 +97,10 @@ namespace NMib::NCloud::NAppManager
 
 		enum EStopFlag
 		{
-			EStopFlag_None = 0
-			, EStopFlag_CloseEncryption = DBit(0)
-			, EStopFlag_AutoStart = DBit(1)
-			, EStopFlag_PreventLaunchUser = DBit(2)
+			EStopFlag_None                  = 0
+			, EStopFlag_CloseEncryption     = DBit(0)
+			, EStopFlag_AutoStart           = DBit(1)
+			, EStopFlag_PreventLaunchUser   = DBit(2)
 			, EStopFlag_PreventLaunchUpdate = DBit(3)
 		};
 
@@ -279,7 +279,6 @@ namespace NMib::NCloud::NAppManager
 			uint32 m_Status = 1;
 		};
 
-
 		struct CVersionManagerApplication;
 		struct CVersionManagerState;
 
@@ -287,14 +286,14 @@ namespace NMib::NCloud::NAppManager
 		{
 			struct CCompareApplicationByTime
 			{
-				COrdering_Partial operator()(CVersionManagerVersion const &_Left, CVersionManagerVersion const &_Right) const;
+				COrdering_Partial operator () (CVersionManagerVersion const &_Left, CVersionManagerVersion const &_Right) const;
 			};
 
 			struct CCompareApplication
 			{
-				COrdering_Partial operator()(CVersionManagerVersion const &_Left, CVersionManagerVersion const &_Right) const;
-				COrdering_Partial operator()(CVersionManager::CVersionIDAndPlatform const &_Left, CVersionManagerVersion const &_Right) const;
-				COrdering_Partial operator()(CVersionManagerVersion const &_Left, CVersionManager::CVersionIDAndPlatform const &_Right) const;
+				COrdering_Partial operator () (CVersionManagerVersion const &_Left, CVersionManagerVersion const &_Right) const;
+				COrdering_Partial operator () (CVersionManager::CVersionIDAndPlatform const &_Left, CVersionManagerVersion const &_Right) const;
+				COrdering_Partial operator () (CVersionManagerVersion const &_Left, CVersionManager::CVersionIDAndPlatform const &_Right) const;
 			};
 
 			CVersionManagerVersion(CVersionManagerState *_pVersionManager);
@@ -359,12 +358,13 @@ namespace NMib::NCloud::NAppManager
 
 		struct CDistributedAppInterfaceServerImplementation : public CDistributedAppInterfaceServer
 		{
-			TCFuture<TCActorSubscriptionWithID<>> f_RegisterDistributedApp
+			auto f_RegisterDistributedApp
 				(
 					TCDistributedActorInterfaceWithID<CDistributedAppInterfaceClient> _ClientInterface
 					, TCDistributedActorInterfaceWithID<CDistributedActorTrustManagerInterface> _TrustInterface
 					, CRegisterInfo _RegisterInfo
-				) override
+				)
+				-> TCFuture<TCActorSubscriptionWithID<>> override
 			;
 			TCFuture<TCActorSubscriptionWithID<>> f_RegisterConfigFiles(CConfigFiles _ConfigFiles) override;
 
@@ -387,13 +387,7 @@ namespace NMib::NCloud::NAppManager
 			TCFuture<void> f_Stop(CStr _Name) override;
 			TCFuture<void> f_Restart(CStr _Name) override;
 
-			TCFuture<void> f_ChangeSettings
-				(
-					CStr _Name
-					, CApplicationChangeSettings _ChangeSettings
-					, CApplicationSettings _Settings
-				) override
-			;
+			TCFuture<void> f_ChangeSettings(CStr _Name, CApplicationChangeSettings _ChangeSettings, CApplicationSettings _Settings) override;
 
 			TCFuture<TCMap<CStr, CApplicationInfo>> f_GetInstalled() override;
 
@@ -432,17 +426,15 @@ namespace NMib::NCloud::NAppManager
 
 		enum EFindVersionFlag
 		{
-			EFindVersionFlag_None = 0
+			EFindVersionFlag_None          = 0
 			, EFindVersionFlag_RetryFailed = DBit(0)
-			, EFindVersionFlag_ForAdd = DBit(1)
+			, EFindVersionFlag_ForAdd      = DBit(1)
 		};
 
 		struct CAppManagerCoordinationInterfaceImplementation : public CAppManagerCoordinationInterface
 		{
 			TCFuture<void> f_RemoveKnownHost(CStr _Group, CStr _Application, CStr _HostID) override;
-			auto f_SubscribeToAppChanges(TCActorFunctorWithID<TCFuture<void> (TCVector<CAppChange> _Changes, bool _bInitial)> _fOnChange)
-				-> TCFuture<TCActorSubscriptionWithID<>> override
-			;
+			auto f_SubscribeToAppChanges(TCActorFunctorWithID<TCFuture<void> (TCVector<CAppChange> _Changes, bool _bInitial)> _fOnChange) -> TCFuture<TCActorSubscriptionWithID<>> override;
 
 			DMibDelegatedActorImplementation(CAppManagerActor);
 		};
@@ -579,7 +571,7 @@ namespace NMib::NCloud::NAppManager
 			CVersionManager::CVersionIDAndPlatform m_LastInstalledVersion;
 			CVersionManager::CVersionInformation m_LastInstalledVersionInfo;
 			TCFunction<void (CStr const &_Info)> m_fOnInfo;
-			TCFunction <void ()> m_fUpdateVersionInfo;
+			TCFunction<void ()> m_fUpdateVersionInfo;
 			CActorSubscription m_DownloadDirectoryCleanup;
 			CActorSubscription m_TemporaryDirectoryCleanup;
 			CStr m_SourcePath;
@@ -614,8 +606,8 @@ namespace NMib::NCloud::NAppManager
 
 		enum EWaitStageFlag
 		{
-			EWaitStageFlag_None = 0
-			, EWaitStageFlag_IgnoreFailed = DBit(0)
+			EWaitStageFlag_None                       = 0
+			, EWaitStageFlag_IgnoreFailed             = DBit(0)
 			, EWaitStageFlag_DisallowInProgressStates = DBit(1)
 		};
 
@@ -673,15 +665,8 @@ namespace NMib::NCloud::NAppManager
 		void fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine) override;
 		void fp_BuildCommandLine_HostMonitor(CDistributedAppCommandLineSpecification &o_CommandLine);
 
-		static CStr fsp_RunTool
-			(
-				CStr const &_Description
-				, CStr const &_Tool
-				, CStr const &_WorkingDir
-				, TCVector<CStr> const &_Arguments
-			)
-		;
-		TCFuture<CBashScriptOutput> fp_RunBashScript
+		static CStr fsp_RunTool(CStr const &_Description, CStr const &_Tool, CStr const &_WorkingDir, TCVector<CStr> const &_Arguments);
+		auto fp_RunBashScript
 			(
 				CStr const &_Script
 				, CStr const &_Description
@@ -689,6 +674,7 @@ namespace NMib::NCloud::NAppManager
 				, TCFunction<void (CStr const &_Output, TCActor<CProcessLaunchActor> const &_LaunchActor)> const &_fOnStdOutput
 				, uint32 _WarningErrorStatus = TCLimitsInt<uint32>::mc_Max
 			)
+			-> TCFuture<CBashScriptOutput>
 		;
 
 		TCFuture<void> fp_InitApp();
@@ -732,7 +718,7 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<void> fp_UpdateAppManagerApplicationVersion(TCSharedPointer<CApplication> _pApplication, uint32 _OldVersion);
 
 		TCFuture<void> fp_UpdateApplicationJson(TCSharedPointer<CApplication> _pApplication);
-		TCFuture<void> fp_RunUpdateScript
+		auto fp_RunUpdateScript
 			(
 				TCSharedPointer<CApplication> const &_pApplication
 				, EUpdateScript _Script
@@ -743,6 +729,7 @@ namespace NMib::NCloud::NAppManager
 				, CVersionManager::CVersionInformation const &_PreviousVersionInformation
 				, fp64 _TimeSinceUpdateStart
 			)
+			-> TCFuture<void>
 		;
 		TCFuture<bool> fp_SelfUpdate(TCSharedPointer<CApplication> _pApplication);
 		TCFuture<ERebootResult> fp_Reboot(bool _bErrorOnPreventReboot);
@@ -769,7 +756,7 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<uint32> fp_CommandLine_HostMonitorConfigVersionList(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_HostMonitorConfigContentsGet(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 
-		TCFuture<void> fp_AddApplication
+		auto fp_AddApplication
 			(
 				CStr _Name
 				, CApplicationSettings _Settings
@@ -782,9 +769,10 @@ namespace NMib::NCloud::NAppManager
 				, TCOptional<CVersionManager::CVersionIDAndPlatform> _Version
 				, CCallingHostInfo _CallingHostInfo
 			)
+			-> TCFuture<void>
 		;
 
-		TCFuture<void> fp_ChangeApplicationSettings
+		auto fp_ChangeApplicationSettings
 			(
 				CStr _Name
 				, CApplicationSettings _Settings
@@ -794,9 +782,10 @@ namespace NMib::NCloud::NAppManager
 				, TCFunction<void (CStr const &_Info)> _fOnInfo
 				, CCallingHostInfo _CallingHostInfo
 			)
+			-> TCFuture<void>
 		;
 
-		TCFuture<void> fp_UpdateApplication
+		auto fp_UpdateApplication
 			(
 				CStr _Name
 				, CAppManagerInterface::CApplicationUpdate _Update
@@ -806,6 +795,7 @@ namespace NMib::NCloud::NAppManager
 				, CCallingHostInfo _CallingHostInfo
 				, bool _bCheckPermissions = true
 			)
+			-> TCFuture<void>
 		;
 
 		TCFuture<void> fp_UpdateApplicationRunProcess(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState);
@@ -817,12 +807,7 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<void> fp_UpdateApplication_SaveApplicationState(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState);
 		TCFuture<void> fp_UpdateApplication_PostUpdate(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState);
 		TCFuture<bool> fp_UpdateApplication_StartNewApp(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState);
-		TCFuture<void> fp_UpdateApplication_DeferToNextRestart
-			(
-				 TCSharedPointerSupportWeak<CUpdateApplicationState> _pState
-				 , TCSharedPointer<CCanDestroyTracker> _pCanDestroy
-			)
-		;
+		TCFuture<void> fp_UpdateApplication_DeferToNextRestart(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState, TCSharedPointer<CCanDestroyTracker> _pCanDestroy);
 		TCFuture<void> fp_UpdateApplication_PostLaunch(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState);
 
 		TCFuture<void> fp_CancelAllApplicationUpdatesOnStopAppManager();
@@ -830,7 +815,7 @@ namespace NMib::NCloud::NAppManager
 		void fp_StartPendingSelfUpdateReporting(CPendingSelfupdate const &_Pending);
 
 		static void fsp_UpdateAttributes(CStr const &_File);
-		static CStr fsp_UnpackApplication
+		static auto fsp_UnpackApplication
 			(
 				CStr const &_ApplicationRootDirectory
 				, CStr const &_Source
@@ -842,6 +827,7 @@ namespace NMib::NCloud::NAppManager
 				, bool _bForceInstall
 				, TCSharedPointer<CUniqueUserGroup> const &_pUniqueUserGroup
 			)
+			-> CStr
 		;
 		TCFuture<void> fp_ChangeEncryption(TCSharedPointer<CApplication> _pApplication, EEncryptOperation _Operation, bool _bForceOverwrite);
 
@@ -853,26 +839,15 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<void> fp_VersionManagerAdded(TCDistributedActor<CVersionManager> _VersionManager, CTrustedActorInfo _Info);
 		void fp_VersionManagerRemoved(TCWeakDistributedActor<CActor> const &_VersionManager);
 
-		TCFuture<CVersionManager::CVersionInformation> fp_DownloadApplicationFromManager
-			(
-				TCDistributedActor<CVersionManager> _Manager
-				, CStr _ApplicationName
-				, CVersionManager::CVersionIDAndPlatform _VersionID
-				, CStr _DestinationDir
-			)
+		auto fp_DownloadApplicationFromManager(TCDistributedActor<CVersionManager> _Manager, CStr _ApplicationName, CVersionManager::CVersionIDAndPlatform _VersionID, CStr _DestinationDir)
+			-> TCFuture<CVersionManager::CVersionInformation>
 		;
 
-		TCFuture<CVersionManager::CVersionInformation> fp_DownloadApplication
-			(
-				CStr _ApplicationName
-				, CVersionManager::CVersionIDAndPlatform _VersionID
-				, CStr _DestinationDir
-			)
-		;
+		TCFuture<CVersionManager::CVersionInformation> fp_DownloadApplication(CStr _ApplicationName, CVersionManager::CVersionIDAndPlatform _VersionID, CStr _DestinationDir);
 
 		void fp_AutoUpdate_Update();
 
-		bool fp_VersionIsNewer
+		auto fp_VersionIsNewer
 			(
 				CVersionManager::CVersionIDAndPlatform const &_LeftVersion
 				, CVersionManager::CVersionInformation const &_LeftVersionInfo
@@ -881,9 +856,10 @@ namespace NMib::NCloud::NAppManager
 				, TCSet<CStr> const &_RequiredTags
 				, TCSet<CStr> const &_AllowedBranches
 			)
+			-> bool
 		;
 
-		CVersionManager::CVersionIDAndPlatform fp_FindVersion
+		auto fp_FindVersion
 			(
 				TCSharedPointer<CApplication> const &_pApplication
 				, TCSet<CStr> const &_RequiredTags
@@ -896,6 +872,7 @@ namespace NMib::NCloud::NAppManager
 				, CVersionManager::CVersionInformation &o_NewestUnconditionalVersionInfo
 				, bool &o_bNewestUnconditionalVersionChanged
 			)
+			-> CVersionManager::CVersionIDAndPlatform
 		;
 
 		TCFuture<void> fp_SetupAppManagerInterfacePermissions();
@@ -907,13 +884,7 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<void> fp_PublishAppInterface();
 		TCFuture<void> fp_PublishAppManagerInterface();
 
-		TCFuture<void> fp_OnUpdateEvent
-			(
-				TCSharedPointerSupportWeak<CUpdateApplicationState> _pState
-				, EUpdateStage _Stage
-				, NStr::CStr _Message
-			)
-		;
+		TCFuture<void> fp_OnUpdateEvent(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState, EUpdateStage _Stage, NStr::CStr _Message);
 
 		TCFuture<void> fp_SendUpdateNotifications(CAppManagerInterface::CUpdateNotification _Notification);
 		TCFuture<void> fp_SendMissedUpdateNotifications(CStr _SubscriptionID, uint64 _LastSeenNotification);
@@ -949,7 +920,7 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<void> fp_SetApplicationSensorStatus(TCSharedPointer<CApplication> _pApplication, CStr _LaunchStatus, CAppManagerInterface::EStatusSeverity _Severity);
 		TCFuture<void> fp_Coordination_WaitForOurAppsTurnToUpdate(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState);
 		TCFuture<void> fp_Coordination_OneAtATime_WaitForOurTurnToUpdate(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState);
-		TCFuture<void> fp_Coordination_WaitForAllToReachWantUpdateStage
+		auto fp_Coordination_WaitForAllToReachWantUpdateStage
 			(
 				TCSharedPointerSupportWeak<CUpdateApplicationState> _pState
 				, EUpdateStage _Stage
@@ -957,8 +928,9 @@ namespace NMib::NCloud::NAppManager
 				, EWaitStageFlag _Flags
 				, TCFunctionMutable<bool ()> _fEvalState = {}
 			)
+			-> TCFuture<void>
 		;
-		TCFuture<void> fp_Coordination_WaitForState
+		auto fp_Coordination_WaitForState
 			(
 				TCSharedPointerSupportWeak<CUpdateApplicationState> _pState
 				, fp64 _Timeout
@@ -968,6 +940,7 @@ namespace NMib::NCloud::NAppManager
 				, CStr _DisconnectedError
 				, bool _bIgnoreFailed = false
 			)
+			-> TCFuture<void>
 		;
 		static ch8 const *fsp_UpdateTypeToStr(EDistributedAppUpdateType _UpdateType);
 

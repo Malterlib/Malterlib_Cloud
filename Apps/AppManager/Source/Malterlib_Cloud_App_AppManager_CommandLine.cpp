@@ -12,12 +12,7 @@ namespace NMib::NCloud::NAppManager
 	void CAppManagerActor::fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine)
 	{
 		CDistributedAppActor::fp_BuildCommandLine(o_CommandLine);
-		o_CommandLine.f_SetProgramDescription
-			(
-				"Malterlib Cloud App Manager"
-				, "Manages malterlib cloud applications by providing services such as encryption at rest and automatic updates."
-			)
-		;
+		o_CommandLine.f_SetProgramDescription("Malterlib Cloud App Manager", "Manages malterlib cloud applications by providing services such as encryption at rest and automatic updates.");
 
 		o_CommandLine.f_RegisterGlobalOptions
 			(
@@ -25,7 +20,7 @@ namespace NMib::NCloud::NAppManager
 					"LogLaunchesToStdErr?"_o=
 					{
 						"Names"_o= _o["--log-launches-to-stderr"]
-						,"Default"_o= false
+						, "Default"_o= false
 						, "Description"_o= "Log application launch output to stderr."
 					}
 				}
@@ -38,11 +33,9 @@ namespace NMib::NCloud::NAppManager
 					"AutoUpdateDelay?"_o=
 					{
 						"Names"_o= _o["--auto-update-delay"]
-						,"Default"_o= fg_GetSys()->f_GetEnvironmentVariable
-						(
-							"MalterlibAppManagerAutoUpdateDelay"
-							, CStr::fs_ToStr(fp64(mc_DefaultAutoUpdateDelay))
-						).f_ToFloat(fp64(mc_DefaultAutoUpdateDelay))
+						, "Default"_o= fg_GetSys()
+						->f_GetEnvironmentVariable("MalterlibAppManagerAutoUpdateDelay", CStr::fs_ToStr(fp64(mc_DefaultAutoUpdateDelay)))
+						.f_ToFloat(fp64(mc_DefaultAutoUpdateDelay))
 						, "Description"_o= "Delay wait when receiving new versions to wait for other version managers to also send their versions."
 					}
 				}
@@ -55,7 +48,7 @@ namespace NMib::NCloud::NAppManager
 					"HostMonitorInterval?"_o=
 					{
 						"Names"_o= _o["--host-monitor-interval"]
-						,"Type"_o= 0.0
+						, "Type"_o= 0.0
 						, "Description"_o= "Override host monitor interval."
 					}
 				}
@@ -68,7 +61,7 @@ namespace NMib::NCloud::NAppManager
 					"HostMonitorPatchInterval?"_o=
 					{
 						"Names"_o= _o["--host-monitor-patch-interval"]
-						,"Type"_o= 0.0
+						, "Type"_o= 0.0
 						, "Description"_o= "Override host monitor patch interval."
 					}
 				}
@@ -81,7 +74,7 @@ namespace NMib::NCloud::NAppManager
 					"HostMonitorMemoryInterval?"_o=
 					{
 						"Names"_o= _o["--host-monitor-memory-interval"]
-						,"Type"_o= 0.0
+						, "Type"_o= 0.0
 						, "Description"_o= "Override host monitor memory interval."
 					}
 				}
@@ -94,7 +87,7 @@ namespace NMib::NCloud::NAppManager
 					"EnableApplicationStatusSensors?"_o=
 					{
 						"Names"_o= _o["--application-status-sensors"]
-						,"Default"_o= true
+						, "Default"_o= true
 						, "Description"_o= "Enable application status sensors."
 					}
 				}
@@ -107,7 +100,7 @@ namespace NMib::NCloud::NAppManager
 					"EnableEncryptionStatusSensors?"_o=
 					{
 						"Names"_o= _o["--encryption-status-sensors"]
-						,"Default"_o= true
+						, "Default"_o= true
 						, "Description"_o= "Enable application encryption sensors."
 					}
 				}
@@ -119,9 +112,9 @@ namespace NMib::NCloud::NAppManager
 		auto SettingsOption_Executable = "Executable?"_o=
 			{
 				"Names"_o= _o["--executable"]
-				,"Type"_o= ""
+				, "Type"_o= ""
 				, "Description"_o= "Start this executable when running application.\n"
-					"Can contain sub-path.\n"
+				"Can contain sub-path.\n"
 			}
 		;
 		auto SettingsOption_RunAsUser = "RunAsUser?"_o=
@@ -169,7 +162,7 @@ namespace NMib::NCloud::NAppManager
 				"Names"_o= _o["--distributed-app"]
 				, "Type"_o= true
 				, "Description"_o= "Expect the app to register as a distributed app. This will cause the AppManager to wait for the app to register before."
-					"returning from add, start and update operations."
+				"returning from add, start and update operations."
 			}
 		;
 		auto SettingsOption_UpdateGroup = "UpdateGroup?"_o=
@@ -334,7 +327,7 @@ namespace NMib::NCloud::NAppManager
 						"Name"_o=
 						{
 							"Names"_o= _o["--name"]
-							,"Default"_o= ""
+							, "Default"_o= ""
 							, "Description"_o= "Uniquely name the application.\n"
 							"If left empty the name defaults to the package name when installing from a Versionanager, "
 							"otherwise if --from-file or a null package is specified specifying a name is required."
@@ -368,30 +361,26 @@ namespace NMib::NCloud::NAppManager
 						, "Version?"_o=
 						{
 							"Names"_o= _o["--version"]
-							,"Type"_o= ""
+							, "Type"_o= ""
 							, "Description"_o= "The version to install from version manager.\n"
-								"Defaults to the latest version available.\n"
+							"Defaults to the latest version available.\n"
 						}
 						, "VersionManagerPlatform?"_o=
 						{
 							"Names"_o= _o["--platform"]
 							, "Type"_o= ""
-							, "Description"_o= fg_Format
-							(
-								"Version manager platform used when downloading version. Defaults to the same as this executable: {}"
-								, DMalterlibCloudPlatform
-							)
+							, "Description"_o= fg_Format("Version manager platform used when downloading version. Defaults to the same as this executable: {}", DMalterlibCloudPlatform)
 						}
 						, "ForceOverwrite?"_o=
 						{
 							"Names"_o= _o["--force-overwrite"]
-							,"Default"_o= false
+							, "Default"_o= false
 							, "Description"_o= "Force zfs to overwrite storage."
 						}
 						, "ForceInstall?"_o=
 						{
 							"Names"_o= _o["--force-install"]
-							,"Default"_o= false
+							, "Default"_o= false
 							, "Description"_o= "Force application install even if application directory already exists."
 						}
 						, "SettingsFromVersionInfo?"_o=
@@ -461,9 +450,8 @@ namespace NMib::NCloud::NAppManager
 			(
 				{
 					"Names"_o= _o["--application-enable-self-update"]
-					, "Description"_o=
-						"Adds an AppManager application that is used for self updating this AppManager.\n"
-						"This is a shortcut for doing --application-add with --self-update-source specified.\n"
+					, "Description"_o= "Adds an AppManager application that is used for self updating this AppManager.\n"
+					"This is a shortcut for doing --application-add with --self-update-source specified.\n"
 					, "Options"_o=
 					{
 						"Name"_o=
@@ -471,7 +459,7 @@ namespace NMib::NCloud::NAppManager
 							"Names"_o= _o[]
 							, "Hidden"_o= true
 							, "Description"_o= "Hidden"
-							,"Default"_o= "SelfUpdate"
+							, "Default"_o= "SelfUpdate"
 						}
 						, "FromFile?"_o=
 						{
@@ -499,14 +487,14 @@ namespace NMib::NCloud::NAppManager
 							"Names"_o= _o[]
 							, "Hidden"_o= true
 							, "Description"_o= "Hidden"
-							,"Default"_o= false
+							, "Default"_o= false
 						}
 						, "ForceInstall?"_o=
 						{
 							"Names"_o= _o[]
 							, "Hidden"_o= true
 							, "Description"_o= "Hidden"
-							,"Default"_o= false
+							, "Default"_o= false
 						}
 						, "SettingsFromVersionInfo?"_o=
 						{
@@ -563,7 +551,7 @@ namespace NMib::NCloud::NAppManager
 						"Name"_o=
 						{
 							"Names"_o= _o["--name"]
-							,"Type"_o= ""
+							, "Type"_o= ""
 							, "Description"_o= "Unique name of the application to change settings for."
 						}
 						, SettingsOption_Dependencies
@@ -718,7 +706,7 @@ namespace NMib::NCloud::NAppManager
 							"Names"_o= _o["--application"]
 							, "Default"_o= ""
 							, "Description"_o= "The application to list versions for.\n"
-								"Leave empty to list all applications.\n"
+							"Leave empty to list all applications.\n"
 						}
 						, "ExtraPlatforms?"_o=
 						{
@@ -766,7 +754,7 @@ namespace NMib::NCloud::NAppManager
 						"Name"_o=
 						{
 							"Names"_o= _o["--name"]
-							,"Type"_o= ""
+							, "Type"_o= ""
 							, "Description"_o= "Unique name of the application to update."
 						}
 					}
@@ -796,19 +784,19 @@ namespace NMib::NCloud::NAppManager
 						"Name"_o=
 						{
 							"Names"_o= _o["--name"]
-							,"Type"_o= ""
+							, "Type"_o= ""
 							, "Description"_o= "Unique name of the application to update."
 						}
 						, "DryRun?"_o=
 						{
 							"Names"_o= _o["--dry-run"]
-							,"Default"_o= false
+							, "Default"_o= false
 							, "Description"_o= "Only list action to take, don't actually do the update."
 						}
 						, "UpdateSettings?"_o=
 						{
 							"Names"_o= _o["--update-settings"]
-							,"Default"_o= false
+							, "Default"_o= false
 							, "Description"_o= "Update settings with settings from downloaded app."
 						}
 						, "RequiredTags?"_o=
@@ -910,13 +898,13 @@ namespace NMib::NCloud::NAppManager
 						"Application"_o=
 						{
 							"Names"_o= _o["--application"]
-							,"Default"_o= ""
+							, "Default"_o= ""
 							, "Description"_o= "The version manager application to to remove the host on. Leave empt to remove from all applications."
 						}
 						, "Group"_o=
 						{
 							"Names"_o= _o["--group"]
-							,"Default"_o= ""
+							, "Default"_o= ""
 							, "Description"_o= "The update group to to remove the host on. Leave empt to remove from all groups."
 						}
 					}

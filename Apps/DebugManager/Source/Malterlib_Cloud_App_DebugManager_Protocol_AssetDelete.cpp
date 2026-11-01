@@ -32,7 +32,8 @@ namespace NMib::NCloud::NDebugManager
 					, _Params.m_nMaxToDelete
 					, _Params.m_bPretend
 				)
-				% "Failed to delete assets in database" % Auditor
+				% "Failed to delete assets in database"
+				% Auditor
 			)
 		;
 

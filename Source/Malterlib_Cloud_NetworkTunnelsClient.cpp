@@ -117,12 +117,7 @@ namespace NMib::NCloud
 			TCSet<TCWeakDistributedActor<ICNetworkTunnels>> m_AvailableOnNetworkTunnels;
 		};
 
-		CInternal
-			(
-				CNetworkTunnelsClient *_pThis
-				, TCActor<CActorDistributionManager> const &_DistributionManager
-				, TCActor<CDistributedActorTrustManager> const &_TrustManager
-			)
+		CInternal(CNetworkTunnelsClient *_pThis, TCActor<CActorDistributionManager> const &_DistributionManager, TCActor<CDistributedActorTrustManager> const &_TrustManager)
 			: m_pThis(_pThis)
 			, m_DistributionManager(_DistributionManager)
 			, m_TrustManager(_TrustManager)
@@ -148,11 +143,7 @@ namespace NMib::NCloud
 		umint m_TunnelID = 0;
 	};
 
-	CNetworkTunnelsClient::CNetworkTunnelsClient
-		(
-			TCActor<CActorDistributionManager> const &_DistributionManager
-			, TCActor<CDistributedActorTrustManager> const &_TrustManager
-		)
+	CNetworkTunnelsClient::CNetworkTunnelsClient(TCActor<CActorDistributionManager> const &_DistributionManager, TCActor<CDistributedActorTrustManager> const &_TrustManager)
 		: mp_pInternal(fg_Construct(this, _DistributionManager, _TrustManager))
 	{
 	}
@@ -403,14 +394,7 @@ namespace NMib::NCloud
 				Connection.m_fSendData = fg_Move(*OpenConnectionResult);
 
 				CAsyncSocketCallbacks SocketCallbacks;
-				SocketCallbacks.m_fOnClose = g_ActorFunctor /
-					[
-						this
-						, pTunnel
-						, ConnectionID
-						, CallbackInfo
-						, AllowDestroy = g_AllowWrongThreadDestroy
-					]
+				SocketCallbacks.m_fOnClose = g_ActorFunctor / [this, pTunnel, ConnectionID, CallbackInfo, AllowDestroy = g_AllowWrongThreadDestroy]
 					(EAsyncSocketStatus _Reason, CStr _Message, EAsyncSocketCloseOrigin _Origin) -> TCFuture<void>
 					{
 						auto &Internal = *mp_pInternal;
@@ -429,8 +413,7 @@ namespace NMib::NCloud
 					}
 				;
 
-				SocketCallbacks.m_fOnReceiveData = g_ActorFunctor / [this, ConnectionID, AllowDestroy = g_AllowWrongThreadDestroy]
-					(CSharedByteVector _Message) -> TCFuture<void>
+				SocketCallbacks.m_fOnReceiveData = g_ActorFunctor / [this, ConnectionID, AllowDestroy = g_AllowWrongThreadDestroy](CSharedByteVector _Message) -> TCFuture<void>
 					{
 						auto &Internal = *mp_pInternal;
 
@@ -484,15 +467,7 @@ namespace NMib::NCloud
 		else
 			ListenAddresses.f_Insert(DefaultListenAddress);
 
-		auto ListenResults = co_await Internal.m_SocketServer
-			(
-				&CAsyncSocketServerActor::f_StartListenAddress
-				, ListenAddresses
-				, ENetFlag_None
-				, fg_Move(Callbacks)
-				, nullptr
-			)
-		;
+		auto ListenResults = co_await Internal.m_SocketServer(&CAsyncSocketServerActor::f_StartListenAddress, ListenAddresses, ENetFlag_None, fg_Move(Callbacks), nullptr);
 
 		CNetAddress ReturnListenAddress;
 

@@ -63,7 +63,7 @@ namespace NMib::NCloud::NBackupManager
 
 						CFileIoTempBuffer Buffer;
 
-						for (uint64 ToDigest = ManifestFile.m_Length; ToDigest; )
+						for (uint64 ToDigest = ManifestFile.m_Length; ToDigest;)
 						{
 							auto BufferResult = Buffer.f_UseBuffer(ToDigest);
 

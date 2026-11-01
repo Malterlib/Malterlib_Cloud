@@ -28,7 +28,7 @@
 #include <Mib/Security/UniqueUserGroup>
 
 #ifdef DPlatformFamily_Windows
-#include <Windows.h>
+#	include <Windows.h>
 #endif
 
 using namespace NMib;
@@ -54,30 +54,26 @@ using namespace NMib::NTime;
 static fp64 g_Timeout = 2_minutes * gc_TimeoutMultiplier;
 static uint32 g_CompressionLevel = 4;
 
-static constexpr ch8 const *gc_AccessDeniedErrorMessage =
-	"Failed to download application from version manager: Failed to download the application from any manager: Failed to start download on remote server: Access denied"
+static constexpr ch8 const *gc_AccessDeniedErrorMessage
+	= "Failed to download application from version manager: Failed to download the application from any manager: Failed to start download on remote server: Access denied"
 ;
 
 namespace
 {
-	template <typename tf_CKey, typename tf_CValue, typename... tf_CParams>
+	template <typename tf_CKey, typename tf_CValue, typename ...tf_CParams>
 	void fg_CreateMapHelper(TCMap<tf_CKey, tf_CValue> &_Return)
 	{
 	}
 
-	template <typename tf_CKey, typename tf_CValue, typename... tf_CParams>
+	template <typename tf_CKey, typename tf_CValue, typename ...tf_CParams>
 	void fg_CreateMapHelper(TCMap<tf_CKey, tf_CValue> &_Return, tf_CKey &&_First, tf_CParams && ...p_Params)
 	{
 		_Return[fg_Forward<tf_CKey>(_First)];
 		fg_CreateMapHelper<tf_CKey, tf_CValue>(_Return, fg_Forward<tf_CParams>(p_Params)...);
 	}
 
-	template <typename tf_CKey, typename tf_CValue, typename... tf_CParams>
-	TCMap<NTraits::TCRemoveReferenceAndQualifiers<tf_CKey>, NTraits::TCRemoveReferenceAndQualifiers<tf_CValue>> fg_CreateMap
-		(
-			tf_CKey && _First
-			, tf_CParams && ...p_Params
-		)
+	template <typename tf_CKey, typename tf_CValue, typename ...tf_CParams>
+	TCMap<NTraits::TCRemoveReferenceAndQualifiers<tf_CKey>, NTraits::TCRemoveReferenceAndQualifiers<tf_CValue>> fg_CreateMap(tf_CKey &&_First, tf_CParams && ...p_Params)
 	{
 		TCMap<NTraits::TCRemoveReferenceAndQualifiers<tf_CKey>, NTraits::TCRemoveReferenceAndQualifiers<tf_CValue>> Return;
 		fg_CreateMapHelper<NTraits::TCRemoveReferenceAndQualifiers<tf_CKey>, NTraits::TCRemoveReferenceAndQualifiers<tf_CValue>>
@@ -90,7 +86,7 @@ namespace
 		return Return;
 	}
 
-	template <typename tf_CKey, typename tf_CValue, typename... tf_CParams>
+	template <typename tf_CKey, typename tf_CValue, typename ...tf_CParams>
 	TCMap<tf_CKey, tf_CValue> fg_CreateMap(tf_CParams && ...p_Params)
 	{
 		TCMap<tf_CKey, tf_CValue> Return;
@@ -485,9 +481,7 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		Security.m_AllowedIncomingConnectionNamespaces.f_Insert(CAppManagerInterface::mc_pDefaultNamespace);
 		Dependencies.m_DistributionManager(&CActorDistributionManager::f_SetSecurity, Security).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 
-		TCActor<CDistributedApp_LaunchHelper> LaunchHelper
-			= fg_ConstructActor<CDistributedApp_LaunchHelper>(Dependencies, DTestUpdateCompatibilityEnableOtherOutput)
-		;
+		TCActor<CDistributedApp_LaunchHelper> LaunchHelper = fg_ConstructActor<CDistributedApp_LaunchHelper>(Dependencies, DTestUpdateCompatibilityEnableOtherOutput);
 
 		auto CleanupLaunchHelper = g_OnScopeExit / [&]
 			{
@@ -593,18 +587,13 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 					.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
 				;
 				TrustManager.f_CallActor(&CDistributedActorTrustManager::f_AllowHostsForNamespace)
-					(
-						CAppManagerInterface::mc_pDefaultNamespace
-						, fg_CreateSet<CStr>(_LaunchInfo.m_HostID)
-						, mcp_WaitForSubscriptions
-					).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
+					(CAppManagerInterface::mc_pDefaultNamespace, fg_CreateSet<CStr>(_LaunchInfo.m_HostID), mcp_WaitForSubscriptions)
+					.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
 				;
 				try
 				{
 					_LaunchInfo.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
-						(
-							fPermissions(TestHostID, fg_CreateMap<CStr, CPermissionRequirements>("AppManager/VersionAppAll", "AppManager/CommandAll", "AppManager/AppAll"))
-						)
+						(fPermissions(TestHostID, fg_CreateMap<CStr, CPermissionRequirements>("AppManager/VersionAppAll", "AppManager/CommandAll", "AppManager/AppAll")))
 						.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
 					;
 				}
@@ -612,7 +601,6 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				{
 					if (_Exception.f_GetErrorStr() != "Function does not exist on remote actor")
 						throw;
-
 				}
 
 				return Address;
@@ -643,15 +631,7 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		;
 
 		auto fInstallAppManually = [&]
-			(
-				CAppManager const &_AppManager
-				, CPackageOptions const &_PackageOptions
-				, CStr const &_Package
-				, CStr const &_Executable
-				, CStr const &_User
-				, CStr const &_Tag
-				, bool _bDoEncryption
-			)
+			(CAppManager const &_AppManager, CPackageOptions const &_PackageOptions, CStr const &_Package, CStr const &_Executable, CStr const &_User, CStr const &_Tag, bool _bDoEncryption)
 			{
 				DMibLogWithCategory(Test, Info, "Install App Manually ({}, {})", CFile::fs_GetFile(_AppManager.m_RootPath), CFile::fs_GetFile(_Package));
 
@@ -785,7 +765,8 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				{
 					DMibLogWithCategory(Test, Info, "Allow Hosts");
 					_AppManager.m_LaunchInfo.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace)
-						(fg_Move(Hosts)).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
+						(fg_Move(Hosts))
+						.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
 					;
 				}
 
@@ -795,7 +776,8 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 					{
 						DMibLogWithCategory(Test, Info, "Add Client Connection");
 						_AppManager.m_LaunchInfo.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)
-							(CDistributedActorTrustManagerInterface::CAddClientConnection{.m_TrustTicket = Ticket, .m_Timeout = g_Timeout}).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
+							(CDistributedActorTrustManagerInterface::CAddClientConnection{.m_TrustTicket = Ticket, .m_Timeout = g_Timeout})
+							.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
 						;
 					}
 				}
@@ -810,17 +792,7 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 			{
 				DMibLogWithCategory(Test, Info, "Setup VersionManager ({})", CFile::fs_GetFile(_AppManager.m_RootPath));
 
-				fInstallAppManually
-					(
-						_AppManager
-						, VersionManagerPackageOptions
-						, _VersionManagerPackage
-						, "VersionManager"
-						, "MalterlibCloudVersionManager"
-						, "VersionManagerTestTag"
-						, true
-					)
-				;
+				fInstallAppManually(_AppManager, VersionManagerPackageOptions, _VersionManagerPackage, "VersionManager", "MalterlibCloudVersionManager", "VersionManagerTestTag", true);
 
 				DMibAssert(fGetAppInfo(_AppManager, "VersionManager").m_Status, ==, "Launched");
 
@@ -832,11 +804,7 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 					DMibLogWithCategory(Test, Info, "Allow Hosts");
 
 					TrustManager.f_CallActor(&CDistributedActorTrustManager::f_AllowHostsForNamespace)
-						(
-							CVersionManager::mc_pDefaultNamespace
-							, fg_CreateSet<CStr>(VersionManagerHostID)
-							, mcp_WaitForSubscriptions
-						)
+						(CVersionManager::mc_pDefaultNamespace, fg_CreateSet<CStr>(VersionManagerHostID), mcp_WaitForSubscriptions)
 						.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
 					;
 				}
@@ -934,7 +902,8 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 				{
 					DMibLogWithCategory(Test, Info, "Add");
-					_AppManager.m_AppManager.f_CallActor(&CAppManagerInterface::f_Add)("SelfUpdate", fg_Move(Add), fg_Move(ApplicationSettings))
+					_AppManager.m_AppManager.f_CallActor(&CAppManagerInterface::f_Add)
+						("SelfUpdate", fg_Move(Add), fg_Move(ApplicationSettings))
 						.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
 					;
 				}
@@ -957,7 +926,8 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 				{
 					DMibLogWithCategory(Test, Info, "Add");
-					_AppManager.m_AppManager.f_CallActor(&CAppManagerInterface::f_Add)(_Application, fg_Move(Add), fg_Move(ApplicationSettings))
+					_AppManager.m_AppManager.f_CallActor(&CAppManagerInterface::f_Add)
+						(_Application, fg_Move(Add), fg_Move(ApplicationSettings))
 						.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
 					;
 				}
@@ -975,7 +945,6 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				CStr SourceTempPath = "{}/TestApps/LatestSource/{}/{}"_f << ProgramDirectory << _UniqueName << _Name;
 
 				{
-
 					CStr VersionInfoFile = "{}/{}VersionInfo.json"_f << SourceTempPath << _Name;
 					CEJsonSorted VersionInfo = CEJsonSorted::fs_FromString(CFile::fs_ReadStringFromFile(VersionInfoFile));
 					CVersionManager::CVersionID VersionID;
@@ -1022,10 +991,7 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 					ChangeTags.m_Application = _Name;
 					ChangeTags.m_VersionID = _PackageInfo.m_VersionID.m_VersionID;
 
-					auto Result = co_await VersionManager.f_CallActor(&CVersionManager::f_ChangeTags)(fg_Move(ChangeTags))
-						.f_Timeout(g_Timeout, "Timed out tagging app")
-						.f_Wrap()
-					;
+					auto Result = co_await VersionManager.f_CallActor(&CVersionManager::f_ChangeTags)(fg_Move(ChangeTags)).f_Timeout(g_Timeout, "Timed out tagging app").f_Wrap();
 
 					if (Result)
 						co_return {};
@@ -1107,7 +1073,6 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 			}
 		;
 
-
 		auto fResubscribeAppManager = [&](CAppManager &_AppManager)
 			{
 				DMibLogWithCategory(Test, Info, "Resubscribe AppManager ({})", CFile::fs_GetFile(_AppManager.m_RootPath));
@@ -1127,7 +1092,7 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 			auto VersionManagerFuture = fSetupAppManager(VersionManagerDir);
 			auto AppManagerFuture = fSetupAppManager(AppManagerDir);
 			fg_Move(KeyManagerFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
-			fg_Move(VersionManagerFuture ).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+			fg_Move(VersionManagerFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 			fg_Move(AppManagerFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 		}
 
@@ -1564,9 +1529,7 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		Security.m_AllowedIncomingConnectionNamespaces.f_Insert(CAppManagerInterface::mc_pDefaultNamespace);
 		Dependencies.m_DistributionManager(&CActorDistributionManager::f_SetSecurity, Security).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 
-		TCActor<CDistributedApp_LaunchHelper> LaunchHelper
-			= fg_ConstructActor<CDistributedApp_LaunchHelper>(Dependencies, DTestUpdateCompatibilityEnableOtherOutput)
-		;
+		TCActor<CDistributedApp_LaunchHelper> LaunchHelper = fg_ConstructActor<CDistributedApp_LaunchHelper>(Dependencies, DTestUpdateCompatibilityEnableOtherOutput);
 
 		auto CleanupLaunchHelper = g_OnScopeExit / [&]
 			{
@@ -1673,18 +1636,13 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 					.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
 				;
 				TrustManager.f_CallActor(&CDistributedActorTrustManager::f_AllowHostsForNamespace)
-					(
-						CAppManagerInterface::mc_pDefaultNamespace
-						, fg_CreateSet<CStr>(_LaunchInfo.m_HostID)
-						, mcp_WaitForSubscriptions
-					).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
+					(CAppManagerInterface::mc_pDefaultNamespace, fg_CreateSet<CStr>(_LaunchInfo.m_HostID), mcp_WaitForSubscriptions)
+					.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
 				;
 				try
 				{
 					_LaunchInfo.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
-						(
-							fPermissions(TestHostID, fg_CreateMap<CStr, CPermissionRequirements>("AppManager/VersionAppAll", "AppManager/CommandAll", "AppManager/AppAll"))
-						)
+						(fPermissions(TestHostID, fg_CreateMap<CStr, CPermissionRequirements>("AppManager/VersionAppAll", "AppManager/CommandAll", "AppManager/AppAll")))
 						.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
 					;
 				}
@@ -1741,7 +1699,8 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 					SimpleLaunch.m_LogName = CFile::fs_GetFile(_Executable);
 				}
 
-				SimpleLaunch.m_Params.m_fOnOutput = [LaunchActor, pResult, StdInBuffer = CStr(), nStdInIndex = umint(0), _StdInLines](EProcessLaunchOutputType _OutputType, CStr const &_Output) mutable
+				SimpleLaunch.m_Params.m_fOnOutput = [LaunchActor, pResult, StdInBuffer = CStr(), nStdInIndex = umint(0), _StdInLines]
+					(EProcessLaunchOutputType _OutputType, CStr const &_Output) mutable
 					{
 						if (_OutputType == EProcessLaunchOutputType_StdErr)
 							pResult->m_StdErr += _Output;
@@ -1783,8 +1742,7 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 				try
 				{
-					auto LaunchSubscription = LaunchActor(&CProcessLaunchActor::f_Launch, SimpleLaunch, _RunLoopHelper.m_HelperActor)
-						.f_CallSync(_RunLoopHelper.m_pRunLoop, g_Timeout);
+					auto LaunchSubscription = LaunchActor(&CProcessLaunchActor::f_Launch, SimpleLaunch, _RunLoopHelper.m_HelperActor).f_CallSync(_RunLoopHelper.m_pRunLoop, g_Timeout);
 					LaunchFinished.f_MoveFuture().f_CallSync(_RunLoopHelper.m_pRunLoop, g_Timeout);
 					fg_Move(LaunchActor).f_Destroy().f_CallSync(_RunLoopHelper.m_pRunLoop, g_Timeout);
 				}
@@ -1811,7 +1769,7 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 						, _Executable
 						, {"--trust-user-add-authentication-factor", "--authentication-factor", "Password", _UserID}
 						, CFile::fs_GetPath(_Executable)
-						, {_Password, _Password}  // Enter password twice for confirmation
+						, {_Password, _Password} // Enter password twice for confirmation
 					)
 				;
 
@@ -1844,7 +1802,8 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 					DMibLogWithCategory(Test, Info, "Allow Hosts for namespace '{}'", _Namespace);
 					_AppManager.m_LaunchInfo.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace)
-						(fg_Move(Hosts)).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
+						(fg_Move(Hosts))
+						.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
 					;
 				}
 
@@ -1856,7 +1815,8 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 					DMibLogWithCategory(Test, Info, "Allow Hosts for authentication namespace");
 					_AppManager.m_LaunchInfo.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace)
-						(fg_Move(AuthHosts)).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
+						(fg_Move(AuthHosts))
+						.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
 					;
 				}
 
@@ -1866,7 +1826,8 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 					{
 						DMibLogWithCategory(Test, Info, "Add Client Connection");
 						_AppManager.m_LaunchInfo.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)
-							(CDistributedActorTrustManagerInterface::CAddClientConnection{.m_TrustTicket = Ticket, .m_Timeout = g_Timeout}).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
+							(CDistributedActorTrustManagerInterface::CAddClientConnection{.m_TrustTicket = Ticket, .m_Timeout = g_Timeout})
+							.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
 						;
 					}
 				}
@@ -1925,11 +1886,7 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 					DMibLogWithCategory(Test, Info, "Allow Hosts");
 
 					TrustManager.f_CallActor(&CDistributedActorTrustManager::f_AllowHostsForNamespace)
-						(
-							CVersionManager::mc_pDefaultNamespace
-							, fg_CreateSet<CStr>(VersionManagerHostID)
-							, mcp_WaitForSubscriptions
-						)
+						(CVersionManager::mc_pDefaultNamespace, fg_CreateSet<CStr>(VersionManagerHostID), mcp_WaitForSubscriptions)
 						.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
 					;
 				}
@@ -1969,14 +1926,18 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 					(
 						VersionManagerExecutable
 						, fg_CreateVector<CStr>
-							(
-								"--trust-permission-add"
-								, "--host", _HostID
-								, "--user", _UserID
-								, _Permission
-								, "--authentication-factors", "[\"Password\"]"
-								, "--max-lifetime", "0"  // No caching - always prompt for password
-							)
+						(
+							"--trust-permission-add"
+							, "--host"
+							, _HostID
+							, "--user"
+							, _UserID
+							, _Permission
+							, "--authentication-factors"
+							, "[\"Password\"]"
+							, "--max-lifetime"
+							, "0" // No caching - always prompt for password
+						)
 					)
 				;
 			}
@@ -1992,17 +1953,9 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 					(
 						RunLoopHelper
 						, _AppManager.m_RootPath / "AppManager"
-						, fg_CreateVector<CStr>
-							(
-								"--application-add"
-								, "--name", _AppName
-								, "--update-tags", "[\"TestTag\"]"
-								, "--auto-update"
-								, "--authentication-user", _UserID
-								, "AppManager"
-							)
+						, fg_CreateVector<CStr>("--application-add", "--name", _AppName, "--update-tags", "[\"TestTag\"]", "--auto-update", "--authentication-user", _UserID, "AppManager")
 						, _AppManager.m_RootPath
-						, {_Password}  // Provide password when prompted
+						, {_Password} // Provide password when prompted
 					)
 				;
 
@@ -2148,7 +2101,12 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		if (bVersionManagerSupportsMultiAuth)
 		{
 			// Test 2-4: Run parallel downloads in different permission modes
-			enum class EParallelTestMode { ESucceed, EFail, EMixed };
+			enum class EParallelTestMode
+			{
+				ESucceed
+				, EFail
+				, EMixed
+			};
 
 			auto fParallelDownloadTest = [&](EParallelTestMode _Mode, CStr _TestName) -> TCUnsafeFuture<void>
 				{
@@ -2164,9 +2122,9 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 						bool bShouldSucceed;
 						switch (_Mode)
 						{
-							case EParallelTestMode::ESucceed: bShouldSucceed = true; break;
-							case EParallelTestMode::EFail: bShouldSucceed = false; break;
-							case EParallelTestMode::EMixed: bShouldSucceed = (i % 2 == 0); break; // alternating
+						case EParallelTestMode::ESucceed: bShouldSucceed = true; break;
+						case EParallelTestMode::EFail: bShouldSucceed = false; break;
+						case EParallelTestMode::EMixed: bShouldSucceed = (i % 2 == 0); break; // alternating
 						}
 
 						auto const &User = bShouldSucceed ? UserInfo : UserInfoNoPerms;
@@ -2187,10 +2145,13 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 											, fg_CreateVector<CStr>
 											(
 												"--application-add"
-												, "--name", AppName
-												, "--update-tags", "[\"TestTag\"]"
+												, "--name"
+												, AppName
+												, "--update-tags"
+												, "[\"TestTag\"]"
 												, "--auto-update"
-												, "--authentication-user", UserID
+												, "--authentication-user"
+												, UserID
 												, "AppManager"
 											)
 											, AppManager_AppManager.m_RootPath
@@ -2199,7 +2160,8 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 									;
 									return Result.m_bSuccess ? "" : Result.m_StdErr.f_Trim();
 								}
-							).f_Call()
+							)
+							.f_Call()
 						;
 
 						if (bAppManagerSupportsMultiAuth)
@@ -2244,7 +2206,6 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 	}
 
 public:
-
 	void f_DoTests()
 	{
 		DMibTestCategory(NTest::CTestCategory("General") << NTest::CTestGroup("SuperUser"))
@@ -2336,7 +2297,8 @@ public:
 				{
 					for (auto &KeyManager : KeyManagers)
 					{
-						CStr TestPath = "AppManager {}-VersionManager {}-KeyManager {}"_f
+						CStr TestPath
+							= "AppManager {}-VersionManager {}-KeyManager {}"_f
 							<< CFile::fs_GetFile(CFile::fs_GetPath(AppManager))
 							<< CFile::fs_GetFile(CFile::fs_GetPath(VersionManager))
 							<< CFile::fs_GetFile(CFile::fs_GetPath(KeyManager))
@@ -2347,7 +2309,8 @@ public:
 							if (NProcess::NPlatform::fg_Process_GetElevation() == EProcessElevation_IsNotElevated)
 								DMibError("You need to be elevated to run these tests (sudo)");
 
-							CStr UniqueName = "{}-{}-{}"_f
+							CStr UniqueName
+								= "{}-{}-{}"_f
 								<< CFile::fs_GetFile(CFile::fs_GetPath(AppManager))
 								<< CFile::fs_GetFile(CFile::fs_GetPath(VersionManager))
 								<< CFile::fs_GetFile(CFile::fs_GetPath(KeyManager))
@@ -2360,22 +2323,15 @@ public:
 							fInit(AppManagerPath, VersionManagerPath, KeyManagerPath, UniqueName);
 							fp_RunUpgradeTests(AppManagerPath, VersionManagerPath, KeyManagerPath, UniqueName);
 						};
-
 					}
 
-					CStr TestPath = "AppManager {}-VersionManager {}"_f
-						<< CFile::fs_GetFile(CFile::fs_GetPath(AppManager))
-						<< CFile::fs_GetFile(CFile::fs_GetPath(VersionManager))
-					;
+					CStr TestPath = "AppManager {}-VersionManager {}"_f << CFile::fs_GetFile(CFile::fs_GetPath(AppManager)) << CFile::fs_GetFile(CFile::fs_GetPath(VersionManager));
 					DMibTestSuite("MultiAuth-" + TestPath)
 					{
 						if (NProcess::NPlatform::fg_Process_GetElevation() == EProcessElevation_IsNotElevated)
 							DMibError("You need to be elevated to run these tests (sudo)");
 
-						CStr UniqueName = "MA-{}-{}"_f
-							<< CFile::fs_GetFile(CFile::fs_GetPath(AppManager))
-							<< CFile::fs_GetFile(CFile::fs_GetPath(VersionManager))
-						;
+						CStr UniqueName = "MA-{}-{}"_f << CFile::fs_GetFile(CFile::fs_GetPath(AppManager)) << CFile::fs_GetFile(CFile::fs_GetPath(VersionManager));
 
 						CStr AppManagerPath = AppManager;
 						CStr VersionManagerPath = VersionManager;

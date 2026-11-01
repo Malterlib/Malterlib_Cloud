@@ -12,13 +12,13 @@ namespace NMib::NCloud
 {
 	DMibImpErrorClassDefine(CExceptionCloudAPI, NException::CException);
 
-#	define DMibErrorCloudAPI(_Description) DMibImpError(NMib::NCloud::CExceptionCloudAPI, _Description)
-#	define DMibErrorCloudAPIInstance(_Description) DMibImpErrorInstance(NMib::NCloud::CExceptionCloudAPI, _Description)
+#define DMibErrorCloudAPI(_Description) DMibImpError(NMib::NCloud::CExceptionCloudAPI, _Description)
+#define DMibErrorCloudAPIInstance(_Description) DMibImpErrorInstance(NMib::NCloud::CExceptionCloudAPI, _Description)
 
-#	ifndef DMibPNoShortCuts
-#		define DErrorCloudAPI(_Description) DMibErrorCloudAPI(_Description)
-#		define DErrorCloudAPIInstance(_Description) DMibErrorCloudAPIInstance(_Description)
-#	endif
+#ifndef DMibPNoShortCuts
+#	define DErrorCloudAPI(_Description) DMibErrorCloudAPI(_Description)
+#	define DErrorCloudAPIInstance(_Description) DMibErrorCloudAPIInstance(_Description)
+#endif
 
 	struct CCloudAPIManager : public NConcurrency::CActor
 	{
@@ -29,7 +29,7 @@ namespace NMib::NCloud
 
 		enum : uint32
 		{
-			EProtocolVersion_Min = 0x101
+			EProtocolVersion_Min       = 0x101
 			, EProtocolVersion_Current = 0x102
 		};
 
@@ -117,5 +117,5 @@ namespace NMib::NCloud
 }
 
 #ifndef DMibPNoShortCuts
-	using namespace NMib::NCloud;
+using namespace NMib::NCloud;
 #endif

@@ -144,9 +144,7 @@ namespace NMib::NCloud::NCloudAPIManager
 					, [&]<typename tf_CException>(tf_CException const &_Exception)
 					{
 						if constexpr (NTraits::cIsSame<tf_CException, CExceptionCloudAPI>)
-						{
 							Messages.f_Insert(fg_Format("{}: {}", _Error, _Exception.f_GetErrorStr()));
-						}
 						else
 						{
 							Messages.f_Insert(_Error);

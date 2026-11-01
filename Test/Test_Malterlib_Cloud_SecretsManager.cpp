@@ -27,7 +27,7 @@
 #include <Mib/File/DirectoryManifest>
 
 #ifdef DPlatformFamily_Windows
-#include <Windows.h>
+#	include <Windows.h>
 #endif
 
 using namespace NMib;
@@ -67,12 +67,10 @@ namespace
 		}
 
 		template <typename tf_CStr>
-		void f_Open(const tf_CStr &_FileName, EFileOpen _OpenFlags, EFileAttrib _Attributes = EFileAttrib_None)
+		void f_Open(tf_CStr const &_FileName, EFileOpen _OpenFlags, EFileAttrib _Attributes = EFileAttrib_None)
 		{
 			if (m_pOpenEvent && fg_StrFindReverse(_FileName, ".txt") != -1)
-			{
 				m_pOpenEvent->f_WaitTimeout(60.0);
-			}
 
 			TCBinaryStreamFile<t_CStreamType>::m_File.f_Open(_FileName, _OpenFlags, _Attributes);
 		}
@@ -80,9 +78,7 @@ namespace
 		void f_Close()
 		{
 			if (m_pCloseEvent)
-			{
 				m_pCloseEvent->f_WaitTimeout(60.0);
-			}
 
 			TCBinaryStreamFile<t_CStreamType>::m_File.f_Close();
 		}
@@ -95,24 +91,20 @@ namespace
 		DMibStreamImplementProtected(TCBinaryStreamFileDelayed);
 	};
 
-	template <typename tf_CKey, typename tf_CValue, typename... tf_CParams>
+	template <typename tf_CKey, typename tf_CValue, typename ...tf_CParams>
 	void fg_CreateMapHelper(TCMap<tf_CKey, tf_CValue> &_Return)
 	{
 	}
 
-	template <typename tf_CKey, typename tf_CValue, typename... tf_CParams>
+	template <typename tf_CKey, typename tf_CValue, typename ...tf_CParams>
 	void fg_CreateMapHelper(TCMap<tf_CKey, tf_CValue> &_Return, tf_CKey &&_First, tf_CParams && ...p_Params)
 	{
 		_Return[fg_Forward<tf_CKey>(_First)];
 		fg_CreateMapHelper<tf_CKey, tf_CValue>(_Return, fg_Forward<tf_CParams>(p_Params)...);
 	}
 
-	template <typename tf_CKey, typename tf_CValue, typename... tf_CParams>
-	TCMap<NTraits::TCRemoveReferenceAndQualifiers<tf_CKey>, NTraits::TCRemoveReferenceAndQualifiers<tf_CValue>> fg_CreateMap
-		(
-			tf_CKey && _First
-			, tf_CParams && ...p_Params
-		)
+	template <typename tf_CKey, typename tf_CValue, typename ...tf_CParams>
+	TCMap<NTraits::TCRemoveReferenceAndQualifiers<tf_CKey>, NTraits::TCRemoveReferenceAndQualifiers<tf_CValue>> fg_CreateMap(tf_CKey &&_First, tf_CParams && ...p_Params)
 	{
 		TCMap<NTraits::TCRemoveReferenceAndQualifiers<tf_CKey>, NTraits::TCRemoveReferenceAndQualifiers<tf_CValue>> Return;
 		fg_CreateMapHelper<NTraits::TCRemoveReferenceAndQualifiers<tf_CKey>, NTraits::TCRemoveReferenceAndQualifiers<tf_CValue>>
@@ -125,7 +117,7 @@ namespace
 		return Return;
 	}
 
-	template <typename tf_CKey, typename tf_CValue, typename... tf_CParams>
+	template <typename tf_CKey, typename tf_CValue, typename ...tf_CParams>
 	TCMap<tf_CKey, tf_CValue> fg_CreateMap(tf_CParams && ...p_Params)
 	{
 		TCMap<tf_CKey, tf_CValue> Return;
@@ -148,12 +140,7 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 	{
 #ifdef DPlatformFamily_Windows
 		AllocConsole();
-		SetConsoleCtrlHandler
-			(
-				nullptr
-				, true
-			)
-		;
+		SetConsoleCtrlHandler(nullptr, true);
 #endif
 
 		CActorRunLoopTestHelper RunLoopHelper;
@@ -418,34 +405,21 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 			TrustSecretsManagers.f_Remove(SecretsManagerHostID);
 #if 0
 			SecretsManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace)
-				(
-					fNamespaceHosts("com.malterlib/Cloud/SecretsManagerCoordination", TrustSecretsManagers)
-				)
+				(fNamespaceHosts("com.malterlib/Cloud/SecretsManagerCoordination", TrustSecretsManagers))
 				> SetupTrustResults
 			;
 #endif
 			SecretsManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace)
-				(
-					fNamespaceHosts(CKeyManager::mc_pDefaultNamespace, fg_CreateSet<CStr>(KeyManagerHostID))
-				)
+				(fNamespaceHosts(CKeyManager::mc_pDefaultNamespace, fg_CreateSet<CStr>(KeyManagerHostID)))
 				> SetupTrustResults
 			;
 
 			TrustManager.f_CallActor(&CDistributedActorTrustManager::f_AllowHostsForNamespace)
-				(
-					CSecretsManager::mc_pDefaultNamespace
-					, fg_CreateSet<CStr>(SecretsManagerHostID)
-					, c_WaitForSubscriptions
-				)
+				(CSecretsManager::mc_pDefaultNamespace, fg_CreateSet<CStr>(SecretsManagerHostID), c_WaitForSubscriptions)
 				> SetupTrustResults
 			;
 
-			SecretsManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
-				(
-					fPermissionsAdd(TestHostID, SecretsManagerPermissionsForTest)
-				)
-				> SetupTrustResults
-			;
+			SecretsManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)(fPermissionsAdd(TestHostID, SecretsManagerPermissionsForTest)) > SetupTrustResults;
 
 			for (auto &SecretsManagerInner : AllSecretsManagers)
 			{
@@ -457,9 +431,7 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 
 				TCPromise<void> Promise;
 				SecretsManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket)
-					(
-						CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{SecretsManager.m_Address}
-					)
+					(CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{SecretsManager.m_Address})
 					> Promise / [=](CDistributedActorTrustManagerInterface::CTrustGenerateConnectionTicketResult &&_Ticket)
 					{
 						auto &SecretsManagerTrustInner = *pSecretsManagerTrustInner;
@@ -470,14 +442,11 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 					}
 				;
 				Promise.f_MoveFuture() > SetupTrustResults;
-
 			}
 
 			TCPromise<void> Promise;
 			KeyManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket)
-				(
-					CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{KeyManagerServerAddress}
-				)
+				(CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{KeyManagerServerAddress})
 				> Promise / [=](CDistributedActorTrustManagerInterface::CTrustGenerateConnectionTicketResult &&_Ticket)
 				{
 					auto &SecretsManagerTrust = *pSecretsManagerTrust;
@@ -604,7 +573,8 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 			;
 			auto fSetProperties = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name, CSecretsManager::CSecretProperties &&_Properties)
 				{
-					SecretsManager.f_CallActor(&CSecretsManager::f_SetSecretProperties)(CSecretsManager::CSecretID{_Folder, _Name}, fg_Move(_Properties) )
+					SecretsManager.f_CallActor(&CSecretsManager::f_SetSecretProperties)
+						(CSecretsManager::CSecretID{_Folder, _Name}, fg_Move(_Properties))
 						.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
 					;
 				}
@@ -625,10 +595,11 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 					return SecretsManager.f_CallActor(&CSecretsManager::f_EnumerateSecrets)(EnumerateProperties).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 				}
 			;
-			auto fAddTagsAndGetProperties = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name, TCSet<NStr::CStr> const &_RemoveTags, TCSet<NStr::CStr> const &_AddTags)
-				-> CSecretsManager::CSecretProperties
+			auto fAddTagsAndGetProperties = [&]
+				(NStr::CStr const &_Folder, NStr::CStr const &_Name, TCSet<NStr::CStr> const &_RemoveTags, TCSet<NStr::CStr> const &_AddTags) -> CSecretsManager::CSecretProperties
 				{
-					SecretsManager.f_CallActor(&CSecretsManager::f_ModifyTags)(CSecretsManager::CSecretID{_Folder, _Name}, _RemoveTags, _AddTags)
+					SecretsManager.f_CallActor(&CSecretsManager::f_ModifyTags)
+						(CSecretsManager::CSecretID{_Folder, _Name}, _RemoveTags, _AddTags)
 						.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
 					;
 					return fGetProperties(_Folder, _Name);
@@ -646,7 +617,8 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 			;
 			auto fRemoveKey = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name, NStr::CStr const &_Key)
 				{
-					SecretsManager.f_CallActor(&CSecretsManager::f_RemoveMetadata)(CSecretsManager::CSecretID{_Folder, _Name}, fg_TempCopy(_Key))
+					SecretsManager.f_CallActor(&CSecretsManager::f_RemoveMetadata)
+						(CSecretsManager::CSecretID{_Folder, _Name}, fg_TempCopy(_Key))
 						.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
 					;
 				}
@@ -661,7 +633,7 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 					return CSecretsManager::CSecretID::fs_Parse(_CompoundName);
 				}
 			;
-			auto fSecretIDSet = [&](auto &&...p_CompoundNames)
+			auto fSecretIDSet = [&](auto && ...p_CompoundNames)
 				{
 					return TCSet<CSecretsManager::CSecretID>{fSecretID(p_CompoundNames)...};
 				}
@@ -814,7 +786,6 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 
 				DMibExpectException(fGetSecret("NoMatch", "Name2"), DMibErrorInstance("No secret matching ID: 'NoMatch/Name2'"));
 				DMibExpectException(fGetSecret("Folder1", "NoMatch"), DMibErrorInstance("No secret matching ID: 'Folder1/NoMatch'"));
-
 			}
 
 			{
@@ -826,44 +797,43 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 				DMibExpect(*fGetProperties("Folder2", "Name1").m_Tags, ==, (TCSet<NStr::CStrSecure>{{"Shared2"}}));
 
 				// No op
-				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {},            {}                      )).m_Tags, ==, (TCSet<NStr::CStrSecure>{{"Shared1", "Unique1"}}));
+				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {}, {})).m_Tags, ==, (TCSet<NStr::CStrSecure>{{"Shared1", "Unique1"}}));
 				{
 					DMibTestPath("Changes 1");
 					DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Folder1/Name1"));
 				}
 				// Add tags
-				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {},            {{"Added"}}             )).m_Tags, ==, (TCSet<NStr::CStrSecure>{{"Shared1", "Unique1", "Added"}}));
+				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {}, {{"Added"}})).m_Tags, ==, (TCSet<NStr::CStrSecure>{{"Shared1", "Unique1", "Added"}}));
 				{
 					DMibTestPath("Changes 2");
 					DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Folder1/Name1"));
-
 				}
 				// Remove
-				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {{"Shared1"}}, {}                      )).m_Tags, ==, (TCSet<NStr::CStrSecure>{{"Unique1", "Added"}}));
+				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {{"Shared1"}}, {})).m_Tags, ==, (TCSet<NStr::CStrSecure>{{"Unique1", "Added"}}));
 				{
 					DMibTestPath("Changes 3");
 					DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Folder1/Name1"));
 				}
-				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {{"Unique1"}}, {}                      )).m_Tags, ==, (TCSet<NStr::CStrSecure>{{"Added"}}));
+				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {{"Unique1"}}, {})).m_Tags, ==, (TCSet<NStr::CStrSecure>{{"Added"}}));
 				{
 					DMibTestPath("Changes 4");
 					DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Folder1/Name1"));
 				}
 				// Remove and Add
-				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {{"Added"}},   {{"Shared1", "Unique1"}})).m_Tags, ==, (TCSet<NStr::CStrSecure>{{"Shared1", "Unique1"}}));
+				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {{"Added"}}, {{"Shared1", "Unique1"}})).m_Tags, ==, (TCSet<NStr::CStrSecure>{{"Shared1", "Unique1"}}));
 				{
 					DMibTestPath("Changes 5");
 					DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Folder1/Name1"));
 				}
 				// Remove non-present tag
-				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {{"Added"}},   {}                      )).m_Tags, ==, (TCSet<NStr::CStrSecure>{{"Shared1", "Unique1"}}));
+				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {{"Added"}}, {})).m_Tags, ==, (TCSet<NStr::CStrSecure>{{"Shared1", "Unique1"}}));
 				{
 					DMibTestPath("Changes 6");
 					DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Folder1/Name1"));
 				}
 
 				// Add to Secret with no existing tags
-				DMibExpect(*(fAddTagsAndGetProperties("Folder2", "Name2", {},            {{"Unique3"}}           )).m_Tags, ==, TCSet<NStr::CStrSecure>{{"Unique3"}});
+				DMibExpect(*(fAddTagsAndGetProperties("Folder2", "Name2", {}, {{"Unique3"}})).m_Tags, ==, TCSet<NStr::CStrSecure>{{"Unique3"}});
 				{
 					DMibTestPath("Changes 7");
 					DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Folder2/Name2"));
@@ -878,20 +848,20 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 				DMibExpectException(fModifySecret("NoMatch", "Name1", {}, {}), DMibErrorInstance("No secret matching ID: 'NoMatch/Name1'"));
 				DMibExpectException(fModifySecret("Folder1", "NoMatch", {}, {}), DMibErrorInstance("No secret matching ID: 'Folder1/NoMatch'"));
 
-				DMibExpectException(fModifySecret("Folder1", "Name1", {{"Not/Allowed"}}, {}),                DMibErrorInstance("Malformed Tag: 'Not/Allowed'"));
-				DMibExpectException(fModifySecret("Folder1", "Name1", {},                {{"Not/Allowed"}}), DMibErrorInstance("Malformed Tag: 'Not/Allowed'"));
+				DMibExpectException(fModifySecret("Folder1", "Name1", {{"Not/Allowed"}}, {}), DMibErrorInstance("Malformed Tag: 'Not/Allowed'"));
+				DMibExpectException(fModifySecret("Folder1", "Name1", {}, {{"Not/Allowed"}}), DMibErrorInstance("Malformed Tag: 'Not/Allowed'"));
 			}
 
 			{
 				DMibTestPath("GetSecrets by SemanticID");
 
-				DMibExpect(fGetBySemantic("Semantic1", {}),                       ==, StringSecret);
-				DMibExpect(fGetBySemantic("Semantic1", {{"Unique1"}}),            ==, StringSecret);
-				DMibExpect(fGetBySemantic("Semantic1", {{"Shared1"}}),            ==, StringSecret);
+				DMibExpect(fGetBySemantic("Semantic1", {}), ==, StringSecret);
+				DMibExpect(fGetBySemantic("Semantic1", {{"Unique1"}}), ==, StringSecret);
+				DMibExpect(fGetBySemantic("Semantic1", {{"Shared1"}}), ==, StringSecret);
 				DMibExpect(fGetBySemantic("Semantic1", {{"Unique1", "Shared1"}}), ==, StringSecret);
-				DMibExpect(fGetBySemantic("Semantic2", {{"Unique2"}}),            ==, ByteVectorSecret);
+				DMibExpect(fGetBySemantic("Semantic2", {{"Unique2"}}), ==, ByteVectorSecret);
 				// Semantic4 has no secret set - check for a NotSet secret
-				DMibExpect(fGetBySemantic("Semantic4", {}),                       ==, CSecretsManager::CSecret{});
+				DMibExpect(fGetBySemantic("Semantic4", {}), ==, CSecretsManager::CSecret{});
 
 				DMibExpectException(fGetBySemantic("NoMatch", {}), DMibErrorInstance("No secret matching Semantic ID: 'NoMatch'"));
 				DMibExpectException
@@ -901,30 +871,25 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 					)
 				;
 
-				DMibExpectException(fGetBySemantic("Semantic2", {}),          DMibErrorInstance("Multiple secrets matching Semantic ID: 'Semantic2'"));
+				DMibExpectException(fGetBySemantic("Semantic2", {}), DMibErrorInstance("Multiple secrets matching Semantic ID: 'Semantic2'"));
 				DMibExpectException(fGetBySemantic("Semantic2", {"Shared2"}), DMibErrorInstance("Multiple secrets matching Semantic ID: 'Semantic2' and Tag: 'Shared2'"));
 			}
 
 			{
 				DMibTestPath("Test Enumeration");
 
-				DMibExpect
-					(
-						fEnumerateFor({},{}), ==, (TCSet<CSecretsManager::CSecretID>{{"Folder1", "Name1"}, {"Folder1", "Name2"}, {"Folder2", "Name1"}, {"Folder2", "Name2"}})
-					)
-				;
-				DMibExpect(fEnumerateFor({{"Semantic1"}}, {}),            ==, (TCSet<CSecretsManager::CSecretID>{{"Folder1", "Name1"}}));
+				DMibExpect(fEnumerateFor({}, {}), ==, (TCSet<CSecretsManager::CSecretID>{{"Folder1", "Name1"}, {"Folder1", "Name2"}, {"Folder2", "Name1"}, {"Folder2", "Name2"}}));
+				DMibExpect(fEnumerateFor({{"Semantic1"}}, {}), ==, (TCSet<CSecretsManager::CSecretID>{{"Folder1", "Name1"}}));
 				DMibExpect(fEnumerateFor({{"Semantic1"}}, {{"Unique1"}}), ==, (TCSet<CSecretsManager::CSecretID>{{"Folder1", "Name1"}}));
 				DMibExpect(fEnumerateFor({{"Semantic1"}}, {{"NoMatch"}}), ==, (TCSet<CSecretsManager::CSecretID>{}));
-				DMibExpect(fEnumerateFor({},              {{"Shared1"}}), ==, (TCSet<CSecretsManager::CSecretID>{{"Folder1", "Name1"}, {"Folder1", "Name2"}}));
-				DMibExpect(fEnumerateFor({},              {{"Shared2"}}), ==, (TCSet<CSecretsManager::CSecretID>{{"Folder2", "Name1"}, {"Folder1", "Name2"}}));
-				DMibExpect(fEnumerateFor({},              {{"NoMatch"}}), ==, (TCSet<CSecretsManager::CSecretID>{}));
-				DMibExpect(fEnumerateFor({{"NoMatch"}},   {}),            ==, (TCSet<CSecretsManager::CSecretID>{}));
+				DMibExpect(fEnumerateFor({}, {{"Shared1"}}), ==, (TCSet<CSecretsManager::CSecretID>{{"Folder1", "Name1"}, {"Folder1", "Name2"}}));
+				DMibExpect(fEnumerateFor({}, {{"Shared2"}}), ==, (TCSet<CSecretsManager::CSecretID>{{"Folder2", "Name1"}, {"Folder1", "Name2"}}));
+				DMibExpect(fEnumerateFor({}, {{"NoMatch"}}), ==, (TCSet<CSecretsManager::CSecretID>{}));
+				DMibExpect(fEnumerateFor({{"NoMatch"}}, {}), ==, (TCSet<CSecretsManager::CSecretID>{}));
 			}
 
 			{
 				DMibTestPath("Test metadata");
-
 
 				auto fSetKeyValueAndGet = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name, NStr::CStr const &_Key, CEJsonSorted const &_Value) -> CSecretsManager::CSecretProperties
 					{
@@ -970,10 +935,7 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 					auto TimeBeforeSetPropertiesCall = NTime::CTime::fs_NowUTC();
 					NMib::NSys::fg_Thread_Sleep(NMib::NTime::NPlatform::fg_TimeRaw_Resolution());
 					SecretsManager.f_CallActor(&CSecretsManager::f_SetSecretProperties)
-						(
-							CSecretsManager::CSecretID{"Test", "Test1"}
-							, CSecretsManager::CSecretProperties{}
-						 )
+						(CSecretsManager::CSecretID{"Test", "Test1"}, CSecretsManager::CSecretProperties{})
 						.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
 					;
 					NMib::NSys::fg_Thread_Sleep(NMib::NTime::NPlatform::fg_TimeRaw_Resolution());
@@ -995,11 +957,7 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 						auto TimeBeforeSetPropertiesCall = NTime::CTime::fs_NowUTC();
 						NMib::NSys::fg_Thread_Sleep(NMib::NTime::NPlatform::fg_TimeRaw_Resolution());
 						SecretsManager.f_CallActor(&CSecretsManager::f_SetSecretProperties)
-							(
-								CSecretsManager::CSecretID{"Test", "Test1"}
-								, CSecretsManager::CSecretProperties{}
-								.f_SetCreated(NTime::CTimeConvert::fs_CreateTime(1972, 2, 2))
-							 )
+							(CSecretsManager::CSecretID{"Test", "Test1"}, CSecretsManager::CSecretProperties{}.f_SetCreated(NTime::CTimeConvert::fs_CreateTime(1972, 2, 2)))
 							.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
 						;
 						NMib::NSys::fg_Thread_Sleep(NMib::NTime::NPlatform::fg_TimeRaw_Resolution());
@@ -1017,11 +975,7 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 					}
 					{
 						SecretsManager.f_CallActor(&CSecretsManager::f_SetSecretProperties)
-							(
-								CSecretsManager::CSecretID{"Test", "Test1"}
-								, CSecretsManager::CSecretProperties{}
-								.f_SetModified(NTime::CTimeConvert::fs_CreateTime(1973, 3, 3))
-							 )
+							(CSecretsManager::CSecretID{"Test", "Test1"}, CSecretsManager::CSecretProperties{}.f_SetModified(NTime::CTimeConvert::fs_CreateTime(1973, 3, 3)))
 							.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
 						;
 						// Verify that Modified was set correctly and that Created retained its value
@@ -1105,7 +1059,6 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 									DMibExpect(ContentAfterSetProperties.f_GetTags(), ==, _PropertiesToSet.f_GetTags());
 								else
 									DMibExpect(ContentAfterSetProperties.f_GetTags(), ==, ContentBeforeSetProperties.f_GetTags());
-
 							}
 						;
 
@@ -1124,7 +1077,7 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 								.f_SetModified(NTime::CTimeConvert::fs_CreateTime(1976, 6, 6))
 								.f_SetSemanticID("SemanticID")
 								.f_AddTags({"Tag1", "Tag2"})
-							 )
+							)
 						;
 						{
 							DMibTestPath("Changes 14");
@@ -1199,7 +1152,6 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 				}
 			}
 
-
 			auto fAddPermissions = [&](TCMap<CStr, CPermissionRequirements> const &_Permissions)
 				{
 					for (auto &SecretsManager : AllSecretsManagers)
@@ -1208,9 +1160,7 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 						auto &SecretsManagerTrust = *pSecretsManagerTrust;
 
 						SecretsManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
-							(
-								fPermissionsAdd(TestHostID, _Permissions)
-							)
+							(fPermissionsAdd(TestHostID, _Permissions))
 							.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
 						;
 					}
@@ -1235,9 +1185,7 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 						auto &SecretsManagerTrust = *pSecretsManagerTrust;
 
 						SecretsManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_RemovePermissions)
-							(
-								fPermissionsRemove(TestHostID, Permissions)
-							)
+							(fPermissionsRemove(TestHostID, Permissions))
 							.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
 						;
 					}
@@ -1252,7 +1200,6 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 					fRemovePermissions(Permissions);
 				}
 			;
-
 
 			// So far we have used the Wildcard and All permissions. Remove them so we can test more fine grained permissions.
 			fRemovePermissions(SecretsManagerPermissionsForTest);
@@ -1359,9 +1306,9 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 					{
 						DMibExpectException
 							(
-								 fGetBySemantic("Semantic1", {{"Shared1", "Unique1"}})
-								 , DMibErrorInstance("No secret matching Semantic ID: 'Semantic1' and Tags: 'Shared1', 'Unique1'")
-							 )
+								fGetBySemantic("Semantic1", {{"Shared1", "Unique1"}})
+								, DMibErrorInstance("No secret matching Semantic ID: 'Semantic1' and Tags: 'Shared1', 'Unique1'")
+							)
 						;
 					}
 					fAddPermission(Needed.fs_GetKey(Permission));
@@ -1372,8 +1319,8 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 					// Check that access is permitted again
 					DMibExpect(fGetBySemantic("Semantic1", {{"Shared1", "Unique1"}}), ==, StringSecret);
 					// Check that we find it for a subset of the tags
-					DMibExpect(fGetBySemantic("Semantic1", {{"Unique1"}}           ), ==, StringSecret);
-					DMibExpect(fGetBySemantic("Semantic1", {{"Shared1"}}           ), ==, StringSecret);
+					DMibExpect(fGetBySemantic("Semantic1", {{"Unique1"}}), ==, StringSecret);
+					DMibExpect(fGetBySemantic("Semantic1", {{"Shared1"}}), ==, StringSecret);
 
 					// This one is a bit strange, but the semantic ID does not work as the tags, where a subset of tags can find a matching secret.
 					// The empty semantic ID will only match secrets with an empty semantic ID
@@ -1398,7 +1345,6 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 						"SecretsManager/Read/SemanticID/Semantic1/Tag/Shared1"
 						, "SecretsManager/Read/SemanticID/Semantic1/Tag/Unique1"
 						, "SecretsManager/Command/EnumerateSecrets"
-
 					)
 				;
 				// Add all permissions we need
@@ -1501,14 +1447,14 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 					fAddPermissions({{"SecretsManager/Write/SemanticID/SemanticNew/Tag/TagNew", {}}});
 					DMibExpectException
 						(
-							 fSetProperties("New", "New", CSecretsManager::CSecretProperties{}.f_SetSemanticID("SemanticNew").f_SetTags({"NoMatch"}))
+							fSetProperties("New", "New", CSecretsManager::CSecretProperties{}.f_SetSemanticID("SemanticNew").f_SetTags({"NoMatch"}))
 							, DMibErrorInstance("Access denied")
 						)
 					;
 
 					DMibExpectException
 						(
-							 fSetProperties("New", "New", CSecretsManager::CSecretProperties{}.f_SetSemanticID("NoMatch").f_SetTags({"TagNew"}))
+							fSetProperties("New", "New", CSecretsManager::CSecretProperties{}.f_SetSemanticID("NoMatch").f_SetTags({"TagNew"}))
 							, DMibErrorInstance("Access denied")
 						)
 					;
@@ -1631,7 +1577,6 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 				fRemovePermissions(Needed);
 			}
 
-
 			{
 				DMibTestPath("Test RemoveMetadata Command Permissions");
 
@@ -1690,7 +1635,6 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 				}
 				fRemovePermissions({"SecretsManager/Command/SetSecretProperties"});
 
-
 				for (auto const &Permission : Needed)
 				{
 					DMibTestPath(fg_Format("Test RemoveSecret Permissions. Missing '{}' permission", Needed.fs_GetKey(Permission)));
@@ -1724,7 +1668,7 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 		{
 			DMibTestPath("Check Database Content");
 
-			for (auto &Launch: SecretsManagerLaunches)
+			for (auto &Launch : SecretsManagerLaunches)
 				Launch.m_Subscription->f_Destroy().f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 
 			// Launch SecretsManagers
@@ -1788,13 +1732,14 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 			;
 			auto fSetProperties = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name, CSecretsManager::CSecretProperties &&_Properties)
 				{
-					SecretsManager.f_CallActor(&CSecretsManager::f_SetSecretProperties)(CSecretsManager::CSecretID{_Folder, _Name}, fg_Move(_Properties))
+					SecretsManager.f_CallActor(&CSecretsManager::f_SetSecretProperties)
+						(CSecretsManager::CSecretID{_Folder, _Name}, fg_Move(_Properties))
 						.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
 					;
 				}
 			;
-			auto fSetPropertiesNoWait = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name, CSecretsManager::CSecretProperties &&_Properties)
-				-> TCFuture<CSecretsManager::CSetSecretPropertiesResult>
+			auto fSetPropertiesNoWait = [&]
+				(NStr::CStr const &_Folder, NStr::CStr const &_Name, CSecretsManager::CSecretProperties &&_Properties) -> TCFuture<CSecretsManager::CSetSecretPropertiesResult>
 				{
 					return SecretsManager.f_CallActor(&CSecretsManager::f_SetSecretProperties)(CSecretsManager::CSecretID{_Folder, _Name}, fg_Move(_Properties));
 				}
@@ -1804,7 +1749,7 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 					SecretsManager.f_CallActor(&CSecretsManager::f_RemoveSecret)(CSecretsManager::CSecretID{_Folder, _Name}).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 				}
 			;
-			auto fRemoveSecretNoWait = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name)  -> TCFuture<void>
+			auto fRemoveSecretNoWait = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name) -> TCFuture<void>
 				{
 					return SecretsManager.f_CallActor(&CSecretsManager::f_RemoveSecret)(CSecretsManager::CSecretID{_Folder, _Name});
 				}
@@ -1853,13 +1798,7 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 
 					CDirectorySyncSend::CConfig Config(CFile::fs_AppendPath(_BasePath, _FileName));
 					Config.m_FileOptions.m_fOpenStream = [pOpenEvent = _pOpenEvent, pCloseEvent = _pCloseEvent]
-						(
-							CStr const &_FileName
-							, EDirectorySyncStreamType _FileType
-							, EFileOpen _OpenFlags
-							, EFileAttrib _Attributes
-						)
-						-> NStorage::TCUniquePointer<NStream::CBinaryStream>
+						(CStr const &_FileName, EDirectorySyncStreamType _FileType, EFileOpen _OpenFlags, EFileAttrib _Attributes) -> NStorage::TCUniquePointer<NStream::CBinaryStream>
 						{
 							TCUniquePointer<TCBinaryStreamFileDelayed<>> pFile = fg_Construct(pOpenEvent, pCloseEvent);
 							pFile->f_Open(_FileName, _OpenFlags, _Attributes);
@@ -1867,15 +1806,8 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 						}
 					;
 
-					fg_CurrentActor().f_Bind<fg_UploadSecretFile>
-						(
-							SecretsManager
-							, Dependencies.m_DistributionManager
-							, fg_TempCopy(_ID)
-							, fg_Move(Config)
-							, fg_Reference(o_Subscription)
-						)
-						> Promise / [Promise] (CDirectorySyncSend::CSyncResult &&_Result) mutable
+					fg_CurrentActor().f_Bind<fg_UploadSecretFile>(SecretsManager, Dependencies.m_DistributionManager, fg_TempCopy(_ID), fg_Move(Config), fg_Reference(o_Subscription))
+						> Promise / [Promise](CDirectorySyncSend::CSyncResult &&_Result) mutable
 						{
 							Promise.f_SetResult(_Result.m_Stats.m_nSyncedFiles - 1);
 						}
@@ -1897,13 +1829,7 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 
 					CDirectorySyncReceive::CConfig Config(CFile::fs_GetExpandedPath(_Outfile, _BasePath), _Flags);
 					Config.m_FileOptions.m_fOpenStream = [_pOpenEvent]
-						(
-							CStr const &_FileName
-							, EDirectorySyncStreamType _FileType
-							, EFileOpen _OpenFlags
-							, EFileAttrib _Attributes
-						)
-						-> NStorage::TCUniquePointer<NStream::CBinaryStream>
+						(CStr const &_FileName, EDirectorySyncStreamType _FileType, EFileOpen _OpenFlags, EFileAttrib _Attributes) -> NStorage::TCUniquePointer<NStream::CBinaryStream>
 						{
 							TCUniquePointer<TCBinaryStreamFileDelayed<>> pFile = fg_Construct(_pOpenEvent, nullptr);
 							pFile->f_Open(_FileName, _OpenFlags, _Attributes);

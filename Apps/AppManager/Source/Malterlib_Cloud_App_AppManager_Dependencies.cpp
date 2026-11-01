@@ -133,15 +133,7 @@ namespace NMib::NCloud::NAppManager
 							return;
 						}
 
-						DMibLogWithCategory
-							(
-								Malterlib/Cloud/AppManager
-								, Error
-								, "App '{}' failed to stop (when dependency failed): {}"
-								, Application.m_Name
-								, _Result.f_GetExceptionStr()
-							)
-						;
+						DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "App '{}' failed to stop (when dependency failed): {}", Application.m_Name, _Result.f_GetExceptionStr());
 
 						fp_SetAppLaunchStatus(_pApplication, "Failed to stop (when dependency failed): {}"_f << _Result.f_GetExceptionStr(), CAppManagerInterface::EStatusSeverity_Error);
 					}
@@ -174,15 +166,7 @@ namespace NMib::NCloud::NAppManager
 				if (Application.m_LaunchStatus.f_IsEmpty())
 					fp_AppLaunchStateChanged(_pApplication, fg_Format("Failed launch: {}", _Result.f_GetExceptionStr()), CAppManagerInterface::EStatusSeverity_Error);
 
-				DMibLogWithCategory
-					(
-						Malterlib/Cloud/AppManager
-						, Error
-						, "App '{}' failed launch: {}"
-						, Application.m_Name
-						, _Result.f_GetExceptionStr()
-					)
-				;
+				DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "App '{}' failed launch: {}", Application.m_Name, _Result.f_GetExceptionStr());
 			}
 		;
 

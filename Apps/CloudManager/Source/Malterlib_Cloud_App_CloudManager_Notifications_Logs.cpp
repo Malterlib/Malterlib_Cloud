@@ -122,7 +122,7 @@ namespace NMib::NCloud::NCloudManager
 							}
 
 							Filter.m_LogDataFilter.m_Flags = Flags;
- 						}
+						}
 					}
 				}
 			}
@@ -393,7 +393,7 @@ namespace NMib::NCloud::NCloudManager
 						case CDistributedAppLogReporter::ELogSeverity_Critical: SlackAttachment.m_Color = CSlackActor::EPredefinedColor_Danger; break;
 						case CDistributedAppLogReporter::ELogSeverity_Error: SlackAttachment.m_Color = CSlackActor::EPredefinedColor_Danger; break;
 						case CDistributedAppLogReporter::ELogSeverity_Warning: SlackAttachment.m_Color = CSlackActor::EPredefinedColor_Warning; break;
-						default: SlackAttachment.m_Color = CSlackActor::CRgbColor{0,135,215}; break;
+						default: SlackAttachment.m_Color = CSlackActor::CRgbColor{0, 135, 215}; break;
 						}
 					}
 
@@ -457,13 +457,7 @@ namespace NMib::NCloud::NCloudManager
 
 			CNotifications::fs_LimitMessage(Message, "logs from applications exists");
 
-			co_await mp_This.mp_Notifications.f_PostSlackMessage
-				(
-					CNotifications::EType_Log | NotificationFlags
-					, Message
-					, fg_Default()
-				)
-			;
+			co_await mp_This.mp_Notifications.f_PostSlackMessage(CNotifications::EType_Log | NotificationFlags, Message, fg_Default());
 		}
 
 		if (mp_LastSeenTimestamp != mp_This.mp_GlobalState.m_LastSeenLogTimestamp)

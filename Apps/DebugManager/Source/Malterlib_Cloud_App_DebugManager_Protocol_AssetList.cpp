@@ -24,12 +24,7 @@ namespace NMib::NCloud::NDebugManager
 		if (!bHasPermissions)
 			co_return Auditor.f_AccessDenied("(Upload asset)", Permissions);
 
-		auto AssetGenerator = co_await pThis->mp_DebugDatabase
-			(
-				&CDebugDatabase::f_Asset_List
-				, fg_ConvertToDebugDatabase<CDebugDatabase::CAssetFilter>(fg_Move(_Params.m_Filter))
-			)
-		;
+		auto AssetGenerator = co_await pThis->mp_DebugDatabase(&CDebugDatabase::f_Asset_List, fg_ConvertToDebugDatabase<CDebugDatabase::CAssetFilter>(fg_Move(_Params.m_Filter)));
 
 		co_return CAssetList::CResult
 			{

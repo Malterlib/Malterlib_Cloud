@@ -14,12 +14,8 @@ namespace NMib::NCloud::NBackupManager
 		CTimeSpan g_BackupTimeMaxInFuture = CTimeSpanConvert::fs_CreateHourSpan(2);
 	}
 
-	CExceptionPointer CBackupManagerServer::fp_CheckBackupKey
-		(
-			CBackupManager::CBackupKey const &_BackupKey
-			, CBackupManagerServer::CBackupKey &o_BackupKey
-			, CDistributedAppAuditor const &_Auditor
-		)
+	auto CBackupManagerServer::fp_CheckBackupKey(CBackupManager::CBackupKey const &_BackupKey, CBackupManagerServer::CBackupKey &o_BackupKey, CDistributedAppAuditor const &_Auditor)
+		-> CExceptionPointer
 	{
 		if (!CBackupManager::fs_IsValidHostname(_BackupKey.m_FriendlyName))
 			return _Auditor.f_Exception({"Backup key friendly name does not adhere to RFC 1123", fg_Format("'{}'", _BackupKey.m_FriendlyName)}).f_ExceptionPointer();
@@ -32,7 +28,8 @@ namespace NMib::NCloud::NBackupManager
 
 		o_BackupKey.m_BackupID = _BackupKey.m_ID;
 		o_BackupKey.m_BackupTime = _BackupKey.m_Time;
-		o_BackupKey.m_BackupName = "{}_{}"_f
+		o_BackupKey.m_BackupName
+			= "{}_{}"_f
 			<< _BackupKey.m_FriendlyName // This makes sure that backups can never be mixed between different hosts
 			<< _Auditor.f_HostInfo().f_GetRealHostID()
 		;
@@ -71,17 +68,7 @@ namespace NMib::NCloud::NBackupManager
 		auto DestroyResult = co_await fg_Move(pBackupInstance->m_BackupInstance).f_Destroy().f_Wrap();
 
 		if (!DestroyResult)
-		{
-			DMibLogWithCategory
-				(
-					Mib/Cloud/BackupManager
-					, Error
-					, "Failed to destroy backup instance '{}': {}"
-					, _Key.f_GetDesc()
-					, DestroyResult.f_GetExceptionStr()
-				)
-			;
-		}
+			DMibLogWithCategory(Mib/Cloud/BackupManager, Error, "Failed to destroy backup instance '{}': {}", _Key.f_GetDesc(), DestroyResult.f_GetExceptionStr());
 
 		pBackupInstance = mp_BackupInstances.f_FindEqual(_Key);
 		DMibCheck(pBackupInstance);
@@ -145,7 +132,6 @@ namespace NMib::NCloud::NBackupManager
 				pBackupInstance->m_OnDisconnectSubscrption = fg_Move(*_Subscription);
 			}
 		;
-
 
 		if (NewInstance.f_WasCreated())
 			Instance.m_OwningHost = Auditor;

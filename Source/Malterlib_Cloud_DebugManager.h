@@ -18,7 +18,7 @@ namespace NMib::NCloud
 
 		enum : uint32
 		{
-			EProtocolVersion_Min = 0x101
+			EProtocolVersion_Min       = 0x101
 			, EProtocolVersion_Current = 0x101
 		};
 
@@ -49,13 +49,13 @@ namespace NMib::NCloud
 
 		enum class EAssetType : uint32
 		{
-			mc_Executable = 0
+			mc_Executable  = 0
 			, mc_DebugInfo = 1
 		};
 
 		enum class EUploadFlag : uint32
 		{
-			mc_None = 0
+			mc_None             = 0
 			, mc_ForceOverwrite = DMibBit(0)
 		};
 
@@ -315,12 +315,8 @@ namespace NMib::NCloud
 
 		static NStr::CStr fs_AssetTypeToStr(EAssetType _AssetType);
 		static EAssetType fs_AssetTypeFromStr(NStr::CStr const &_String);
-		static NConcurrency::TCFuture<CCrashDumpInfos> fs_GatherCrashDumpInfos
-			(
-				NContainer::TCVector<NStr::CStr> _Sources
-				, CMetadata _DefaultMetadata
-				, NStorage::TCOptional<NStr::CStr> _DefaultExceptionInfo
-			)
+		static auto fs_GatherCrashDumpInfos(NContainer::TCVector<NStr::CStr> _Sources, CMetadata _DefaultMetadata, NStorage::TCOptional<NStr::CStr> _DefaultExceptionInfo)
+			-> NConcurrency::TCFuture<CCrashDumpInfos>
 		;
 	};
 }

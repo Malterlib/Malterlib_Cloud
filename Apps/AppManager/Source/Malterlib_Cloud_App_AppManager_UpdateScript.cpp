@@ -11,14 +11,10 @@ namespace NMib::NCloud::NAppManager
 	{
 		switch (_Script)
 		{
-		case EUpdateScript_PreUpdate:
-			return m_PreUpdate;
-		case EUpdateScript_PostUpdate:
-			return m_PostUpdate;
-		case EUpdateScript_PostLaunch:
-			return m_PostLaunch;
-		case EUpdateScript_OnError:
-			return m_OnError;
+		case EUpdateScript_PreUpdate: return m_PreUpdate;
+		case EUpdateScript_PostUpdate: return m_PostUpdate;
+		case EUpdateScript_PostLaunch: return m_PostLaunch;
+		case EUpdateScript_OnError: return m_OnError;
 		}
 		DMibNeverGetHere;
 		return m_PreUpdate;
@@ -28,20 +24,16 @@ namespace NMib::NCloud::NAppManager
 	{
 		switch (_Script)
 		{
-		case EUpdateScript_PreUpdate:
-			return "PreUpdate";
-		case EUpdateScript_PostUpdate:
-			return "PostUpdate";
-		case EUpdateScript_PostLaunch:
-			return "PostLaunch";
-		case EUpdateScript_OnError:
-			return "OnError";
+		case EUpdateScript_PreUpdate: return "PreUpdate";
+		case EUpdateScript_PostUpdate: return "PostUpdate";
+		case EUpdateScript_PostLaunch: return "PostLaunch";
+		case EUpdateScript_OnError: return "OnError";
 		}
 		DMibNeverGetHere;
 		return "Unknown";
 	}
 
-	TCFuture<void> CAppManagerActor::fp_RunUpdateScript
+	auto CAppManagerActor::fp_RunUpdateScript
 		(
 			TCSharedPointer<CApplication> const &_pApplication
 			, EUpdateScript _Script
@@ -52,6 +44,7 @@ namespace NMib::NCloud::NAppManager
 			, CVersionManager::CVersionInformation const &_PreviousVersionInformation
 			, fp64 _TimeSinceUpdateStart
 		)
+		-> TCFuture<void>
 	{
 		struct CState
 		{
@@ -69,6 +62,7 @@ namespace NMib::NCloud::NAppManager
 				fg_Move(m_LaunchActor).f_Destroy().f_DiscardResult();
 			}
 		};
+
 		TCSharedPointer<CState> pState = fg_Construct();
 
 		CStr Script = _pApplication->m_Settings.m_UpdateScripts.f_GetScript(_Script);
@@ -90,14 +84,7 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 
-		DMibLogWithCategory
-			(
-				Malterlib/Cloud/AppManager
-				, Info
-				, "[{}] Launch update script"
-				, Description
-			)
-		;
+		DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "[{}] Launch update script", Description);
 
 		CProcessLaunchParams LaunchParams = CProcessLaunchParams::fs_LaunchExecutable
 			(
@@ -113,14 +100,7 @@ namespace NMib::NCloud::NAppManager
 					{
 					case NProcess::EProcessLaunchState_Launched:
 						{
-							DMibLogWithCategory
-								(
-									Malterlib/Cloud/AppManager
-									, Info
-									, "[{}] Launched update script"
-									, Description
-								)
-							;
+							DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "[{}] Launched update script", Description);
 						}
 						break;
 					case NProcess::EProcessLaunchState_LaunchFailed:
@@ -142,14 +122,7 @@ namespace NMib::NCloud::NAppManager
 							}
 							else
 							{
-								DMibLogWithCategory
-									(
-										Malterlib/Cloud/AppManager
-										, Info
-										, "[{}] Bash script exited with success"
-										, Description
-									)
-								;
+								DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "[{}] Bash script exited with success", Description);
 								if (!pState->m_bReplied)
 								{
 									pState->m_Promise.f_SetResult();
@@ -252,15 +225,7 @@ namespace NMib::NCloud::NAppManager
 				{
 					if (!Member.f_Value().f_IsString())
 					{
-						DMibLogWithCategory
-							(
-								Malterlib/Cloud/AppManager
-								, Info
-								, "[{}] Invalid type in UpdateScriptEnvironment.{}"
-								, Description
-								, Member.f_Name()
-							)
-						;
+						DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "[{}] Invalid type in UpdateScriptEnvironment.{}", Description, Member.f_Name());
 						continue;
 					}
 
@@ -272,13 +237,7 @@ namespace NMib::NCloud::NAppManager
 		LaunchParams.m_bMergeEnvironment = true;
 		LaunchParams.m_bAllowExecutableLocate = true;
 
-		pState->m_LaunchActor
-			(
-				&CProcessLaunchActor::f_Launch
-				, LaunchParams
-				, fg_ThisActor(this)
-			)
-			> [pState, Description, fReportError](TCAsyncResult<CActorSubscription> &&_Subscription)
+		pState->m_LaunchActor(&CProcessLaunchActor::f_Launch, LaunchParams, fg_ThisActor(this)) > [pState, Description, fReportError](TCAsyncResult<CActorSubscription> &&_Subscription)
 			{
 				if (!pState->m_LaunchActor)
 					return;

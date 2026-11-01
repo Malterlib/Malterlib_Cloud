@@ -23,13 +23,7 @@ namespace NMib::NCloud
 			CFileTransferResult m_TransferResult;
 		};
 
-		CDebugManagerHelper
-			(
-				NStr::CStr const &_RootDirectory
-				, uint64 _QueueSize = NFile::gc_IdealNetworkQueueSize
-				, fp64 _Timeout = 30.0
-			)
-		;
+		CDebugManagerHelper(NStr::CStr const &_RootDirectory, uint64 _QueueSize = NFile::gc_IdealNetworkQueueSize, fp64 _Timeout = 30.0);
 		~CDebugManagerHelper();
 
 		CDebugManagerHelper(CDebugManagerHelper const &);
@@ -39,7 +33,7 @@ namespace NMib::NCloud
 
 		NConcurrency::TCFuture<void> f_AbortAll() const;
 
-		NConcurrency::TCUnsafeFuture<CUploadResult> f_Asset_Upload
+		auto f_Asset_Upload
 			(
 				NConcurrency::TCDistributedActor<CDebugManager> _DebugManager
 				, NStr::CStr _Source
@@ -48,20 +42,24 @@ namespace NMib::NCloud
 				, CDebugManager::EUploadFlag _Flags = CDebugManager::EUploadFlag::mc_None
 				, uint64 _QueueSize = 0
 				, int32 _CompressionLevel = 3
-			) const
+			)
+			const
+			-> NConcurrency::TCUnsafeFuture<CUploadResult>
 		;
 
-		NConcurrency::TCUnsafeFuture<CFileTransferResult> f_Asset_Download
+		auto f_Asset_Download
 			(
 				NConcurrency::TCDistributedActor<CDebugManager> _DebugManager
 				, CDebugManager::CAssetFilter _Filter
 				, NStr::CStr _DestinationDirectory
 				, CFileTransferReceive::EReceiveFlag _ReceiveFlags = CFileTransferReceive::EReceiveFlag_IgnoreExisting
 				, uint64 _QueueSize = 0
-			) const
+			)
+			const
+			-> NConcurrency::TCUnsafeFuture<CFileTransferResult>
 		;
 
-		NConcurrency::TCUnsafeFuture<CUploadResult> f_CrashDump_Upload
+		auto f_CrashDump_Upload
 			(
 				NConcurrency::TCDistributedActor<CDebugManager> _DebugManager
 				, NStr::CStr _Source
@@ -71,17 +69,21 @@ namespace NMib::NCloud
 				, CDebugManager::EUploadFlag _Flags = CDebugManager::EUploadFlag::mc_None
 				, uint64 _QueueSize = 0
 				, int32 _CompressionLevel = 3
-			) const
+			)
+			const
+			-> NConcurrency::TCUnsafeFuture<CUploadResult>
 		;
 
-		NConcurrency::TCUnsafeFuture<CFileTransferResult> f_CrashDump_Download
+		auto f_CrashDump_Download
 			(
 				NConcurrency::TCDistributedActor<CDebugManager> _DebugManager
 				, CDebugManager::CCrashDumpFilter _Filter
 				, NStr::CStr _DestinationDirectory
 				, CFileTransferReceive::EReceiveFlag _ReceiveFlags = CFileTransferReceive::EReceiveFlag_IgnoreExisting
 				, uint64 _QueueSize = 0
-			) const
+			)
+			const
+			-> NConcurrency::TCUnsafeFuture<CFileTransferResult>
 		;
 
 	private:

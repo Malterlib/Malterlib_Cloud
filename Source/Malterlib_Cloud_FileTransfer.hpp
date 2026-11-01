@@ -8,8 +8,10 @@ namespace NMib::NCloud
 	template <typename tf_CTypeTo, typename tf_CTypeFrom>
 	NConcurrency::TCAsyncGenerator<tf_CTypeTo> CFileTransferSendDownloadFile::fs_TranslateGenerator(NConcurrency::TCAsyncGenerator<tf_CTypeFrom> _FilesGenerator)
 	{
-		NStorage::TCSharedPointer<typename NConcurrency::TCAsyncGenerator<tf_CTypeFrom>::CPipelinedIterator> pIterator
-			= fg_Construct(co_await fg_Move(_FilesGenerator).f_GetPipelinedIterator())
+		NStorage::TCSharedPointer<typename NConcurrency::TCAsyncGenerator<tf_CTypeFrom>::CPipelinedIterator> pIterator = fg_Construct
+			(
+				co_await fg_Move(_FilesGenerator).f_GetPipelinedIterator()
+			)
 		;
 
 		for (auto &iGenerator = *pIterator; iGenerator; co_await ++iGenerator)

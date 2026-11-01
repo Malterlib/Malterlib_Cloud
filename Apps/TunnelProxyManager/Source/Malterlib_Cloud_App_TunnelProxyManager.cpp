@@ -52,7 +52,6 @@ namespace NMib::NCloud::NTunnelProxyManager
 
 						if (pOldPublication->m_Subscription)
 							co_await fg_Exchange(pOldPublication->m_Subscription, nullptr)->f_Destroy();
-
 					}
 					else if (_fLog)
 						co_await _fLog("Publishing new tunnel '{}': {}"_f << TunnelName << Host);
@@ -132,11 +131,7 @@ namespace NMib::NCloud::NTunnelProxyManager
 								auto Auditor = mp_State.f_Auditor();
 								Auditor.f_Info
 									(
-										"<{}> ({}) {{{}} {} New connection"_f
-										<< _CallbackInfo.m_RemoteHostID
-										<< _CallbackInfo.m_ConnectionID
-										<< TunnelName
-										<< _CallbackInfo.m_Address
+										"<{}> ({}) {{{}} {} New connection"_f << _CallbackInfo.m_RemoteHostID << _CallbackInfo.m_ConnectionID << TunnelName << _CallbackInfo.m_Address
 									)
 								;
 								co_return {};

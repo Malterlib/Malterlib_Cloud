@@ -5,7 +5,7 @@
 #include <Mib/Core/Application>
 
 #ifdef DPlatformFamily_Windows
-#include <Windows.h>
+#	include <Windows.h>
 #endif
 
 #include "Malterlib_Cloud_App_AppDistributionManager.h"

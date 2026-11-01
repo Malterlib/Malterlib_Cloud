@@ -40,9 +40,7 @@ namespace NMib::NCloud::NAppManager
 					mp_AppManagerInterface.m_Actor->f_ShareInterface<CAppManagerInterface>()
 					, g_ActorSubscription / [this, WeakCloudManager = _CloudManager.f_Weak()]() -> TCFuture<void>
 					{
-						co_await fp_CloudManagerRemoved(WeakCloudManager).f_Wrap()
-							> fg_LogWarning("Malterlib/Cloud/AppManager", "Failed to destroy register subscription for cloud manager")
-						;
+						co_await fp_CloudManagerRemoved(WeakCloudManager).f_Wrap() > fg_LogWarning("Malterlib/Cloud/AppManager", "Failed to destroy register subscription for cloud manager");
 
 						co_return {};
 					}
@@ -57,14 +55,7 @@ namespace NMib::NCloud::NAppManager
 
 			if (SensorReporter)
 			{
-				auto SubscriptionResult = co_await mp_SensorStore
-					(
-						&CDistributedAppSensorStoreLocal::f_AddExtraSensorReporter
-						, fg_Move(*SensorReporter)
-						, _Info
-					)
-					.f_Wrap()
-				;
+				auto SubscriptionResult = co_await mp_SensorStore(&CDistributedAppSensorStoreLocal::f_AddExtraSensorReporter, fg_Move(*SensorReporter), _Info).f_Wrap();
 
 				if (SubscriptionResult)
 					SensorReporterSubscription = fg_Move(*SubscriptionResult);
@@ -82,14 +73,7 @@ namespace NMib::NCloud::NAppManager
 
 			if (LogReporter)
 			{
-				auto SubscriptionResult = co_await mp_LogStore
-					(
-						&CDistributedAppLogStoreLocal::f_AddExtraLogReporter
-						, fg_Move(*LogReporter)
-						, _Info
-					)
-					.f_Wrap()
-				;
+				auto SubscriptionResult = co_await mp_LogStore(&CDistributedAppLogStoreLocal::f_AddExtraLogReporter, fg_Move(*LogReporter), _Info).f_Wrap();
 
 				if (SubscriptionResult)
 					LogReporterSubscription = fg_Move(*SubscriptionResult);

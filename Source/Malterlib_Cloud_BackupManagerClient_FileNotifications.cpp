@@ -581,9 +581,8 @@ namespace NMib::NCloud
 
 		auto pActive = f_MarkInstancesActive();
 
-		f_UpdateManifest(RelativePath, OriginalPath, bDirtyHint)
-			+ f_UpdateManifest(RelativePathFrom, OriginalPathFrom, bDirtyHint)
-			> [=, this](TCAsyncResult<CUpdateManifestResult> &&_Change, TCAsyncResult<CUpdateManifestResult> &&_ChangeFrom)
+		f_UpdateManifest(RelativePath, OriginalPath, bDirtyHint) + f_UpdateManifest(RelativePathFrom, OriginalPathFrom, bDirtyHint) > [=, this]
+			(TCAsyncResult<CUpdateManifestResult> &&_Change, TCAsyncResult<CUpdateManifestResult> &&_ChangeFrom)
 			{
 				(void)pActive;
 				DMibCheck(Sequence > m_LastSeenNotificationSequence);
@@ -604,12 +603,7 @@ namespace NMib::NCloud
 				}
 
 				auto fSendManifestChange = [&]
-					(
-						CStr const &_Path
-						, CBackupManagerBackup::CManifestChange const &_ManifestChange
-						, bool _bDirty
-						, CBackupManagerClient_ChecksumState const &_ChecksumState
-					)
+					(CStr const &_Path, CBackupManagerBackup::CManifestChange const &_ManifestChange, bool _bDirty, CBackupManagerClient_ChecksumState const &_ChecksumState)
 					{
 #if defined DMibContractConfigure_CheckEnabled
 						CStr ManifestError;
@@ -672,7 +666,8 @@ namespace NMib::NCloud
 							DMibCloudBackupManagerDebugOut("### {},{} {}.m_bRemoved {}.m_bAdded\n", Sequence, NotificationStr, RelativePathFrom, RelativePath);
 							fSendManifestChange
 								(
-									RelativePath, CBackupManagerBackup::CManifestChange_Rename{fg_Move(Change.m_ManifestFile), RelativePathFrom}
+									RelativePath
+									, CBackupManagerBackup::CManifestChange_Rename{fg_Move(Change.m_ManifestFile), RelativePathFrom}
 									, Change.m_bIDChanged
 									, Change.m_ChecksumState
 								)
@@ -689,7 +684,8 @@ namespace NMib::NCloud
 							(
 								RelativePathFrom
 								, CBackupManagerBackup::CManifestChange_Add{fg_Move(ChangeFrom.m_ManifestFile)}
-								, ChangeFrom.m_bIDChanged, ChangeFrom.m_ChecksumState
+								, ChangeFrom.m_bIDChanged
+								, ChangeFrom.m_ChecksumState
 							)
 						;
 					}
