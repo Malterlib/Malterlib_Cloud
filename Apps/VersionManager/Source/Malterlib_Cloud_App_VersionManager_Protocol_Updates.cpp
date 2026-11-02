@@ -178,9 +178,9 @@ namespace NMib::NCloud::NVersionManager
 				CSubscription const *pSubscription = fp_GetSubscription(ApplicationName, SubscriptionID);
 
 				TCVector<CVersionManager::CNewVersionNotification> NewVersionNotifications;
-				if (pSubscription && bHasPermissions)
+				auto *pApplication = mp_Applications.f_FindEqual(_Application);
+				if (pSubscription && bHasPermissions && pApplication)
 				{
-					auto *pApplication = mp_Applications.f_FindEqual(_Application);
 					umint nToSend = pSubscription->m_nInitial;
 					umint nVersions = pApplication->m_VersionsByTime.f_GetLen();
 					(void)nVersions;
