@@ -166,7 +166,7 @@ namespace NMib::NCloud::NAppManager
 		auto &Watch = mp_SensorRebootPreventionWatch[Key];
 		Watch.m_Application = _Application;
 		Watch.m_SensorInfo = _SensorInfo;
-		Watch.m_SensorSubscription = co_await mp_SensorStore
+		auto SensorSubscription = co_await mp_SensorStore
 			(
 				&CDistributedAppSensorStoreLocal::f_SubscribeSensorStatus
 				, TCVector<CDistributedAppSensorReader_SensorStatusFilter>{fg_Move(Filter)}
@@ -183,6 +183,18 @@ namespace NMib::NCloud::NAppManager
 				}
 			)
 		;
+
+		// The watch can have been removed while subscribing
+		auto *pWatch = mp_SensorRebootPreventionWatch.f_FindEqual(Key);
+		if (!pWatch)
+		{
+			if (SensorSubscription)
+				co_await SensorSubscription->f_Destroy().f_Wrap() > fg_LogError("Malterlib/Cloud/AppManager", "Failed to remove sensor subscription");
+
+			co_return {};
+		}
+
+		pWatch->m_SensorSubscription = fg_Move(SensorSubscription);
 
 		co_return {};
 	}
