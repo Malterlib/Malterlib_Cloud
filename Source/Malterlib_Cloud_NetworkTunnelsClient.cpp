@@ -619,8 +619,20 @@ namespace NMib::NCloud
 						}
 					;
 
-					auto &State = m_NetworkTunnelsState[_Tunnels];
-					State.m_ChangesSubscription = co_await _Tunnels.f_CallActor(&ICNetworkTunnels::f_SubscribeTunnels)(fg_Move(Subscribe));
+					m_NetworkTunnelsState[_Tunnels];
+					auto ChangesSubscription = co_await _Tunnels.f_CallActor(&ICNetworkTunnels::f_SubscribeTunnels)(fg_Move(Subscribe));
+
+					// The actor can have been removed while subscribing
+					auto *pState = m_NetworkTunnelsState.f_FindEqual(_Tunnels);
+					if (!pState)
+					{
+						if (ChangesSubscription)
+							co_await fg_Move(ChangesSubscription)->f_Destroy();
+
+						co_return {};
+					}
+
+					pState->m_ChangesSubscription = fg_Move(ChangesSubscription);
 
 					co_return {};
 				}
