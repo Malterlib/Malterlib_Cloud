@@ -177,20 +177,7 @@ namespace NMib::NCloud
 				auto fCleanupConnection = [pThis = m_pThis, ConnectionID, RemoteConnectionID = _OpenConnection.m_ConnectionID, Name = _OpenConnection.m_Name, AppAuditor]
 					(CStr _Description) -> TCFuture<void>
 					{
-						auto &Internal = *pThis->mp_pInternal;
-						auto *pConnection = Internal.m_Connections.f_FindEqual(ConnectionID);
-						if (pConnection)
-						{
-							AppAuditor.f_Info("({} - {}) {{{}} Tunnel connection closed: {}"_f << RemoteConnectionID << ConnectionID << Name << _Description);
-
-							auto Connection = fg_Move(*pConnection);
-							Internal.m_Connections.f_Remove(pConnection);
-
-							if (Connection.m_Socket)
-								co_await Connection.m_Socket.f_Destroy();
-							co_await fg_Move(Connection.m_fSendData).f_Destroy();
-						}
-						co_return {};
+						return pThis->mp_pInternal->f_CleanupConnection(ConnectionID, RemoteConnectionID, Name, AppAuditor, fg_Move(_Description));
 					}
 				;
 
@@ -293,6 +280,7 @@ namespace NMib::NCloud
 
 		TCFuture<void> f_SetupPermissions();
 		TCFuture<void> f_SendChange(ICNetworkTunnels::CTunnelChange _Change, CStr _Name);
+		TCFuture<void> f_CleanupConnection(umint _ConnectionID, CStr _RemoteConnectionID, CStr _Name, CDistributedAppAuditor _AppAuditor, CStr _Description);
 
 		CNetworkTunnelsServer *m_pThis;
 		TCActor<CActorDistributionManager> m_DistributionManager;
@@ -364,6 +352,23 @@ namespace NMib::NCloud
 		co_await Internal.f_SetupPermissions();
 		co_await Internal.m_NetworkTunnelInstance.f_Publish<ICNetworkTunnels>(Internal.m_DistributionManager, this);
 
+		co_return {};
+	}
+
+	TCFuture<void> CNetworkTunnelsServer::CInternal::f_CleanupConnection(umint _ConnectionID, CStr _RemoteConnectionID, CStr _Name, CDistributedAppAuditor _AppAuditor, CStr _Description)
+	{
+		auto *pConnection = m_Connections.f_FindEqual(_ConnectionID);
+		if (pConnection)
+		{
+			_AppAuditor.f_Info("({} - {}) {{{}} Tunnel connection closed: {}"_f << _RemoteConnectionID << _ConnectionID << _Name << _Description);
+
+			auto Connection = fg_Move(*pConnection);
+			m_Connections.f_Remove(pConnection);
+
+			if (Connection.m_Socket)
+				co_await Connection.m_Socket.f_Destroy();
+			co_await fg_Move(Connection.m_fSendData).f_Destroy();
+		}
 		co_return {};
 	}
 
