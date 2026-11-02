@@ -903,7 +903,7 @@ namespace NMib::NCloud::NAppManager
 
 		TCFuture<void> fp_PublishCoordinationInterface();
 		TCFuture<void> fp_SubscribeCoordinationInterface();
-		TCFuture<void> fp_NewRemoteAppManager(CRemoteAppManager *_pAppManager);
+		TCFuture<void> fp_NewRemoteAppManager(CStr _HostID, TCDistributedActor<CAppManagerCoordinationInterface> _Actor);
 		void fp_NewRemoteKnownApplication(CRemoteApplicationKey const &_RemoteKey, CStr const &_HostID);
 		void fp_SendInitialInfoToRemoteAppManager(CRemoteAppManager &_AppManager);
 		void fp_OnAppUpdateInfoChange(TCSharedPointer<CApplication> const &_pApplication);

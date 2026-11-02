@@ -24,7 +24,7 @@ namespace NMib::NCloud::NAppManager
 					mp_RemoteAppManagerStateByActor.f_Insert(RemoteActor);
 					RemoteActor.m_bInitialStateReceived = false;
 
-					co_await fp_NewRemoteAppManager(&RemoteActor);
+					co_await fp_NewRemoteAppManager(RemoteActor.f_GetHostID(), RemoteActor.m_Actor);
 
 					co_return {};
 				}
@@ -56,12 +56,11 @@ namespace NMib::NCloud::NAppManager
 			pOnChange->m_fOnChanged();
 	}
 
-	TCFuture<void> CAppManagerActor::fp_NewRemoteAppManager(CRemoteAppManager *_pAppManager)
+	TCFuture<void> CAppManagerActor::fp_NewRemoteAppManager(CStr _HostID, TCDistributedActor<CAppManagerCoordinationInterface> _Actor)
 	{
-		CStr HostID = _pAppManager->f_GetHostID();
-		auto Actor = _pAppManager->m_Actor;
+		CStr HostID = fg_Move(_HostID);
 
-		auto Subscription = co_await Actor.f_CallActor(&CAppManagerCoordinationInterface::f_SubscribeToAppChanges)
+		auto Subscription = co_await _Actor.f_CallActor(&CAppManagerCoordinationInterface::f_SubscribeToAppChanges)
 			(
 				g_ActorFunctor / [this, HostID, AllowDestroy = g_AllowWrongThreadDestroy](TCVector<CAppManagerCoordinationInterface::CAppChange> _Changes, bool _bInitial) -> TCFuture<void>
 				{
