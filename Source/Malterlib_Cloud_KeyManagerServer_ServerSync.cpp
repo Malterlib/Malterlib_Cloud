@@ -23,31 +23,33 @@ namespace NMib::NCloud
 		auto CheckDestroy = co_await m_pThis->f_CheckDestroyedOnResume();
 
 		NContainer::TCMap<CKeyManagerServerSync::CHostKeyID, NContainer::TCSet<NStr::CStr>> ForwardVerified;
-		for (auto &OtherKeyManager : m_OtherKeyManagers)
+		// Collect first: the other key managers can come and go while the calls are awaited
+		NContainer::TCVector<NConcurrency::TCWeakDistributedActor<NConcurrency::CActor>> OtherKeyManagerKeys;
+		for (auto &OtherKeyManagerEntry : m_OtherKeyManagers.f_Entries())
+			OtherKeyManagerKeys.f_Insert(OtherKeyManagerEntry.f_Key());
+
+		for (auto &OtherKeyManagerKey : OtherKeyManagerKeys)
 		{
-			if (OtherKeyManager.m_ActorInfo.m_HostInfo.m_HostID == _FromHostID)
+			auto *pOtherKeyManager = m_OtherKeyManagers.f_FindEqual(OtherKeyManagerKey);
+			if (!pOtherKeyManager)
 				continue;
 
-			auto Result = co_await OtherKeyManager.m_ServerSync.f_CallActor(&CKeyManagerServerSync::f_CreateNewKeys)(_CreateNewKeys).f_Wrap();
+			auto ActorInfo = pOtherKeyManager->m_ActorInfo;
+			if (ActorInfo.m_HostInfo.m_HostID == _FromHostID)
+				continue;
+
+			auto Result = co_await pOtherKeyManager->m_ServerSync.f_CallActor(&CKeyManagerServerSync::f_CreateNewKeys)(_CreateNewKeys).f_Wrap();
 			if (!Result)
 			{
-				DMibLogWithCategory
-					(
-						Mib/Cloud/KeyManagerServer
-						, Error
-						, "Failed to create new keys in remote key manager '{}': {}"
-						, OtherKeyManager.m_ActorInfo.m_HostInfo
-						, Result.f_GetExceptionStr()
-					)
-				;
+				DMibLogWithCategory(Mib/Cloud/KeyManagerServer, Error, "Failed to create new keys in remote key manager '{}': {}", ActorInfo.m_HostInfo, Result.f_GetExceptionStr());
 				continue;
 			}
 
 			for (auto &HostKeyID : _CreateNewKeys.f_Keys())
 			{
 				auto &LocalKey = m_Database.m_Clients[HostKeyID.m_HostID].m_Keys[HostKeyID.m_KeyID];
-				if (LocalKey.m_VerifiedOnServers(OtherKeyManager.m_ActorInfo.m_HostInfo.m_HostID).f_WasCreated())
-					ForwardVerified[HostKeyID][OtherKeyManager.m_ActorInfo.m_HostInfo.m_HostID];
+				if (LocalKey.m_VerifiedOnServers(ActorInfo.m_HostInfo.m_HostID).f_WasCreated())
+					ForwardVerified[HostKeyID][ActorInfo.m_HostInfo.m_HostID];
 			}
 		}
 
@@ -61,26 +63,28 @@ namespace NMib::NCloud
 
 		auto CheckDestroy = co_await m_pThis->f_CheckDestroyedOnResume();
 
-		for (auto &OtherKeyManager : m_OtherKeyManagers)
+		// Collect first: the other key managers can come and go while the calls are awaited
+		NContainer::TCVector<NConcurrency::TCWeakDistributedActor<NConcurrency::CActor>> OtherKeyManagerKeys;
+		for (auto &OtherKeyManagerEntry : m_OtherKeyManagers.f_Entries())
+			OtherKeyManagerKeys.f_Insert(OtherKeyManagerEntry.f_Key());
+
+		for (auto &OtherKeyManagerKey : OtherKeyManagerKeys)
 		{
-			if (OtherKeyManager.m_ActorInfo.m_HostInfo.m_HostID == _FromHostID)
+			auto *pOtherKeyManager = m_OtherKeyManagers.f_FindEqual(OtherKeyManagerKey);
+			if (!pOtherKeyManager)
 				continue;
 
-			if (OtherKeyManager.m_ServerSync->f_InterfaceVersion() < EKeyManagerProtocolVersion_SupportRemovePreCreatedKeys)
+			auto ActorInfo = pOtherKeyManager->m_ActorInfo;
+			if (ActorInfo.m_HostInfo.m_HostID == _FromHostID)
 				continue;
 
-			auto Result = co_await OtherKeyManager.m_ServerSync.f_CallActor(&CKeyManagerServerSync::f_RemovePreCreatedKeys)(_Keys).f_Wrap();
+			if (pOtherKeyManager->m_ServerSync->f_InterfaceVersion() < EKeyManagerProtocolVersion_SupportRemovePreCreatedKeys)
+				continue;
+
+			auto Result = co_await pOtherKeyManager->m_ServerSync.f_CallActor(&CKeyManagerServerSync::f_RemovePreCreatedKeys)(_Keys).f_Wrap();
 			if (!Result)
 			{
-				DMibLogWithCategory
-					(
-						Mib/Cloud/KeyManagerServer
-						, Error
-						, "Failed to remove pre-created keys in remote key manager '{}': {}"
-						, OtherKeyManager.m_ActorInfo.m_HostInfo
-						, Result.f_GetExceptionStr()
-					)
-				;
+				DMibLogWithCategory(Mib/Cloud/KeyManagerServer, Error, "Failed to remove pre-created keys in remote key manager '{}': {}", ActorInfo.m_HostInfo, Result.f_GetExceptionStr());
 				continue;
 			}
 		}
@@ -95,23 +99,25 @@ namespace NMib::NCloud
 
 		auto CheckDestroy = co_await m_pThis->f_CheckDestroyedOnResume();
 
-		for (auto &OtherKeyManager : m_OtherKeyManagers)
+		// Collect first: the other key managers can come and go while the calls are awaited
+		NContainer::TCVector<NConcurrency::TCWeakDistributedActor<NConcurrency::CActor>> OtherKeyManagerKeys;
+		for (auto &OtherKeyManagerEntry : m_OtherKeyManagers.f_Entries())
+			OtherKeyManagerKeys.f_Insert(OtherKeyManagerEntry.f_Key());
+
+		for (auto &OtherKeyManagerKey : OtherKeyManagerKeys)
 		{
-			if (OtherKeyManager.m_ActorInfo.m_HostInfo.m_HostID == _FromHostID)
+			auto *pOtherKeyManager = m_OtherKeyManagers.f_FindEqual(OtherKeyManagerKey);
+			if (!pOtherKeyManager)
 				continue;
 
-			auto Result = co_await OtherKeyManager.m_ServerSync.f_CallActor(&CKeyManagerServerSync::f_PreCreateKeys)(_PreCreateKeys).f_Wrap();
+			auto ActorInfo = pOtherKeyManager->m_ActorInfo;
+			if (ActorInfo.m_HostInfo.m_HostID == _FromHostID)
+				continue;
+
+			auto Result = co_await pOtherKeyManager->m_ServerSync.f_CallActor(&CKeyManagerServerSync::f_PreCreateKeys)(_PreCreateKeys).f_Wrap();
 			if (!Result)
 			{
-				DMibLogWithCategory
-					(
-						Mib/Cloud/KeyManagerServer
-						, Error
-						, "Failed to pre-create new keys in remote key manager '{}': {}"
-						, OtherKeyManager.m_ActorInfo.m_HostInfo
-						, Result.f_GetExceptionStr()
-					)
-				;
+				DMibLogWithCategory(Mib/Cloud/KeyManagerServer, Error, "Failed to pre-create new keys in remote key manager '{}': {}", ActorInfo.m_HostInfo, Result.f_GetExceptionStr());
 				continue;
 			}
 		}
