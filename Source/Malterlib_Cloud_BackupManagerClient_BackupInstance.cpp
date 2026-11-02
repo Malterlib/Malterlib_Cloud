@@ -173,7 +173,6 @@ namespace NMib::NCloud::NPrivate
 										DestroyResult.f_GetException()
 										, [&](CExceptionBackupManagerHashMismatch const &_Exception)
 										{
-											(void)_Exception;
 											DMibLog(Info, "Reschedule: {}: {}", FileName, _Exception);
 
 											fp_ReportHashMismatch(pRunningState, *pPendingFile);

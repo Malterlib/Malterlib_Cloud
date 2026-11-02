@@ -130,8 +130,6 @@ namespace NMib::NCloud::NAppManager
 
 					co_await fg_AllDone(SendInitialResults);
 
-					(void)_Subscription;
-
 					co_return {};
 				}
 			)
