@@ -79,15 +79,19 @@ namespace NMib::NCloud::NAppManager
 	{
 	}
 
-	TCFuture<void> CAppManagerActor::fp_VersionManagerSubscribe(CVersionManagerState *_pVersionManagerState)
+	TCFuture<void> CAppManagerActor::fp_VersionManagerSubscribe(TCDistributedActor<CVersionManager> _VersionManager)
 	{
-		_pVersionManagerState->m_Subscription.f_Clear();
+		auto *pVersionManagerState = mp_VersionManagers.f_FindEqual(_VersionManager);
+		if (!pVersionManagerState)
+			co_return {};
+
+		pVersionManagerState->m_Subscription.f_Clear();
 
 		CVersionManager::CSubscribeToUpdates SubscriptionParams;
 		SubscriptionParams.m_Application = CStr(); // All applications we have access to
 		SubscriptionParams.m_nInitial = 20;
 		SubscriptionParams.m_Platforms = mp_KnownPlatforms;
-		SubscriptionParams.m_fOnNewVersions = g_ActorFunctor / [this, Actor = _pVersionManagerState->f_GetManager().f_Weak(), AllowDestroy = g_AllowWrongThreadDestroy]
+		SubscriptionParams.m_fOnNewVersions = g_ActorFunctor / [this, Actor = _VersionManager.f_Weak(), AllowDestroy = g_AllowWrongThreadDestroy]
 			(CVersionManager::CNewVersionNotifications _NewVersions) -> NConcurrency::TCFuture<CVersionManager::CNewVersionNotifications::CResult>
 			{
 				auto *pManager = mp_VersionManagers.f_FindEqual(Actor);
@@ -120,10 +124,10 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 
-		umint SubscribeSequence = ++_pVersionManagerState->m_SubscribeSequence;
+		umint SubscribeSequence = ++pVersionManagerState->m_SubscribeSequence;
 
-		auto Actor = _pVersionManagerState->f_GetManager().f_Weak();
-		auto Subscription = co_await _pVersionManagerState->f_GetManager().f_CallActor(&CVersionManager::f_SubscribeToUpdates)(fg_Move(SubscriptionParams)).f_Wrap();
+		auto Actor = _VersionManager.f_Weak();
+		auto Subscription = co_await _VersionManager.f_CallActor(&CVersionManager::f_SubscribeToUpdates)(fg_Move(SubscriptionParams)).f_Wrap();
 		auto *pManager = mp_VersionManagers.f_FindEqual(Actor);
 		if (!Subscription)
 		{
@@ -154,7 +158,7 @@ namespace NMib::NCloud::NAppManager
 	{
 		TCFutureVector<void> Results;
 		for (auto &Manager : mp_VersionManagers)
-			fp_VersionManagerSubscribe(&Manager) > Results;
+			fp_VersionManagerSubscribe(Manager.f_GetManager()) > Results;
 
 		co_await fg_AllDone(Results);
 
@@ -165,7 +169,7 @@ namespace NMib::NCloud::NAppManager
 	{
 		auto &NewManager = mp_VersionManagers[_VersionManager];
 		NewManager.m_HostInfo = _Info;
-		co_await fp_VersionManagerSubscribe(&NewManager);
+		co_await fp_VersionManagerSubscribe(_VersionManager);
 
 		co_return {};
 	}

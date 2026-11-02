@@ -835,7 +835,7 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<void> fp_KeyManagersUpdated();
 
 		TCFuture<void> fp_VersionManagerResubscribeAll();
-		TCFuture<void> fp_VersionManagerSubscribe(CVersionManagerState *_pVersionManagerState);
+		TCFuture<void> fp_VersionManagerSubscribe(TCDistributedActor<CVersionManager> _VersionManager);
 		TCFuture<void> fp_VersionManagerAdded(TCDistributedActor<CVersionManager> _VersionManager, CTrustedActorInfo _Info);
 		void fp_VersionManagerRemoved(TCWeakDistributedActor<CActor> const &_VersionManager);
 
