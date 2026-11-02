@@ -966,13 +966,33 @@ namespace NMib::NCloud::NVersionManager
 		if (bRetrySequenceChanged)
 			pVersion->m_VersionInfo.m_RetrySequence = _RemoteRetrySequence;
 
+		uint32 NewRetrySequence = pVersion->m_VersionInfo.m_RetrySequence;
+
+		// The version can change or be removed while this waits, so what is saved and announced is what it has then
+		auto OnResume = co_await fg_OnResume
+			(
+				[&]() -> TCAsyncResult<void>
+				{
+					TCAsyncResult<void> Result;
+					auto *pApplication = mp_Applications.f_FindEqual(_Application);
+					// NOLINTNEXTLINE(malterlib-coroutine-actor-reference): pApplication is a local of the callback, which the check takes for a pointer kept from before the suspension
+					pVersion = pApplication ? pApplication->m_Versions.f_FindEqual(_VersionID) : nullptr;
+					if (!pVersion)
+						Result.f_SetResult();
+
+					return Result;
+				}
+			)
+		;
+
 		CStr VersionPath = fg_Format("{}/Applications/{}/{}", mp_AppState.m_RootDirectory, _Application, _VersionID.f_EncodeFileName());
 		co_await (fp_SaveVersionInfo(VersionPath, pVersion->m_VersionInfo) % "Failed to save version info");
+
 		co_await (fp_SaveVersionToDatabase(_Application, _VersionID, pVersion->m_VersionInfo) % "Failed to save version to database");
 
 		fp_NewTagsKnown(_TransformedTags);
 
-		co_await fp_NewVersion(_Application, pVersion->f_GetIdentifier(), pVersion->m_VersionInfo, _OriginID);
+		co_await fp_NewVersion(_Application, _VersionID, pVersion->m_VersionInfo, _OriginID);
 
 		DMibLogWithCategory
 			(
@@ -984,7 +1004,7 @@ namespace NMib::NCloud::NVersionManager
 				, _VersionID.m_Platform
 				, bTagsChanged
 				, OldRetrySequence
-				, pVersion->m_VersionInfo.m_RetrySequence
+				, NewRetrySequence
 			)
 		;
 
