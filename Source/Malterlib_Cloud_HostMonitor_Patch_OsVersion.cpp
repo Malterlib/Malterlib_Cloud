@@ -157,8 +157,10 @@ namespace NMib::NCloud
 
 		CLogError LogError("Malterlib/Cloud/HostMonitor");
 
-		CCloudManager::CExpectedVersionRange *pExpectedVersionRange = nullptr;
+		TCOptional<CCloudManager::CExpectedVersionRange> ExpectedVersionRange;
 		{
+			CCloudManager::CExpectedVersionRange *pExpectedVersionRange = nullptr;
+
 			CCloudManager::CCurrentVersion CurrentVersion;
 			CurrentVersion.m_Major = m_CurrentOsVersion.m_Major;
 			CurrentVersion.m_Minor = m_CurrentOsVersion.m_Minor;
@@ -176,6 +178,10 @@ namespace NMib::NCloud
 				CurrentVersion.m_Major.f_Clear();
 				pExpectedVersionRange = m_ExpectedOsVersions.m_Versions.f_FindEqual(CurrentVersion);
 			}
+
+			// Copy, f_SetExpectedOsVersions can replace the expected versions while suspended below
+			if (pExpectedVersionRange)
+				ExpectedVersionRange = *pExpectedVersionRange;
 		}
 
 		bool bUpdateDatabase = false;
@@ -200,22 +206,22 @@ namespace NMib::NCloud
 
 		CDistributedAppSensorReporter::CStatus Status;
 
-		if (pExpectedVersionRange)
+		if (ExpectedVersionRange)
 		{
-			if (pExpectedVersionRange->f_IsDeprecated())
+			if (ExpectedVersionRange->f_IsDeprecated())
 			{
 				Status.m_Severity = fg_Max(Status.m_Severity, CDistributedAppSensorReporter::EStatusSeverity_Warning);
 				Status.m_Description = "The OS version '{}' is deprecated"_f << m_CurrentOsVersion;
 			}
-			else if (pExpectedVersionRange->m_Min && CloudManagerVersion < *pExpectedVersionRange->m_Min)
+			else if (ExpectedVersionRange->m_Min && CloudManagerVersion < *ExpectedVersionRange->m_Min)
 			{
 				Status.m_Severity = fg_Max(Status.m_Severity, CDistributedAppSensorReporter::EStatusSeverity_Warning);
-				Status.m_Description = "The OS version '{}' is older than the allowed lowest version '{}'"_f << m_CurrentOsVersion << *pExpectedVersionRange->m_Min;
+				Status.m_Description = "The OS version '{}' is older than the allowed lowest version '{}'"_f << m_CurrentOsVersion << *ExpectedVersionRange->m_Min;
 			}
-			else if (pExpectedVersionRange->m_Max && CloudManagerVersion > *pExpectedVersionRange->m_Max)
+			else if (ExpectedVersionRange->m_Max && CloudManagerVersion > *ExpectedVersionRange->m_Max)
 			{
 				Status.m_Severity = fg_Max(Status.m_Severity, CDistributedAppSensorReporter::EStatusSeverity_Warning);
-				Status.m_Description = "The OS version '{}' is newer than the allowed higest version '{}'"_f << m_CurrentOsVersion << *pExpectedVersionRange->m_Max;
+				Status.m_Description = "The OS version '{}' is newer than the allowed higest version '{}'"_f << m_CurrentOsVersion << *ExpectedVersionRange->m_Max;
 			}
 		}
 
@@ -231,7 +237,7 @@ namespace NMib::NCloud
 		}
 		else
 		{
-			if (pExpectedVersionRange)
+			if (ExpectedVersionRange)
 			{
 				Status.m_Severity = CDistributedAppSensorReporter::EStatusSeverity_Ok;
 				Status.m_Description = "OS is up to date";
