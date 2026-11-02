@@ -119,7 +119,12 @@ namespace NMib::NCloud
 		{
 			auto NewKeyFromAvailableKeys = co_await Internal.f_TryUseAvailableKey(_Identifier, _KeySize, AppAuditor);
 
-			auto &KeyStore = Client.m_Keys[_Identifier];
+			// Another request for the same identifier can have created the key while suspended, don't overwrite it
+			auto KeyStoreMapping = Internal.m_Database.m_Clients[HostID].m_Keys(_Identifier);
+			if (!KeyStoreMapping.f_WasCreated())
+				co_return AppAuditor.f_Exception("Key with ID '{}' was created by a concurrent request"_f << _Identifier);
+
+			auto &KeyStore = *KeyStoreMapping;
 
 			if (NewKeyFromAvailableKeys)
 				KeyStore.m_Key = fg_Move(*NewKeyFromAvailableKeys);
