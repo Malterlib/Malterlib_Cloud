@@ -765,24 +765,29 @@ struct CVersionManager_Refresh_Tests : public NMib::NTest::CTest
 				DMibTestPath("RefreshSendsNotificationsForNewVersions");
 
 				// Set up subscription tracking
-				TCVector<CVersionManager::CNewVersionNotification> ReceivedNotifications;
-				TCPromise<void> NotificationReceived;
-				bool bReceivedNotification = false;
+				struct CNotificationState
+				{
+					TCVector<CVersionManager::CNewVersionNotification> m_ReceivedNotifications;
+					TCPromise<void> m_NotificationReceived;
+					bool m_bReceivedNotification = false;
+				};
+
+				TCSharedPointer<CNotificationState> pNotificationState = fg_Construct();
 
 				CVersionManager::CSubscribeToUpdates SubscribeParams;
 				SubscribeParams.m_Application = "TestApp";
 				SubscribeParams.m_nInitial = 0; // Don't send existing versions
 
-				SubscribeParams.m_fOnNewVersions = g_ActorFunctor / [&]
+				SubscribeParams.m_fOnNewVersions = g_ActorFunctor / [pNotificationState]
 					(CVersionManager::CNewVersionNotifications _Notifications) -> TCFuture<CVersionManager::CNewVersionNotifications::CResult>
 					{
 						for (auto &Notification : _Notifications.m_NewVersions)
-							ReceivedNotifications.f_InsertLast(Notification);
+							pNotificationState->m_ReceivedNotifications.f_InsertLast(Notification);
 
-						if (!bReceivedNotification && !ReceivedNotifications.f_IsEmpty())
+						if (!pNotificationState->m_bReceivedNotification && !pNotificationState->m_ReceivedNotifications.f_IsEmpty())
 						{
-							bReceivedNotification = true;
-							NotificationReceived.f_SetResult();
+							pNotificationState->m_bReceivedNotification = true;
+							pNotificationState->m_NotificationReceived.f_SetResult();
 						}
 
 						co_return {};
@@ -814,15 +819,15 @@ struct CVersionManager_Refresh_Tests : public NMib::NTest::CTest
 				DMibExpect(RefreshResult.m_nAdded, ==, 1);
 
 				// Wait for notification (with timeout)
-				auto NotificationResult = co_await NotificationReceived.f_Future().f_Timeout(10.0, "Timed out waiting for notification").f_Wrap();
+				auto NotificationResult = co_await pNotificationState->m_NotificationReceived.f_Future().f_Timeout(10.0, "Timed out waiting for notification").f_Wrap();
 				DMibExpectNoException(NotificationResult.f_Access());
 
 				// Verify we received the correct notification
-				DMibExpect(ReceivedNotifications.f_GetLen(), >=, 1);
-				if (!ReceivedNotifications.f_IsEmpty())
+				DMibExpect(pNotificationState->m_ReceivedNotifications.f_GetLen(), >=, 1);
+				if (!pNotificationState->m_ReceivedNotifications.f_IsEmpty())
 				{
 					bool bFoundVersion = false;
-					for (auto &Notification : ReceivedNotifications)
+					for (auto &Notification : pNotificationState->m_ReceivedNotifications)
 					{
 						if (Notification.m_Application == "TestApp" && Notification.m_VersionIDAndPlatform == NewVersionID)
 						{
