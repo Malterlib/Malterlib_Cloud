@@ -940,7 +940,9 @@ namespace NMib::NCloud::NCloudClient
 			}
 		;
 
-		for (auto &TrustedActor : mp_DebugManagers.m_Actors)
+		// A copy: the debug managers can come and go while the deletes are awaited
+		auto DebugManagers = mp_DebugManagers.m_Actors;
+		for (auto &TrustedActor : DebugManagers)
 		{
 			if (!Host.f_IsEmpty() && TrustedActor.m_TrustInfo.m_HostInfo.m_HostID != Host)
 				continue;
@@ -1266,7 +1268,9 @@ namespace NMib::NCloud::NCloudClient
 			}
 		;
 
-		for (auto &TrustedActor : mp_DebugManagers.m_Actors)
+		// A copy: the debug managers can come and go while the deletes are awaited
+		auto DebugManagers = mp_DebugManagers.m_Actors;
+		for (auto &TrustedActor : DebugManagers)
 		{
 			if (!Host.f_IsEmpty() && TrustedActor.m_TrustInfo.m_HostInfo.m_HostID != Host)
 				continue;
