@@ -174,15 +174,22 @@ namespace NMib::NCloud
 		{
 			MountsToDelete.f_Remove(Mount);
 
-			auto Mapping = m_AutomaticMounts(Mount);
-			if (!Mapping.f_WasCreated())
+			if (!m_AutomaticMounts(Mount).f_WasCreated())
 				continue;
-
-			auto &AutomaticMount = *Mapping;
 
 			CMonitorPathOptions MonitorOptions;
 			MonitorOptions.m_Path = Mount;
-			AutomaticMount.m_MonitorPathSubscription = co_await f_MonitorPath(MonitorOptions, false);
+			auto Subscription = co_await f_MonitorPath(MonitorOptions, false);
+
+			auto *pAutomaticMount = m_AutomaticMounts.f_FindEqual(Mount);
+			if (!pAutomaticMount)
+			{
+				if (Subscription)
+					co_await Subscription->f_Destroy();
+				continue;
+			}
+
+			pAutomaticMount->m_MonitorPathSubscription = fg_Move(Subscription);
 		}
 
 		for (auto &MountToDelete : MountsToDelete)
@@ -195,7 +202,7 @@ namespace NMib::NCloud
 			if (pAutomaticMount->m_MonitorPathSubscription)
 				co_await fg_Exchange(pAutomaticMount->m_MonitorPathSubscription, nullptr)->f_Destroy();
 
-			m_AutomaticMounts.f_Remove(pAutomaticMount);
+			m_AutomaticMounts.f_Remove(MountToDelete);
 		}
 
 		co_return {};
