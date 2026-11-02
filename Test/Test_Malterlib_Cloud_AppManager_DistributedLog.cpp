@@ -482,7 +482,7 @@ struct CAppManager_DistributedLog_Tests : public NMib::NTest::CTest
 			co_return co_await fp_TestLimitsImpl
 				(
 					"BigEntry"
-					, g_ActorFunctor / [&](CStr _Root, CAppManagerTestHelper *_pAppManagerTestHelper) -> TCFuture<void>
+					, g_ActorFunctor / [LineSize, EntrySize](CStr _Root, CAppManagerTestHelper *_pAppManagerTestHelper) -> TCFuture<void>
 					{
 						co_await _pAppManagerTestHelper->f_LaunchTool
 							(
@@ -509,7 +509,7 @@ struct CAppManager_DistributedLog_Tests : public NMib::NTest::CTest
 			co_return co_await fp_TestLimitsImpl
 				(
 					"BigLine"
-					, g_ActorFunctor / [&](CStr _Root, CAppManagerTestHelper *_pAppManagerTestHelper) -> TCFuture<void>
+					, g_ActorFunctor / [LineSize, EntrySize](CStr _Root, CAppManagerTestHelper *_pAppManagerTestHelper) -> TCFuture<void>
 					{
 						co_await _pAppManagerTestHelper->f_LaunchTool
 							(
@@ -538,7 +538,7 @@ struct CAppManager_DistributedLog_Tests : public NMib::NTest::CTest
 			co_return co_await fp_TestLimitsImpl
 				(
 					"ManyLines"
-					, g_ActorFunctor / [&](CStr _Root, CAppManagerTestHelper *_pAppManagerTestHelper) -> TCFuture<void>
+					, g_ActorFunctor / [nEntries, LineSize, EntrySize](CStr _Root, CAppManagerTestHelper *_pAppManagerTestHelper) -> TCFuture<void>
 					{
 						co_await _pAppManagerTestHelper->f_LaunchTool
 							(
