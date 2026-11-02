@@ -112,6 +112,10 @@ Repository
 
 %Group "{Malterlib}/{Lib_Malterlib_Cloud}"
 {
+	Property
+	{
+		MalterlibConcurrency_DistributedAppPrefixHeader true
+	}
 	Target
 	{
 		DependencyInjectionGroups =+ "{Malterlib}/{Lib_Malterlib_Cloud}/{TargetInjection}"

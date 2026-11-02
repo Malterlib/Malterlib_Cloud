@@ -5,6 +5,7 @@
 {
 	Property
 	{
+		MalterlibConcurrency_DistributedAppPrefixHeader true
 	}
 	Target
 	{
