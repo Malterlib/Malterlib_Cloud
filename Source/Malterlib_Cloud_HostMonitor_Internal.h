@@ -88,6 +88,7 @@ namespace NMib::NCloud
 		TCFuture<void> f_SetupDatabase();
 
 		TCFuture<CActorSubscription> f_MonitorPath(CMonitorPathOptions _Options, bool _bUpdateDiskSpace);
+		TCFuture<void> f_Cleanup();
 
 		TCFuture<void> f_PeriodicUpdate();
 		TCFuture<void> f_PeriodicUpdate_Diskspace(bool _bCanSkip);

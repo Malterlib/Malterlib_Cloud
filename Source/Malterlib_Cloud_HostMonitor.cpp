@@ -61,7 +61,7 @@ namespace NMib::NCloud
 			(
 				[&]() -> TCFuture<void>
 				{
-					auto Future = fp_Destroy();
+					auto Future = Internal.f_Cleanup();
 					co_await fg_Move(Future);
 
 					co_return {};
@@ -149,44 +149,49 @@ namespace NMib::NCloud
 
 	TCFuture<void> CHostMonitor::fp_Destroy()
 	{
-		auto &Internal = *mp_pInternal;
+		co_await mp_pInternal->f_Cleanup();
 
+		co_return {};
+	}
+
+	TCFuture<void> CHostMonitor::CInternal::f_Cleanup()
+	{
 		CLogError LogError("Malterlib/Cloud/HostMonitor");
 
-		if (Internal.m_UpdateTimerSubscription)
-			co_await fg_Exchange(Internal.m_UpdateTimerSubscription, nullptr)->f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy update timer subscription");
+		if (m_UpdateTimerSubscription)
+			co_await fg_Exchange(m_UpdateTimerSubscription, nullptr)->f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy update timer subscription");
 
 		{
 			TCFutureVector<void> Results;
 
-			for (auto &Config : Internal.m_MonitoredConfigs)
+			for (auto &Config : m_MonitoredConfigs)
 			{
 				for (auto &File : Config.m_Files)
 					fg_Move(File.m_UpdateSequencer).f_Destroy() > Results;
 			}
 
-			fg_Move(Internal.m_UpdatePeriodicSequencer).f_Destroy() > Results;
-			fg_Move(Internal.m_UpdatePeriodicDiskSpaceSequencer).f_Destroy() > Results;
-			fg_Move(Internal.m_UpdatePeriodicPatch).f_Destroy() > Results;
+			fg_Move(m_UpdatePeriodicSequencer).f_Destroy() > Results;
+			fg_Move(m_UpdatePeriodicDiskSpaceSequencer).f_Destroy() > Results;
+			fg_Move(m_UpdatePeriodicPatch).f_Destroy() > Results;
 
 			co_await fg_AllDone(Results).f_Wrap() > fg_LogError("Malterlib/Cloud/HostMonitor", "Failed to destroy sequencers");
 		}
 
 		TCFutureVector<void> Destroys;
 
-		for (auto &MonitoredPath : Internal.m_MonitoredPaths)
+		for (auto &MonitoredPath : m_MonitoredPaths)
 			MonitoredPath.f_Destroy() > Destroys;
 
-		if (Internal.m_OsVersionReporter && Internal.m_OsVersionReporter->m_fReportReadings)
-			fg_Move(Internal.m_OsVersionReporter->m_fReportReadings).f_Destroy() > Destroys;
+		if (m_OsVersionReporter && m_OsVersionReporter->m_fReportReadings)
+			fg_Move(m_OsVersionReporter->m_fReportReadings).f_Destroy() > Destroys;
 
-		if (Internal.m_OsVersionStatusReporter && Internal.m_OsVersionStatusReporter->m_fReportReadings)
-			fg_Move(Internal.m_OsVersionStatusReporter->m_fReportReadings).f_Destroy() > Destroys;
+		if (m_OsVersionStatusReporter && m_OsVersionStatusReporter->m_fReportReadings)
+			fg_Move(m_OsVersionStatusReporter->m_fReportReadings).f_Destroy() > Destroys;
 
-		if (Internal.m_OsPatchStatusReporter && Internal.m_OsPatchStatusReporter->m_fReportReadings)
-			fg_Move(Internal.m_OsPatchStatusReporter->m_fReportReadings).f_Destroy() > Destroys;
+		if (m_OsPatchStatusReporter && m_OsPatchStatusReporter->m_fReportReadings)
+			fg_Move(m_OsPatchStatusReporter->m_fReportReadings).f_Destroy() > Destroys;
 
-		for (auto &Reporter : Internal.m_MemoryReporters)
+		for (auto &Reporter : m_MemoryReporters)
 		{
 			if (Reporter.m_SensorReporter && Reporter.m_SensorReporter->m_fReportReadings)
 				fg_Move(Reporter.m_SensorReporter->m_fReportReadings).f_Destroy() > Destroys;
