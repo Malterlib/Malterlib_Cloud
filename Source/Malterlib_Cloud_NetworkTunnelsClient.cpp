@@ -336,7 +336,7 @@ namespace NMib::NCloud
 					co_return DMibErrorInstance(Error);
 				}
 
-				auto &Connection = Internal.m_Connections[ConnectionID];
+				Internal.m_Connections[ConnectionID];
 
 				auto Cleanup = g_OnScopeExitActor / [this, ConnectionID]
 					{
@@ -397,7 +397,16 @@ namespace NMib::NCloud
 					co_return OpenConnectionResult.f_GetException();
 				}
 
-				Connection.m_fSendData = fg_Move(*OpenConnectionResult);
+				// The connection can have been closed while opening it
+				auto *pConnection = Internal.m_Connections.f_FindEqual(ConnectionID);
+				if (!pConnection)
+				{
+					co_await fg_Move(*OpenConnectionResult).f_Destroy().f_Wrap() > fg_LogError("Network tunnel client", "Failed to destroy send data");
+
+					co_return DMibErrorInstance("Connection was closed");
+				}
+
+				pConnection->m_fSendData = fg_Move(*OpenConnectionResult);
 
 				CAsyncSocketCallbacks SocketCallbacks;
 				SocketCallbacks.m_fOnClose = g_ActorFunctor / [this, pTunnel, ConnectionID, CallbackInfo, AllowDestroy = g_AllowWrongThreadDestroy]
@@ -439,7 +448,17 @@ namespace NMib::NCloud
 
 					co_return SocketResult.f_GetException();
 				}
-				Connection.m_Socket = fg_Move(*SocketResult);
+
+				// The connection can have been closed while accepting it
+				pConnection = Internal.m_Connections.f_FindEqual(ConnectionID);
+				if (!pConnection)
+				{
+					co_await fg_Move(*SocketResult).f_Destroy().f_Wrap() > fg_LogError("Network tunnel client", "Failed to destroy socket");
+
+					co_return DMibErrorInstance("Connection was closed");
+				}
+
+				pConnection->m_Socket = fg_Move(*SocketResult);
 
 				Cleanup->f_Clear();
 
