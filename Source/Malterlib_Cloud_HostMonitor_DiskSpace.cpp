@@ -21,14 +21,27 @@ namespace NMib::NCloud
 
 		auto OnResume = co_await m_pThis->f_CheckDestroyedOnResume();
 
-		auto &MonitoredPath = m_MonitoredPaths[_Options.m_Path];
+		++m_MonitoredPaths[_Options.m_Path].m_RefCount;
+
+		// The reference count we hold keeps the path from being removed, but validate on resume anyway
+		CMonitoredPath *pMonitoredPath = nullptr;
+		auto OnResumeMonitoredPath = co_await fg_OnResume
+			(
+				[&]() -> CExceptionPointer
+				{
+					pMonitoredPath = m_MonitoredPaths.f_FindEqual(_Options.m_Path);
+					if (!pMonitoredPath)
+						return DMibErrorInstance("Monitored path was removed");
+					return {};
+				}
+			)
+		;
 
 		bool bUpdateReporter = false;
-		++MonitoredPath.m_RefCount;
 
-		if (MonitoredPath.m_RefCount == 1 || MonitoredPath.m_Options != _Options)
+		if (pMonitoredPath->m_RefCount == 1 || pMonitoredPath->m_Options != _Options)
 		{
-			MonitoredPath.m_Options = _Options;
+			pMonitoredPath->m_Options = _Options;
 			bUpdateReporter = true;
 		}
 
@@ -90,28 +103,28 @@ namespace NMib::NCloud
 				auto SensorInfo = fGetSensorInfo("free", "Free Disk Space", CInternal::ESensorType_Free);
 				auto Reporter = co_await m_SensorStore(&CDistributedAppSensorStoreLocal::f_OpenSensorReporter, fg_Move(SensorInfo));
 
-				if (MonitoredPath.m_FreeReporter)
-					fg_Move(MonitoredPath.m_FreeReporter->m_fReportReadings).f_Destroy() > fg_LogError("Malterlib/Cloud/HostMonitor", "Failed to destroy previous reporter");
+				if (pMonitoredPath->m_FreeReporter)
+					fg_Move(pMonitoredPath->m_FreeReporter->m_fReportReadings).f_Destroy() > fg_LogError("Malterlib/Cloud/HostMonitor", "Failed to destroy previous reporter");
 
-				MonitoredPath.m_FreeReporter = fg_Move(Reporter);
+				pMonitoredPath->m_FreeReporter = fg_Move(Reporter);
 			}
 			{
 				auto SensorInfo = fGetSensorInfo("freepercent", "Free Disk Space %", CInternal::ESensorType_FreePercent);
 				auto Reporter = co_await m_SensorStore(&CDistributedAppSensorStoreLocal::f_OpenSensorReporter, fg_Move(SensorInfo));
 
-				if (MonitoredPath.m_FreePercentReporter)
-					fg_Move(MonitoredPath.m_FreePercentReporter->m_fReportReadings).f_Destroy() > fg_LogError("Malterlib/Cloud/HostMonitor", "Failed to destroy previous reporter");
+				if (pMonitoredPath->m_FreePercentReporter)
+					fg_Move(pMonitoredPath->m_FreePercentReporter->m_fReportReadings).f_Destroy() > fg_LogError("Malterlib/Cloud/HostMonitor", "Failed to destroy previous reporter");
 
-				MonitoredPath.m_FreePercentReporter = fg_Move(Reporter);
+				pMonitoredPath->m_FreePercentReporter = fg_Move(Reporter);
 			}
 			{
 				auto SensorInfo = fGetSensorInfo("total", "Total Disk Space", CInternal::ESensorType_Total);
 				auto Reporter = co_await m_SensorStore(&CDistributedAppSensorStoreLocal::f_OpenSensorReporter, fg_Move(SensorInfo));
 
-				if (MonitoredPath.m_TotalReporter)
-					fg_Move(MonitoredPath.m_TotalReporter->m_fReportReadings).f_Destroy() > fg_LogError("Malterlib/Cloud/HostMonitor", "Failed to destroy previous reporter");
+				if (pMonitoredPath->m_TotalReporter)
+					fg_Move(pMonitoredPath->m_TotalReporter->m_fReportReadings).f_Destroy() > fg_LogError("Malterlib/Cloud/HostMonitor", "Failed to destroy previous reporter");
 
-				MonitoredPath.m_TotalReporter = fg_Move(Reporter);
+				pMonitoredPath->m_TotalReporter = fg_Move(Reporter);
 			}
 		}
 
@@ -128,16 +141,17 @@ namespace NMib::NCloud
 				if (!pMonitoredPath)
 					co_return {};
 
-				auto &MonitoredPath = *pMonitoredPath;
-
-				if (--MonitoredPath.m_RefCount > 0)
+				if (--pMonitoredPath->m_RefCount > 0)
 					co_return {};
 
-				auto DestroyResult = co_await MonitoredPath.f_Destroy().f_Wrap();
+				auto DestroyResult = co_await pMonitoredPath->f_Destroy().f_Wrap();
 				if (!DestroyResult)
 					DMibLogWithCategory(Malterlib/Cloud/HostMonitor, Error, "Failed to destroy reporters for '{}': {}", Path, DestroyResult.f_GetExceptionStr());
 
-				Internal.m_MonitoredPaths.f_Remove(pMonitoredPath);
+				// f_MonitorPath can have started monitoring the path again, or another unsubscribe can have removed it, while destroying
+				auto *pRemovePath = Internal.m_MonitoredPaths.f_FindEqual(Path);
+				if (pRemovePath && pRemovePath->m_RefCount == 0)
+					Internal.m_MonitoredPaths.f_Remove(pRemovePath);
 
 				co_return {};
 			}
