@@ -11,14 +11,17 @@ namespace NMib::NCloud
 {
 	TCFuture<CActorSubscription> CHostMonitor::f_MonitorPath(CMonitorPathOptions _Options)
 	{
-		auto &Internal = *mp_pInternal;
+		return mp_pInternal->f_MonitorPath(fg_Move(_Options), true);
+	}
 
-		if (!Internal.m_Config.m_Interval)
+	TCFuture<CActorSubscription> CHostMonitor::CInternal::f_MonitorPath(CMonitorPathOptions _Options, bool _bUpdateDiskSpace)
+	{
+		if (!m_Config.m_Interval)
 			co_return {};
 
-		auto OnResume = co_await f_CheckDestroyedOnResume();
+		auto OnResume = co_await m_pThis->f_CheckDestroyedOnResume();
 
-		auto &MonitoredPath = Internal.m_MonitoredPaths[_Options.m_Path];
+		auto &MonitoredPath = m_MonitoredPaths[_Options.m_Path];
 
 		bool bUpdateReporter = false;
 		++MonitoredPath.m_RefCount;
@@ -37,9 +40,9 @@ namespace NMib::NCloud
 					SensorInfo.m_Identifier = "org.malterlib.diskspace.{}"_f << _Identifier;
 					SensorInfo.m_IdentifierScope = _Options.m_Path;
 					SensorInfo.m_Name = _Name;
-					SensorInfo.m_Metadata = Internal.m_SensorMetadata;
-					if (Internal.m_Config.m_Interval != 0.0)
-						SensorInfo.m_ExpectedReportInterval = Internal.m_Config.m_Interval;
+					SensorInfo.m_Metadata = m_SensorMetadata;
+					if (m_Config.m_Interval != 0.0)
+						SensorInfo.m_ExpectedReportInterval = m_Config.m_Interval;
 
 					switch (_Type)
 					{
@@ -85,7 +88,7 @@ namespace NMib::NCloud
 
 			{
 				auto SensorInfo = fGetSensorInfo("free", "Free Disk Space", CInternal::ESensorType_Free);
-				auto Reporter = co_await Internal.m_SensorStore(&CDistributedAppSensorStoreLocal::f_OpenSensorReporter, fg_Move(SensorInfo));
+				auto Reporter = co_await m_SensorStore(&CDistributedAppSensorStoreLocal::f_OpenSensorReporter, fg_Move(SensorInfo));
 
 				if (MonitoredPath.m_FreeReporter)
 					fg_Move(MonitoredPath.m_FreeReporter->m_fReportReadings).f_Destroy() > fg_LogError("Malterlib/Cloud/HostMonitor", "Failed to destroy previous reporter");
@@ -94,7 +97,7 @@ namespace NMib::NCloud
 			}
 			{
 				auto SensorInfo = fGetSensorInfo("freepercent", "Free Disk Space %", CInternal::ESensorType_FreePercent);
-				auto Reporter = co_await Internal.m_SensorStore(&CDistributedAppSensorStoreLocal::f_OpenSensorReporter, fg_Move(SensorInfo));
+				auto Reporter = co_await m_SensorStore(&CDistributedAppSensorStoreLocal::f_OpenSensorReporter, fg_Move(SensorInfo));
 
 				if (MonitoredPath.m_FreePercentReporter)
 					fg_Move(MonitoredPath.m_FreePercentReporter->m_fReportReadings).f_Destroy() > fg_LogError("Malterlib/Cloud/HostMonitor", "Failed to destroy previous reporter");
@@ -103,7 +106,7 @@ namespace NMib::NCloud
 			}
 			{
 				auto SensorInfo = fGetSensorInfo("total", "Total Disk Space", CInternal::ESensorType_Total);
-				auto Reporter = co_await Internal.m_SensorStore(&CDistributedAppSensorStoreLocal::f_OpenSensorReporter, fg_Move(SensorInfo));
+				auto Reporter = co_await m_SensorStore(&CDistributedAppSensorStoreLocal::f_OpenSensorReporter, fg_Move(SensorInfo));
 
 				if (MonitoredPath.m_TotalReporter)
 					fg_Move(MonitoredPath.m_TotalReporter->m_fReportReadings).f_Destroy() > fg_LogError("Malterlib/Cloud/HostMonitor", "Failed to destroy previous reporter");
@@ -112,11 +115,14 @@ namespace NMib::NCloud
 			}
 		}
 
-		co_await Internal.f_PeriodicUpdate_Diskspace(false);
+		// Not when called from f_PeriodicUpdate_Diskspace_UpdateMounts, which already holds m_UpdatePeriodicDiskSpaceSequencer and updates
+		// the new path after it returns
+		if (_bUpdateDiskSpace)
+			co_await f_PeriodicUpdate_Diskspace(false);
 
-		co_return g_ActorSubscription / [this, Path = _Options.m_Path]() -> TCFuture<void>
+		co_return g_ActorSubscription / [pThis = m_pThis, Path = _Options.m_Path]() -> TCFuture<void>
 			{
-				auto &Internal = *mp_pInternal;
+				auto &Internal = *pThis->mp_pInternal;
 
 				auto *pMonitoredPath = Internal.m_MonitoredPaths.f_FindEqual(Path);
 				if (!pMonitoredPath)
@@ -162,7 +168,7 @@ namespace NMib::NCloud
 
 			CMonitorPathOptions MonitorOptions;
 			MonitorOptions.m_Path = Mount;
-			AutomaticMount.m_MonitorPathSubscription = co_await m_pThis->f_MonitorPath(MonitorOptions);
+			AutomaticMount.m_MonitorPathSubscription = co_await f_MonitorPath(MonitorOptions, false);
 		}
 
 		for (auto &MountToDelete : MountsToDelete)
