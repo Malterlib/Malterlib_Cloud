@@ -171,7 +171,7 @@ namespace NMib::NCloud::NVersionManager
 
 		// Sync lifecycle
 		TCFuture<void> fp_SyncInit();
-		TCFuture<void> fp_SyncDestroy();
+		DMibActorPhase(Destroy) TCFuture<void> fp_SyncDestroy();
 
 		// Sync sensor functions
 		TCFuture<void> fp_SyncRegisterSensors();
@@ -263,7 +263,7 @@ namespace NMib::NCloud::NVersionManager
 		// Sync configuration and state
 		TCMap<CStr, CSyncSourceState> mp_SyncSources;
 		TCMap<CStr, CSyncHostSubscription> mp_SyncHostSubscriptions; // Keyed by host ID
-		TCMap<CSyncVersionKey, CSyncVersionState> mp_SyncVersionStates;
+		DMibActorEntries(Destroy) TCMap<CSyncVersionKey, CSyncVersionState> mp_SyncVersionStates;
 		TCTrustedActorSubscription<CVersionManager> mp_SyncVersionManagerSubscription;
 	};
 }

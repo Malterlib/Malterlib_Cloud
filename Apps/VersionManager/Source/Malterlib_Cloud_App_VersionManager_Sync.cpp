@@ -626,6 +626,8 @@ namespace NMib::NCloud::NVersionManager
 		if (_MatchingConfigs.f_IsEmpty())
 			co_return {};
 
+		auto OnResume = co_await f_CheckDestroyedOnResume();
+
 		TCSet<CStr> AllOwnedTags;
 		TCSet<CStr> ShouldBePresentTags;
 		bool bAnySyncRetrySequence = false;
