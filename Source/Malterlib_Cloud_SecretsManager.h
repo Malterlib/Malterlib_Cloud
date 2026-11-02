@@ -17,8 +17,8 @@ namespace NMib::NCloud
 {
 	DMibImpErrorClassDefine(CExceptionSecretsManagerUnexpectedValue, NException::CException);
 
-#define DMibErrorSecretsManagerUnexpectedValue(_Description) DMibImpError(NMib::NCloud::CExceptionSecretsManagerUnexpectedValue, _Description)
-#define DMibErrorInstanceSecretsManagerUnexpectedValue(_Description) DMibImpErrorInstance(NMib::NCloud::CExceptionSecretsManagerUnexpectedValue, _Description)
+#define DMibErrorSecretsManagerUnexpectedValue(d_Description) DMibImpError(NMib::NCloud::CExceptionSecretsManagerUnexpectedValue, d_Description)
+#define DMibErrorInstanceSecretsManagerUnexpectedValue(d_Description) DMibImpErrorInstance(NMib::NCloud::CExceptionSecretsManagerUnexpectedValue, d_Description)
 
 	struct CSecretsManager : public NConcurrency::CActor
 	{

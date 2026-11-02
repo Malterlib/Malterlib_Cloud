@@ -24,8 +24,8 @@ namespace NMib::NCloud
 
 	DMibImpErrorClassDefine(CExceptionBackupManagerHashMismatch, NException::CException);
 
-#define DMibErrorBackupManagerHashMismatch(_Description) DMibImpError(NMib::NCloud::CExceptionBackupManagerHashMismatch, _Description)
-#define DMibErrorInstanceBackupManagerHashMismatch(_Description) DMibImpErrorInstance(NMib::NCloud::CExceptionBackupManagerHashMismatch, _Description)
+#define DMibErrorBackupManagerHashMismatch(d_Description) DMibImpError(NMib::NCloud::CExceptionBackupManagerHashMismatch, d_Description)
+#define DMibErrorInstanceBackupManagerHashMismatch(d_Description) DMibImpErrorInstance(NMib::NCloud::CExceptionBackupManagerHashMismatch, d_Description)
 
 //#	define DMibCloudBackupManagerDebug
 
