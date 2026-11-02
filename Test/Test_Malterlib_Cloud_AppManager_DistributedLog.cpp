@@ -203,45 +203,26 @@ struct CAppManager_DistributedLog_Tests : public NMib::NTest::CTest
 			{
 				DMibTestPath("Local Store");
 
-				auto fGenerateLogEntry = g_ActorFunctor / [&]() -> TCFuture<void>
-					{
-						co_await AppManagerTestHelper.f_LaunchTool(TestAppDirectory / "TestApp", {"--generate-log-entries", "5"}, TestAppDirectory);
+				co_await AppManagerTestHelper.f_LaunchTool(TestAppDirectory / "TestApp", {"--generate-log-entries", "5"}, TestAppDirectory);
 
-						co_return {};
-					}
+				auto Logs = CEJsonSorted::fs_FromString
+					(
+						co_await AppManagerTestHelper.f_LaunchTool(TestAppDirectory / "TestApp", {"--log-list", "--identifier", "org.malterlib.log.test", "--json"}, TestAppDirectory)
+					)
 				;
+				DMibExpect(Logs, ==, fSortLogs(ExpectedLogs));
 
-				co_await fGenerateLogEntry();
-
-				auto fReadLogs = g_ActorFunctor / [&]() -> TCFuture<CEJsonSorted>
-					{
-						auto Result = co_await AppManagerTestHelper.f_LaunchTool
-							(
-								TestAppDirectory / "TestApp"
-								, {"--log-list", "--identifier", "org.malterlib.log.test", "--json"}
-								, TestAppDirectory
-							)
-						;
-						co_return CEJsonSorted::fs_FromString(Result);
-					}
+				auto LogEntries = CEJsonSorted::fs_FromString
+					(
+						co_await AppManagerTestHelper.f_LaunchTool
+						(
+							TestAppDirectory / "TestApp"
+							, {"--log-entries-list", "--identifier", "org.malterlib.log.test", "--newest", "--max-entries=0", "--json"}
+							, TestAppDirectory
+						)
+					)
 				;
-
-				auto fReadLogEntries = g_ActorFunctor / [&]() -> TCFuture<CEJsonSorted>
-					{
-						auto Result = co_await AppManagerTestHelper.f_LaunchTool
-							(
-								TestAppDirectory / "TestApp"
-								, {"--log-entries-list", "--identifier", "org.malterlib.log.test", "--newest", "--max-entries=0", "--json"}
-								, TestAppDirectory
-							)
-						;
-
-						co_return CEJsonSorted::fs_FromString(Result);
-					}
-				;
-
-				DMibExpect(co_await fReadLogs(), ==, fSortLogs(ExpectedLogs));
-				DMibExpect(fMakeComparable(co_await fReadLogEntries()), ==, ExpectedLogEntries);
+				DMibExpect(fMakeComparable(fg_Move(LogEntries)), ==, ExpectedLogEntries);
 			}
 
 			auto TestAppHostID = CStr((co_await AppManagerTestHelper.f_LaunchTool(TestAppDirectory / "TestApp", {"--trust-host-id"}, TestAppDirectory)).f_Trim());
@@ -266,34 +247,24 @@ struct CAppManager_DistributedLog_Tests : public NMib::NTest::CTest
 
 				CStr AppManagerPath = AppManagerInfo.m_RootDirectory / "AppManager";
 
-				auto fReadLogs = g_ActorFunctor / [&]() -> TCFuture<CEJsonSorted>
-					{
-						auto Result = co_await AppManagerTestHelper.f_LaunchTool
-							(
-								AppManagerPath
-								, {"--log-list", "--identifier", "org.malterlib.log.test", "--json"}
-								, AppManagerInfo.m_RootDirectory
-							)
-						;
-						co_return CEJsonSorted::fs_FromString(Result);
-					}
+				auto Logs = CEJsonSorted::fs_FromString
+					(
+						co_await AppManagerTestHelper.f_LaunchTool(AppManagerPath, {"--log-list", "--identifier", "org.malterlib.log.test", "--json"}, AppManagerInfo.m_RootDirectory)
+					)
 				;
+				DMibExpect(Logs, ==, fSortLogs(fSetHostInfo(ExpectedLogs)));
 
-				auto fReadLogEntries = g_ActorFunctor / [&]() -> TCFuture<CEJsonSorted>
-					{
-						auto Result = co_await AppManagerTestHelper.f_LaunchTool
-							(
-								AppManagerPath
-								, {"--log-entries-list", "--identifier", "org.malterlib.log.test", "--newest", "--max-entries=0", "--json"}
-								, AppManagerInfo.m_RootDirectory
-							)
-						;
-						co_return CEJsonSorted::fs_FromString(Result);
-					}
+				auto LogEntries = CEJsonSorted::fs_FromString
+					(
+						co_await AppManagerTestHelper.f_LaunchTool
+						(
+							AppManagerPath
+							, {"--log-entries-list", "--identifier", "org.malterlib.log.test", "--newest", "--max-entries=0", "--json"}
+							, AppManagerInfo.m_RootDirectory
+						)
+					)
 				;
-
-				DMibExpect(co_await fReadLogs(), ==, fSortLogs(fSetHostInfo(ExpectedLogs)));
-				DMibExpect(fMakeComparable(co_await fReadLogEntries()), ==, fSetHostInfo(ExpectedLogEntries));
+				DMibExpect(fMakeComparable(fg_Move(LogEntries)), ==, fSetHostInfo(ExpectedLogEntries));
 			}
 
 			auto fSetHostInfoAppManager =
@@ -322,34 +293,24 @@ struct CAppManager_DistributedLog_Tests : public NMib::NTest::CTest
 				CStr CloudClientDirectory = AppManagerTestHelper.m_pState->m_RootDirectory / "MalterlibCloud";
 				CStr CloudClientPath = CloudClientDirectory / "MalterlibCloud";
 
-				auto fReadLogs = g_ActorFunctor / [&]() -> TCFuture<CEJsonSorted>
-					{
-						auto Result = co_await AppManagerTestHelper.f_LaunchTool
-							(
-								CloudClientPath
-								, {"--cloud-manager-log-list", "--identifier", "org.malterlib.log.test", "--json"}
-								, CloudClientDirectory
-							)
-						;
-						co_return CEJsonSorted::fs_FromString(Result);
-					}
+				auto Logs = CEJsonSorted::fs_FromString
+					(
+						co_await AppManagerTestHelper.f_LaunchTool(CloudClientPath, {"--cloud-manager-log-list", "--identifier", "org.malterlib.log.test", "--json"}, CloudClientDirectory)
+					)
 				;
+				DMibExpect(Logs, ==, fSortLogs(fSetHostInfo(ExpectedLogs)));
 
-				auto fReadLogEntries = g_ActorFunctor / [&]() -> TCFuture<CEJsonSorted>
-					{
-						auto Result = co_await AppManagerTestHelper.f_LaunchTool
-							(
-								CloudClientPath
-								, {"--cloud-manager-log-entries-list", "--identifier", "org.malterlib.log.test", "--newest", "--max-entries=0", "--json"}
-								, CloudClientDirectory
-							)
-						;
-						co_return CEJsonSorted::fs_FromString(Result);
-					}
+				auto LogEntries = CEJsonSorted::fs_FromString
+					(
+						co_await AppManagerTestHelper.f_LaunchTool
+						(
+							CloudClientPath
+							, {"--cloud-manager-log-entries-list", "--identifier", "org.malterlib.log.test", "--newest", "--max-entries=0", "--json"}
+							, CloudClientDirectory
+						)
+					)
 				;
-
-				DMibExpect(co_await fReadLogs(), ==, fSortLogs(fSetHostInfo(ExpectedLogs)));
-				DMibExpect(fMakeComparable(co_await fReadLogEntries()), ==, fSetHostInfo(ExpectedLogEntries));
+				DMibExpect(fMakeComparable(fg_Move(LogEntries)), ==, fSetHostInfo(ExpectedLogEntries));
 			}
 
 			co_return {};
