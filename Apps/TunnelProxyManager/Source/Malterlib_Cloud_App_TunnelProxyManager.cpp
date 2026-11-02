@@ -25,6 +25,9 @@ namespace NMib::NCloud::NTunnelProxyManager
 	{
 		CLogError LogError("TunnelProxyManager");
 
+		auto OnResume = co_await f_CheckDestroyedOnResume();
+		auto SequenceSubscription = co_await mp_ReloadSequencer.f_Sequence();
+
 		TCFutureVector<void> RemoveResults;
 
 		{
@@ -50,7 +53,8 @@ namespace NMib::NCloud::NTunnelProxyManager
 						if (_fLog)
 							co_await _fLog("Changing published tunnel '{}': {} -> {}"_f << TunnelName << pOldPublication->m_Host << Host);
 
-						if (pOldPublication->m_Subscription)
+						pOldPublication = mp_Publications.f_FindEqual(TunnelName);
+						if (pOldPublication && pOldPublication->m_Subscription)
 							co_await fg_Exchange(pOldPublication->m_Subscription, nullptr)->f_Destroy();
 					}
 					else if (_fLog)
@@ -117,7 +121,8 @@ namespace NMib::NCloud::NTunnelProxyManager
 						if (_fLog)
 							co_await _fLog("Changing tunnel subscription '{}' listen: {} -> {}"_f << TunnelName << pOldSubscription->m_ListenHost << ListenHost);
 
-						if (pOldSubscription->m_Tunnel.m_Subscription)
+						pOldSubscription = mp_Subscriptions.f_FindEqual(TunnelName);
+						if (pOldSubscription && pOldSubscription->m_Tunnel.m_Subscription)
 							fg_Exchange(pOldSubscription->m_Tunnel.m_Subscription, nullptr)->f_Destroy() > RemoveResults;
 					}
 					else if (_fLog)
@@ -258,6 +263,8 @@ namespace NMib::NCloud::NTunnelProxyManager
 			co_await fg_Move(mp_TunnelsServer).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy tunnels server");
 
 		co_await CDistributedAppActor::fp_Destroy();
+
+		co_await fg_Move(mp_ReloadSequencer).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy reload sequencer");
 
 		co_return {};
 	}

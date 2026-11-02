@@ -43,5 +43,6 @@ namespace NMib::NCloud::NTunnelProxyManager
 		TCActor<CNetworkTunnelsClient> mp_TunnelsClient;
 		TCMap<CStr, CPublication> mp_Publications;
 		TCMap<CStr, CSubscription> mp_Subscriptions;
+		CSequencer mp_ReloadSequencer{"TunnelProxyManager ReloadSequencer"};
 	};
 }
