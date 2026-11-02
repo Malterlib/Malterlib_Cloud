@@ -157,7 +157,7 @@ namespace NMib::NCloud::NVersionManager
 		TCFuture<void> fp_RemoveVersionFromDatabase(CStr _Application, CVersionManager::CVersionIDAndPlatform _VersionID);
 		void fp_NotifyUploadsEmpty();
 
-		TCFuture<void> fp_SendSubscriptionInitial(CStr _Application, CSubscription const *_pSubscription);
+		TCFuture<void> fp_SendSubscriptionInitial(CStr _Application, CStr _SubscriptionID);
 		TCFuture<void> fp_UpdateSubscriptionsForChangedPermissions(CPermissionIdentifiers _Identity);
 
 		TCFuture<TCSet<CStr>> fp_FilterApplicationsByPermissions(CStr _Description, TCSet<CStr> _Applications);

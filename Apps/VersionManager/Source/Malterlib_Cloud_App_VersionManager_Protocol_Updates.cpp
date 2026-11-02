@@ -142,7 +142,7 @@ namespace NMib::NCloud::NVersionManager
 				{
 					if (Subscription.m_CallingHostInfo.f_GetRealHostID() != _Identity.f_GetHostID())
 						continue;
-					fp_SendSubscriptionInitial(_Application, &Subscription) > Results;
+					fp_SendSubscriptionInitial(_Application, Subscription.f_GetSubscriptionID()) > Results;
 				}
 			}
 		;
@@ -155,15 +155,13 @@ namespace NMib::NCloud::NVersionManager
 		co_return {};
 	}
 
-	TCFuture<void> CVersionManagerDaemonActor::CServer::fp_SendSubscriptionInitial(CStr _ApplicationName, CSubscription const *_pSubscription)
+	TCFuture<void> CVersionManagerDaemonActor::CServer::fp_SendSubscriptionInitial(CStr _ApplicationName, CStr _SubscriptionID)
 	{
-		auto fSendInitialForApplication =
-			[
-				this
-				, CallingHostInfo = _pSubscription->m_CallingHostInfo
-				, SubscriptionID = _pSubscription->f_GetSubscriptionID()
-				, ApplicationName = _ApplicationName
-			]
+		CSubscription const *pInitialSubscription = fp_GetSubscription(_ApplicationName, _SubscriptionID);
+		if (!pInitialSubscription)
+			co_return {};
+
+		auto fSendInitialForApplication = [this, CallingHostInfo = pInitialSubscription->m_CallingHostInfo, SubscriptionID = _SubscriptionID, ApplicationName = _ApplicationName]
 			(CStr _Application) -> TCFuture<TCVector<CVersionManager::CNewVersionNotification>>
 			{
 				auto bHasPermissions = co_await mp_Permissions.f_HasPermission
@@ -213,7 +211,7 @@ namespace NMib::NCloud::NVersionManager
 
 		auto Results = co_await fg_AllDoneWrapped(NewVersionNotificationResults);
 
-		CSubscription const *pSubscription = fp_GetSubscription(_ApplicationName, _pSubscription->f_GetSubscriptionID());
+		CSubscription const *pSubscription = fp_GetSubscription(_ApplicationName, _SubscriptionID);
 
 		if (!pSubscription)
 			co_return {};
@@ -296,7 +294,7 @@ namespace NMib::NCloud::NVersionManager
 			co_return fg_Move(Result);
 
 		auto ApplicationName = _Params.m_Application;
-		co_await pThis->fp_SendSubscriptionInitial(_Params.m_Application, &Subscription);
+		co_await pThis->fp_SendSubscriptionInitial(_Params.m_Application, SubscriptionID);
 
 		{
 			CSubscription const *pSubscription = pThis->fp_GetSubscription(ApplicationName, SubscriptionID);
