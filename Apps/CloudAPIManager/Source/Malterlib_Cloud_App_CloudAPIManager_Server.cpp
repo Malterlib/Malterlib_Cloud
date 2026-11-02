@@ -131,7 +131,7 @@ namespace NMib::NCloud::NCloudAPIManager
 		return mp_HttpQueryActor;
 	}
 
-	TCVector<CStr> CCloudAPIManagerDaemonActor::CServer::fsp_AuditMessages(CStr const &_Error, CExceptionPointer _pException)
+	TCVector<CStr> CCloudAPIManagerDaemonActor::CServer::fsp_AuditMessages(CStr const &_Error, CExceptionPointer const &_pException)
 	{
 		TCVector<CStr> Messages;
 

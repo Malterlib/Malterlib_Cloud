@@ -38,7 +38,7 @@ namespace NVersionManagerSyncTests
 	};
 
 	// Helper to create a single sync source config (without SyncSources wrapper)
-	CEJsonSorted fg_CreateSyncSource(TCSet<CStr> _SyncHosts, CSyncConfigOptions const &_Options = {})
+	CEJsonSorted fg_CreateSyncSource(TCSet<CStr> const &_SyncHosts, CSyncConfigOptions const &_Options = {})
 	{
 		CEJsonSorted Source = EJsonType_Object;
 
@@ -93,7 +93,7 @@ namespace NVersionManagerSyncTests
 	}
 
 	// Helper to create full sync config from named sources
-	CEJsonSorted fg_CreateMultiSyncConfig(CEJsonSorted _Sources)
+	CEJsonSorted fg_CreateMultiSyncConfig(CEJsonSorted const &_Sources)
 	{
 		CEJsonSorted Config = EJsonType_Object;
 		Config["SyncSources"] = _Sources;
@@ -102,7 +102,7 @@ namespace NVersionManagerSyncTests
 	}
 
 	// Helper to create sync source config JSON
-	CEJsonSorted fg_CreateSyncConfig(CStr _Name, TCSet<CStr> _SyncHosts, CSyncConfigOptions const &_Options = {})
+	CEJsonSorted fg_CreateSyncConfig(CStr const &_Name, TCSet<CStr> const &_SyncHosts, CSyncConfigOptions const &_Options = {})
 	{
 		CEJsonSorted SyncSources = EJsonType_Object;
 		SyncSources[_Name] = fg_CreateSyncSource(_SyncHosts, _Options);
@@ -116,7 +116,7 @@ namespace NVersionManagerSyncTests
 	// Helper structure for dual VersionManager sync tests
 	struct CSyncTestHelper : public CAllowUnsafeThis
 	{
-		CSyncTestHelper(CStr _TestName, CAppManagerTestHelper::EOption _Options)
+		CSyncTestHelper(CStr const &_TestName, CAppManagerTestHelper::EOption _Options)
 			: m_Options(_Options)
 			, m_SourceHelper(_TestName + "_Source", _Options, g_Timeout)
 		{
@@ -350,7 +350,7 @@ namespace NVersionManagerSyncTests
 	// Helper structure for three-way VersionManager sync tests
 	struct CTripleSyncTestHelper : public CAllowUnsafeThis
 	{
-		CTripleSyncTestHelper(CStr _TestName, CAppManagerTestHelper::EOption _Options)
+		CTripleSyncTestHelper(CStr const &_TestName, CAppManagerTestHelper::EOption _Options)
 			: m_Options(_Options)
 			, m_ManagerAHelper(_TestName + "_ManagerA", _Options, g_Timeout)
 		{

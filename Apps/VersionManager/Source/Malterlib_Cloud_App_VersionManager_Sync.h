@@ -73,8 +73,8 @@ namespace NMib::NCloud::NVersionManager
 	/// State for tracking sync processing of a specific version
 	struct CSyncVersionState
 	{
-		CSyncVersionState(NStr::CStr _SequencerDescription)
-			: m_Sequencer(fg_Move(_SequencerDescription))
+		CSyncVersionState(NStr::CStr const &_SequencerDescription)
+			: m_Sequencer(_SequencerDescription)
 		{
 		}
 

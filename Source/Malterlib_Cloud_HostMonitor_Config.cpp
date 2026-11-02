@@ -112,7 +112,7 @@ namespace NMib::NCloud
 		;
 	}
 
-	CExceptionPointer CHostMonitor::CInternal::f_ConfigFile_CheckFilePrerequisites(CMonitoredConfigFile * &o_pConfigFile, CStr _ConfigID, CStr _FileName)
+	CExceptionPointer CHostMonitor::CInternal::f_ConfigFile_CheckFilePrerequisites(CMonitoredConfigFile * &o_pConfigFile, CStr const &_ConfigID, CStr const &_FileName)
 	{
 		auto *pSubscription = m_MonitoredConfigs.f_FindEqual(_ConfigID);
 		if (!pSubscription)

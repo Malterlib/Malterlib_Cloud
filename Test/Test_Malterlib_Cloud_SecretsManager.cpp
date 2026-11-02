@@ -587,7 +587,7 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 					return SecretsManager.f_CallActor(&CSecretsManager::f_GetSecretBySemanticID)(GetProperties).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 				}
 			;
-			auto fEnumerateFor = [&](TCOptional<NStr::CStrSecure> _ID, TCSet<NStr::CStr> const &_Tags) -> TCSet<CSecretsManager::CSecretID>
+			auto fEnumerateFor = [&](TCOptional<NStr::CStrSecure> const &_ID, TCSet<NStr::CStr> const &_Tags) -> TCSet<CSecretsManager::CSecretID>
 				{
 					CSecretsManager::CEnumerateSecrets EnumerateProperties;
 					EnumerateProperties.m_SemanticID = _ID;
@@ -1754,7 +1754,7 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 					return SecretsManager.f_CallActor(&CSecretsManager::f_RemoveSecret)(CSecretsManager::CSecretID{_Folder, _Name});
 				}
 			;
-			auto fWriteFile = [&](CStr _FileName, CStr _Content)
+			auto fWriteFile = [&](CStr const &_FileName, CStr const &_Content)
 				{
 					CFile File;
 					File.f_Open(CFile::fs_AppendPath(RootDirectory, _FileName), EFileOpen_Write | EFileOpen_ShareAll);

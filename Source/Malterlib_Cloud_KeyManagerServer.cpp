@@ -24,7 +24,7 @@ namespace NMib::NCloud
 		return NContainer::TCMap<NStr::CStr, CClientKey>::fs_GetKey(*this);
 	}
 
-	bool ICKeyManagerServerDatabase::CDatabase::f_HasAvailableKey(CSymmetricKey _Key)
+	bool ICKeyManagerServerDatabase::CDatabase::f_HasAvailableKey(CSymmetricKey const &_Key)
 	{
 		auto *pKeys = m_AvailableKeys.f_FindEqual(_Key.f_GetLen());
 		if (!pKeys)

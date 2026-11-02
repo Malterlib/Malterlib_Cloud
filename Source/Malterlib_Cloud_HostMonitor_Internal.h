@@ -103,7 +103,7 @@ namespace NMib::NCloud
 		TCFuture<CPatchesNeeded> f_Patch_PatchesNeeded();
 		TCFuture<void> f_Patch_InstallPatches();
 
-		CExceptionPointer f_ConfigFile_CheckFilePrerequisites(CMonitoredConfigFile * &o_pConfigFile, CStr _ConfigID, CStr _FileName);
+		CExceptionPointer f_ConfigFile_CheckFilePrerequisites(CMonitoredConfigFile * &o_pConfigFile, CStr const &_ConfigID, CStr const &_FileName);
 
 		TCFuture<void> f_ConfigFile_Changed(CStr _ConfigID, CStr _FileName);
 		TCFuture<void> f_ConfigFile_ValueChanged(CStr _ConfigID, CStr _FileName, NHostMonitorDatabase::CConfigFileHistoryEntryValue _Value);

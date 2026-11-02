@@ -77,7 +77,7 @@ namespace NMib::NCloud::NCloudAPIManager
 
 		TCFuture<COpenStackServiceInfo> fp_GetOpenStackServiceInfo(CCloudContext &_CloudContext);
 
-		static TCVector<CStr> fsp_AuditMessages(CStr const &_Error, CExceptionPointer _pException);
+		static TCVector<CStr> fsp_AuditMessages(CStr const &_Error, CExceptionPointer const &_pException);
 
 		TCActor<CHttpClientActor> const &fp_GetHttpQueryActor();
 

@@ -65,7 +65,7 @@ namespace NMib::NCloud
 
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
-			bool f_HasAvailableKey(CSymmetricKey _Key);
+			bool f_HasAvailableKey(CSymmetricKey const &_Key);
 
 			NContainer::TCMap<NStr::CStr, CClientStore> m_Clients;
 			NContainer::TCMap<uint32, NContainer::TCSet<CSymmetricKey>> m_AvailableKeys;

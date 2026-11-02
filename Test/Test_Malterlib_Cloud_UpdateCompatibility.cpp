@@ -1331,7 +1331,7 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		{
 		}
 
-		void f_SetLaunchActor(TCActor<CProcessLaunchActor> _LaunchActor)
+		void f_SetLaunchActor(TCActor<CProcessLaunchActor> &&_LaunchActor)
 		{
 			mp_LaunchActor = fg_Move(_LaunchActor);
 		}
@@ -1682,7 +1682,9 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		};
 
 		// Launch a process and provide stdin input (typically for password prompts)
-		auto fLaunchWithStdIn = [](CActorRunLoopTestHelper &_RunLoopHelper, CStr _Executable, TCVector<CStr> _Params, CStr _WorkingDir, TCVector<CStr> _StdInLines) -> CProcessWithStdinResult
+		auto fLaunchWithStdIn = []
+			(CActorRunLoopTestHelper &_RunLoopHelper, CStr const &_Executable, TCVector<CStr> const &_Params, CStr const &_WorkingDir, TCVector<CStr> const &_StdInLines)
+			-> CProcessWithStdinResult
 			{
 				using namespace NMib::NStr;
 
@@ -1758,7 +1760,7 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		;
 
 		// Register a password authentication factor for a user
-		auto fRegisterUserPassword = [&](CStr _Executable, CStr _UserID, CStr _Password) -> CStr
+		auto fRegisterUserPassword = [&](CStr const &_Executable, CStr const &_UserID, CStr const &_Password) -> CStr
 			{
 				DMibLogWithCategory(Test, Info, "Registering password factor for user {}", _UserID);
 

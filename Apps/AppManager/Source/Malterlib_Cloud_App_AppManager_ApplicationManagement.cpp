@@ -381,7 +381,7 @@ namespace NMib::NCloud::NAppManager
 		auto &Settings = _pApplication->m_Settings;
 		auto User = _pUniqueUserGroup->f_GetUser(Settings.m_RunAsUser);
 		auto Group = _pUniqueUserGroup->f_GetGroup(Settings.m_RunAsGroup);
-		auto fSetOwners = [&](CStr _Directory)
+		auto fSetOwners = [&](CStr &&_Directory)
 			{
 				while (_Directory.f_GetLen() >= _ApplicationDir.f_GetLen())
 				{
@@ -397,10 +397,7 @@ namespace NMib::NCloud::NAppManager
 		{
 			CStr SourcePath = fg_Format("{}/{}", _ApplicationDir, File);
 			if (CFile::fs_FileExists(SourcePath, EFileAttrib_File | EFileAttrib_Link))
-			{
-				CStr Directory = CFile::fs_GetPath(SourcePath);
-				fSetOwners(Directory);
-			}
+				fSetOwners(CFile::fs_GetPath(SourcePath));
 		}
 
 #ifdef DPlatformFamily_Linux
