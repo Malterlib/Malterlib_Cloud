@@ -61,8 +61,8 @@ namespace NMib::NCloud
 		{
 			auto &StatisticName = StatisticEntry.f_Key();
 			auto &Statistic = StatisticEntry.f_Value();
-			auto &Reporter = m_MemoryReporters[StatisticName];
-			if (!Reporter.m_SensorReporter || Reporter.m_Characteristics != Statistic.m_Characteristics)
+			auto *pReporter = &m_MemoryReporters[StatisticName];
+			if (!pReporter->m_SensorReporter || pReporter->m_Characteristics != Statistic.m_Characteristics)
 			{
 				auto &Characteristics = Statistic.m_Characteristics;
 
@@ -84,14 +84,18 @@ namespace NMib::NCloud
 					SensorInfo.m_CriticalValue = CDistributedAppSensorReporter::CValueComparison{.m_CompareToValue = Characteristics.m_ErrorValue, .m_Operator = ReporterOperator};
 				}
 
-				Reporter.m_SensorReporter = co_await m_SensorStore(&CDistributedAppSensorStoreLocal::f_OpenSensorReporter, fg_Move(SensorInfo));
-				Reporter.m_Characteristics = Statistic.m_Characteristics;
+				auto SensorReporter = co_await m_SensorStore(&CDistributedAppSensorStoreLocal::f_OpenSensorReporter, fg_Move(SensorInfo));
+
+				// The reporters can have changed during the suspension
+				pReporter = &m_MemoryReporters[StatisticName];
+				pReporter->m_SensorReporter = fg_Move(SensorReporter);
+				pReporter->m_Characteristics = Statistic.m_Characteristics;
 			}
 
 			CDistributedAppSensorReporter::CSensorReading Reading;
 			Reading.m_Data = Statistic.m_Value;
 
-			Reporter.m_SensorReporter->m_fReportReadings(TCVector<CDistributedAppSensorReporter::CSensorReading>{fg_Move(Reading)})
+			pReporter->m_SensorReporter->m_fReportReadings(TCVector<CDistributedAppSensorReporter::CSensorReading>{fg_Move(Reading)})
 				% ("Failed to report memory readings for '{}'"_f << StatisticName)
 				> ReportResults
 			;
