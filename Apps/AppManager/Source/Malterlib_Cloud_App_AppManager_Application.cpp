@@ -217,7 +217,7 @@ namespace NMib::NCloud::NAppManager
 			(
 				TCFunctionMovable<TCFuture<uint32> ()>
 				(
-					[this, _Flags, pApplication = TCSharedPointer<CApplication>(fg_Explicit(this))]() mutable -> TCFuture<uint32>
+					[_Flags, pApplication = TCSharedPointer<CApplication>(fg_Explicit(this))]() mutable -> TCFuture<uint32>
 					{
 						if (pApplication->m_bDeleted)
 							co_return 0;
@@ -230,7 +230,7 @@ namespace NMib::NCloud::NAppManager
 						TCFuture<void> SaveStateFuture;
 
 						if (_Flags & (EStopFlag_PreventLaunchUser | EStopFlag_PreventLaunchUpdate))
-							SaveStateFuture = m_pThis->fp_UpdateApplicationJson(pApplication);
+							SaveStateFuture = pApplication->m_pThis->fp_UpdateApplicationJson(pApplication);
 						else
 							SaveStateFuture = g_Void;
 
@@ -239,7 +239,7 @@ namespace NMib::NCloud::NAppManager
 						pApplication->m_bStopped = true;
 
 						while (pApplication->m_bPendingStop)
-							co_await m_OnStops.f_Insert().f_Future();
+							co_await pApplication->m_OnStops.f_Insert().f_Future();
 
 						pApplication->m_bPendingStop = true;
 
@@ -261,13 +261,13 @@ namespace NMib::NCloud::NAppManager
 						TCFutureVector<uint32> ChildrenCloses;
 
 						// Stop all children and dependents first
-						for (auto &pDependent : f_GetDependents())
+						for (auto &pDependent : pApplication->f_GetDependents())
 							pDependent->f_Stop(EStopFlag_AutoStart) > ChildrenCloses;
 
-						for (auto &ChildApp : m_Children)
+						for (auto &ChildApp : pApplication->m_Children)
 							ChildApp.f_Stop(EStopFlag_AutoStart) > ChildrenCloses;
 
-						m_pThis->fp_AppLaunchStateChanged(pApplication, "Stopping", CAppManagerInterface::EStatusSeverity_Warning);
+						pApplication->m_pThis->fp_AppLaunchStateChanged(pApplication, "Stopping", CAppManagerInterface::EStatusSeverity_Warning);
 
 						auto [ChildrenCloseResults, SaveStateResult] = co_await ((fg_AllDoneWrapped(ChildrenCloses) + fg_Move(SaveStateFuture)) % "Failed to stop child application");
 
@@ -342,7 +342,7 @@ namespace NMib::NCloud::NAppManager
 						}
 
 						if (pApplication->m_LaunchStatusSeverity == CAppManagerInterface::EStatusSeverity_None || pApplication->m_LaunchStatus == "Stopping")
-							m_pThis->fp_AppLaunchStateChanged(pApplication, "Stopped", CAppManagerInterface::EStatusSeverity_Warning);
+							pApplication->m_pThis->fp_AppLaunchStateChanged(pApplication, "Stopped", CAppManagerInterface::EStatusSeverity_Warning);
 
 						if (pApplication->m_BackupClient)
 						{
@@ -361,7 +361,7 @@ namespace NMib::NCloud::NAppManager
 							if (pApplication->m_bDeleted)
 								co_return 0;
 
-							auto CloseEncryptionResult = co_await f_CloseEncryption(*StopResult).f_Wrap();
+							auto CloseEncryptionResult = co_await pApplication->f_CloseEncryption(*StopResult).f_Wrap();
 							if (!CloseEncryptionResult)
 								DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Error closing encryption: {}", CloseEncryptionResult.f_GetExceptionStr());
 
