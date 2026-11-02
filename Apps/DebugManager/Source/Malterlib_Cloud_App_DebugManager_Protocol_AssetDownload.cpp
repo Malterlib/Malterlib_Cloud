@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <Mib/Core/Core>
+#include <Mib/Concurrency/AsyncDestroy>
 #include <Mib/Concurrency/LogError>
 #include <Mib/Cryptography/UUID>
 
@@ -28,13 +29,31 @@ namespace NMib::NCloud::NDebugManager
 		auto const DownloadID = fg_RandomID(pThis->mp_Downloads);
 		auto &Download = pThis->mp_Downloads[DownloadID];
 
-		auto Cleanup = g_OnScopeExit / [&]
-			{
-				if (pParams->m_Subscription)
-					pParams->m_Subscription->f_Destroy().f_DiscardResult();
+		auto Cleanup = co_await fg_AsyncDestroy
+			(
+				[pThis, pParams, DownloadID]() -> TCFuture<void>
+				{
+					co_await ECoroutineFlag_CaptureExceptions;
 
-				pThis->mp_Downloads.f_Remove(DownloadID);
-			}
+					auto Subscription = fg_Move(pParams->m_Subscription);
+					TCActor<NCloud::CFileTransferSend> FileTransferSend;
+					if (auto *pDownload = pThis->mp_Downloads.f_FindEqual(DownloadID))
+					{
+						FileTransferSend = fg_Move(pDownload->m_FileTransferSend);
+						pThis->mp_Downloads.f_Remove(DownloadID);
+					}
+
+					CLogError LogError("DebugManager");
+
+					if (Subscription)
+						co_await Subscription->f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy download subscription");
+
+					if (FileTransferSend)
+						co_await fg_Move(FileTransferSend).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy file transfer send");
+
+					co_return {};
+				}
+			)
 		;
 
 		auto AssetGenerator = co_await
