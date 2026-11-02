@@ -222,7 +222,7 @@ namespace NMib::NCloud::NAppDistributionManager
 		TCTrustedActorSubscription<CVersionManager> mp_VersionManagerSubscription;
 		TCMap<CStr, CVersionManagerApplication> mp_VersionManagerApplications;
 		TCMap<TCDistributedActor<CVersionManager>, CVersionManagerState> mp_VersionManagers;
-		TCLinkedList<CVersionManagerDownloadState> mp_Downloads;
+		DMibActorEntries(Destroy, Owner) TCMap<CStr, CVersionManagerDownloadState> mp_Downloads;
 
 		TCSharedPointer<CCanDestroyTracker> mp_pCanDestroy = fg_Construct();
 	};
