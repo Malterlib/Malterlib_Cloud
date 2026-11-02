@@ -230,11 +230,13 @@ namespace NMib::NCloud
 			auto MappedClient = m_Database.m_Clients(Client.m_HostID);
 			if (MappedClient.f_WasCreated())
 				bDatabaseChanged = true;
-			auto &LocalClient = *MappedClient;
 
 			for (auto iKey = co_await fg_Move(Client.m_Keys).f_GetPipelinedIterator(); iKey; co_await ++iKey)
 			{
 				auto &&Key = *iKey;
+
+				// The suspensions of the earlier iterations can have changed the clients
+				auto &LocalClient = m_Database.m_Clients[Client.m_HostID];
 				auto MappedKey = LocalClient.m_Keys(Key.m_KeyID);
 				auto &LocalKey = *MappedKey;
 
