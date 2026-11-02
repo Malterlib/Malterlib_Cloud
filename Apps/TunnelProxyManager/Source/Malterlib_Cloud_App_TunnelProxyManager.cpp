@@ -77,22 +77,22 @@ namespace NMib::NCloud::NTunnelProxyManager
 				Publication.m_Host = NewHosts[TunnelName];
 			}
 
+			// Collect first: the log is awaited, and the publications can change meanwhile
 			TCSet<CStr> ToRemove;
 			for (auto &PublicationEntry : mp_Publications.f_Entries())
 			{
 				auto &TunnelName = PublicationEntry.f_Key();
-				auto &Publication = PublicationEntry.f_Value();
+				if (!NewHosts.f_FindEqual(TunnelName))
+					ToRemove[TunnelName];
+			}
 
-				if (NewHosts.f_FindEqual(TunnelName))
-					continue;
-
-				if (Publication.m_Subscription)
-					fg_Exchange(Publication.m_Subscription, nullptr)->f_Destroy() > RemoveResults;
+			for (auto &TunnelName : ToRemove)
+			{
+				if (auto *pPublication = mp_Publications.f_FindEqual(TunnelName); pPublication && pPublication->m_Subscription)
+					fg_Exchange(pPublication->m_Subscription, nullptr)->f_Destroy() > RemoveResults;
 
 				if (_fLog)
 					co_await _fLog("Removing published tunnel '{}'"_f << TunnelName);
-
-				ToRemove[TunnelName];
 			}
 
 			for (auto &Remove : ToRemove)
@@ -194,22 +194,22 @@ namespace NMib::NCloud::NTunnelProxyManager
 				Subscription.m_ListenHost = NewListenHosts[TunnelName];
 			}
 
+			// Collect first: the log is awaited, and the subscriptions can change meanwhile
 			TCSet<CStr> ToRemove;
 			for (auto &SubscriptionEntry : mp_Subscriptions.f_Entries())
 			{
 				auto &TunnelName = SubscriptionEntry.f_Key();
-				auto &Subscription = SubscriptionEntry.f_Value();
+				if (!NewListenHosts.f_FindEqual(TunnelName))
+					ToRemove[TunnelName];
+			}
 
-				if (NewListenHosts.f_FindEqual(TunnelName))
-					continue;
-
-				if (Subscription.m_Tunnel.m_Subscription)
-					fg_Exchange(Subscription.m_Tunnel.m_Subscription, nullptr)->f_Destroy() > RemoveResults;
+			for (auto &TunnelName : ToRemove)
+			{
+				if (auto *pSubscription = mp_Subscriptions.f_FindEqual(TunnelName); pSubscription && pSubscription->m_Tunnel.m_Subscription)
+					fg_Exchange(pSubscription->m_Tunnel.m_Subscription, nullptr)->f_Destroy() > RemoveResults;
 
 				if (_fLog)
 					co_await _fLog("Removing tunnel subscription '{}'"_f << TunnelName);
-
-				ToRemove[TunnelName];
 			}
 
 			for (auto &Remove : ToRemove)
