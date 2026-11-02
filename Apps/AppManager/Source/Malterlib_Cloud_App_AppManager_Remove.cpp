@@ -30,10 +30,12 @@ namespace NMib::NCloud::NAppManager
 		if (!pApplication)
 			co_return Auditor.f_Exception(fg_Format("No such application '{}'", _Name));
 
-		auto InProgressScope = co_await (pThis->fp_SetInProgressWithWait(*pApplication, "Remove") % Auditor);
+		auto pRemovingApplication = *pApplication;
+
+		auto InProgressScope = co_await (pThis->fp_SetInProgressWithWait(pRemovingApplication, "Remove") % Auditor);
 		auto DestroyInProgress = co_await fg_AsyncDestroy(fg_Move(InProgressScope));
 
-		if (CStr Error = pThis->fp_GetApplicationStopErrors(co_await (*pApplication)->f_Stop(EStopFlag_CloseEncryption).f_Wrap(), _Name); !Error.f_IsEmpty())
+		if (CStr Error = pThis->fp_GetApplicationStopErrors(co_await pRemovingApplication->f_Stop(EStopFlag_CloseEncryption).f_Wrap(), _Name); !Error.f_IsEmpty())
 			Auditor.f_Warning(Error);
 
 		pApplication = pThis->mp_Applications.f_FindEqual(_Name);
