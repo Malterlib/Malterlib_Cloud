@@ -73,6 +73,23 @@ namespace NMib::NCloud::NSecretsManager
 
 			return nullptr;
 		}
+
+		struct CPermissionInputs
+		{
+			bool operator == (CPermissionInputs const &_Other) const = default;
+
+			bool m_bExists = false;
+			CStrSecure m_SemanticID;
+			TCSet<CStrSecure> m_Tags;
+		};
+
+		CPermissionInputs fg_GetPermissionInputs(CSecretPropertiesInternal const *_pSecretProperties)
+		{
+			if (!_pSecretProperties)
+				return {};
+
+			return {.m_bExists = true, .m_SemanticID = _pSecretProperties->m_SemanticID, .m_Tags = _pSecretProperties->m_Tags};
+		}
 	}
 
 	auto CSecretsManagerDaemonActor::CServer::fs_MatchSecret
@@ -177,13 +194,25 @@ namespace NMib::NCloud::NSecretsManager
 			co_return fg_Move(pError);
 
 		NContainer::TCMap<CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
+		NContainer::TCMap<CStr, bool> HasPermissions;
+		CSecretPropertiesInternal *pSecretProperties = nullptr;
 
-		Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/GetSecret"}};
-		auto *pSecretProperties = m_pThis->mp_Database.m_Secrets.f_FindEqual(_ID);
-		if (pSecretProperties)
-			fsp_AddPermissionQueryIndexedByPermission("Read", pSecretProperties->m_SemanticID, pSecretProperties->m_Tags, Permissions);
+		while (true)
+		{
+			Permissions.f_Clear();
+			Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/GetSecret"}};
+			pSecretProperties = m_pThis->mp_Database.m_Secrets.f_FindEqual(_ID);
+			auto PermissionInputs = fg_GetPermissionInputs(pSecretProperties);
+			if (pSecretProperties)
+				fsp_AddPermissionQueryIndexedByPermission("Read", pSecretProperties->m_SemanticID, pSecretProperties->m_Tags, Permissions);
 
-		auto HasPermissions = co_await (This.mp_Permissions.f_HasPermissions("Get secret from SecretsManager", Permissions) % "Permission denied getting secret" % Auditor);
+			HasPermissions = co_await (This.mp_Permissions.f_HasPermissions("Get secret from SecretsManager", Permissions) % "Permission denied getting secret" % Auditor);
+
+			// The secret can have been changed or removed while checking the permissions, if so check them again
+			pSecretProperties = m_pThis->mp_Database.m_Secrets.f_FindEqual(_ID);
+			if (fg_GetPermissionInputs(pSecretProperties) == PermissionInputs)
+				break;
+		}
 
 		if (!HasPermissions["Command"])
 			co_return Auditor.f_AccessDenied("(GetSecret, command)", Permissions["Command"]);
@@ -233,17 +262,29 @@ namespace NMib::NCloud::NSecretsManager
 			co_return fg_Move(pError);
 
 		NContainer::TCMap<CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
+		NContainer::TCMap<CStr, bool> HasPermissions;
+		CSecretPropertiesInternal *pSecretProperties = nullptr;
 
-		Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/GetSecretProperties"}};
-		auto *pSecretProperties = m_pThis->mp_Database.m_Secrets.f_FindEqual(_ID);
-		if (pSecretProperties)
-			fsp_AddPermissionQueryIndexedByPermission("Read", pSecretProperties->m_SemanticID, pSecretProperties->m_Tags, Permissions);
+		while (true)
+		{
+			Permissions.f_Clear();
+			Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/GetSecretProperties"}};
+			pSecretProperties = m_pThis->mp_Database.m_Secrets.f_FindEqual(_ID);
+			auto PermissionInputs = fg_GetPermissionInputs(pSecretProperties);
+			if (pSecretProperties)
+				fsp_AddPermissionQueryIndexedByPermission("Read", pSecretProperties->m_SemanticID, pSecretProperties->m_Tags, Permissions);
 
-		auto HasPermissions = co_await
-			(
-				This.mp_Permissions.f_HasPermissions("Get secret properties from SecretsManager", Permissions) % "Permission denied getting secret properties" % Auditor
-			)
-		;
+			HasPermissions = co_await
+				(
+					This.mp_Permissions.f_HasPermissions("Get secret properties from SecretsManager", Permissions) % "Permission denied getting secret properties" % Auditor
+				)
+			;
+
+			// The secret can have been changed or removed while checking the permissions, if so check them again
+			pSecretProperties = m_pThis->mp_Database.m_Secrets.f_FindEqual(_ID);
+			if (fg_GetPermissionInputs(pSecretProperties) == PermissionInputs)
+				break;
+		}
 
 		if (!HasPermissions["Command"])
 			co_return Auditor.f_AccessDenied("(GetSecretProperties, command)", Permissions["Command"]);
@@ -360,34 +401,46 @@ namespace NMib::NCloud::NSecretsManager
 		}
 
 		NContainer::TCMap<CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
+		NContainer::TCMap<CStr, bool> HasPermissions;
+		CSecretPropertiesInternal *pSecretProperties = nullptr;
 
-		Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/SetSecretProperties"}};
-		auto *pSecretProperties = m_pThis->mp_Database.m_Secrets.f_FindEqual(_ID);
-		if (pSecretProperties)
+		while (true)
 		{
-			// Must have permission to write to the old secret
-			fsp_AddPermissionQueryIndexedByPermission("Write", pSecretProperties->m_SemanticID, pSecretProperties->m_Tags, Permissions);
-			// As well as the new semantic ID/tags combo
-			if (_Secret.m_SemanticID || _Secret.m_Tags)
+			Permissions.f_Clear();
+			Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/SetSecretProperties"}};
+			pSecretProperties = m_pThis->mp_Database.m_Secrets.f_FindEqual(_ID);
+			auto PermissionInputs = fg_GetPermissionInputs(pSecretProperties);
+			if (pSecretProperties)
 			{
-				fsp_AddPermissionQueryIndexedByPermission
-					(
-						"Write"
-						, _Secret.m_SemanticID ? *_Secret.m_SemanticID : pSecretProperties->m_SemanticID
-						, _Secret.m_Tags ? *_Secret.m_Tags : pSecretProperties->m_Tags
-						, Permissions
-					)
-				;
+				// Must have permission to write to the old secret
+				fsp_AddPermissionQueryIndexedByPermission("Write", pSecretProperties->m_SemanticID, pSecretProperties->m_Tags, Permissions);
+				// As well as the new semantic ID/tags combo
+				if (_Secret.m_SemanticID || _Secret.m_Tags)
+				{
+					fsp_AddPermissionQueryIndexedByPermission
+						(
+							"Write"
+							, _Secret.m_SemanticID ? *_Secret.m_SemanticID : pSecretProperties->m_SemanticID
+							, _Secret.m_Tags ? *_Secret.m_Tags : pSecretProperties->m_Tags
+							, Permissions
+						)
+					;
+				}
 			}
-		}
-		else
-			fsp_AddPermissionQueryIndexedByPermission("Write", _Secret.f_GetSemanticID(), _Secret.f_GetTags(), Permissions);
+			else
+				fsp_AddPermissionQueryIndexedByPermission("Write", _Secret.f_GetSemanticID(), _Secret.f_GetTags(), Permissions);
 
-		auto HasPermissions = co_await
-			(
-				This.mp_Permissions.f_HasPermissions("Set secret properties in SecretsManager", Permissions) % "Permission denied setting secret properties" % Auditor
-			)
-		;
+			HasPermissions = co_await
+				(
+					This.mp_Permissions.f_HasPermissions("Set secret properties in SecretsManager", Permissions) % "Permission denied setting secret properties" % Auditor
+				)
+			;
+
+			// The secret can have been changed or removed while checking the permissions, if so check them again
+			pSecretProperties = m_pThis->mp_Database.m_Secrets.f_FindEqual(_ID);
+			if (fg_GetPermissionInputs(pSecretProperties) == PermissionInputs)
+				break;
+		}
 
 		if (!HasPermissions["Command"])
 			co_return Auditor.f_AccessDenied("(SetSecretProperties, command)", Permissions["Command"]);
@@ -542,27 +595,39 @@ namespace NMib::NCloud::NSecretsManager
 		}
 
 		NContainer::TCMap<CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
+		NContainer::TCMap<CStr, bool> HasPermissions;
+		CSecretPropertiesInternal *pSecretProperties = nullptr;
 
-		Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/ModifyTags"}};
-		auto *pSecretProperties = m_pThis->mp_Database.m_Secrets.f_FindEqual(_ID);
-		if (pSecretProperties)
+		while (true)
 		{
-			fsp_AddPermissionQueryIndexedByPermission("Write", pSecretProperties->m_SemanticID, pSecretProperties->m_Tags, Permissions);
+			Permissions.f_Clear();
+			Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/ModifyTags"}};
+			pSecretProperties = m_pThis->mp_Database.m_Secrets.f_FindEqual(_ID);
+			auto PermissionInputs = fg_GetPermissionInputs(pSecretProperties);
+			if (pSecretProperties)
+			{
+				fsp_AddPermissionQueryIndexedByPermission("Write", pSecretProperties->m_SemanticID, pSecretProperties->m_Tags, Permissions);
 
-			if (!_TagsToRemove.f_IsEmpty())
-				fsp_AddPermissionQueryIndexedByPermission("Write", pSecretProperties->m_SemanticID, _TagsToRemove, Permissions);
+				if (!_TagsToRemove.f_IsEmpty())
+					fsp_AddPermissionQueryIndexedByPermission("Write", pSecretProperties->m_SemanticID, _TagsToRemove, Permissions);
 
-			if (!_TagsToAdd.f_IsEmpty())
-				fsp_AddPermissionQueryIndexedByPermission("Write", pSecretProperties->m_SemanticID, _TagsToAdd, Permissions);
+				if (!_TagsToAdd.f_IsEmpty())
+					fsp_AddPermissionQueryIndexedByPermission("Write", pSecretProperties->m_SemanticID, _TagsToAdd, Permissions);
 
-			// If we remove everything from the tags set we must have NoTags permission
-			auto CurrentTags(pSecretProperties->m_Tags);
-			CurrentTags -= _TagsToRemove;
-			if (CurrentTags.f_IsEmpty())
-				fsp_AddPermissionQueryIndexedByPermission("Write", pSecretProperties->m_SemanticID, CurrentTags, Permissions);
+				// If we remove everything from the tags set we must have NoTags permission
+				auto CurrentTags(pSecretProperties->m_Tags);
+				CurrentTags -= _TagsToRemove;
+				if (CurrentTags.f_IsEmpty())
+					fsp_AddPermissionQueryIndexedByPermission("Write", pSecretProperties->m_SemanticID, CurrentTags, Permissions);
+			}
+
+			HasPermissions = co_await (This.mp_Permissions.f_HasPermissions("Modify tags in SecretsManager", Permissions) % "Permission denied modifying tags" % Auditor);
+
+			// The secret can have been changed or removed while checking the permissions, if so check them again
+			pSecretProperties = m_pThis->mp_Database.m_Secrets.f_FindEqual(_ID);
+			if (fg_GetPermissionInputs(pSecretProperties) == PermissionInputs)
+				break;
 		}
-
-		auto HasPermissions = co_await (This.mp_Permissions.f_HasPermissions("Modify tags in SecretsManager", Permissions) % "Permission denied modifying tags" % Auditor);
 
 		if (!HasPermissions["Command"])
 			co_return Auditor.f_AccessDenied("(ModifyTags, command)", Permissions["Command"]);
@@ -604,24 +669,27 @@ namespace NMib::NCloud::NSecretsManager
 		if (auto pError = fg_ValidateID(ID, Auditor))
 			co_return fg_Move(pError);
 
-		CSecretPropertiesInternal *pSecretProperties;
-		auto OnResume = co_await fg_OnResume
-			(
-				[&]() -> CExceptionPointer
-				{
-					pSecretProperties = m_pThis->mp_Database.m_Secrets.f_FindEqual(ID);
-					return {};
-				}
-			)
-		;
-
 		NContainer::TCMap<CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
-		Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/SetMetadata"}};
+		NContainer::TCMap<CStr, bool> HasPermissions;
+		CSecretPropertiesInternal *pSecretProperties = nullptr;
 
-		if (pSecretProperties)
-			fsp_AddPermissionQueryIndexedByPermission("Write", pSecretProperties->m_SemanticID, pSecretProperties->m_Tags, Permissions);
+		while (true)
+		{
+			Permissions.f_Clear();
+			Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/SetMetadata"}};
+			pSecretProperties = m_pThis->mp_Database.m_Secrets.f_FindEqual(ID);
+			auto PermissionInputs = fg_GetPermissionInputs(pSecretProperties);
 
-		auto HasPermissions = co_await (This.mp_Permissions.f_HasPermissions("Set metadata in SecretsManager", Permissions) % "Permission denied setting metadata" % Auditor);
+			if (pSecretProperties)
+				fsp_AddPermissionQueryIndexedByPermission("Write", pSecretProperties->m_SemanticID, pSecretProperties->m_Tags, Permissions);
+
+			HasPermissions = co_await (This.mp_Permissions.f_HasPermissions("Set metadata in SecretsManager", Permissions) % "Permission denied setting metadata" % Auditor);
+
+			// The secret can have been changed or removed while checking the permissions, if so check them again
+			pSecretProperties = m_pThis->mp_Database.m_Secrets.f_FindEqual(ID);
+			if (fg_GetPermissionInputs(pSecretProperties) == PermissionInputs)
+				break;
+		}
 
 		if (!HasPermissions["Command"])
 			co_return Auditor.f_AccessDenied("(SetMetadata, command)", Permissions["Command"]);
@@ -675,13 +743,25 @@ namespace NMib::NCloud::NSecretsManager
 			co_return fg_Move(pError);
 
 		NContainer::TCMap<CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
+		NContainer::TCMap<CStr, bool> HasPermissions;
+		CSecretPropertiesInternal *pSecretProperties = nullptr;
 
-		Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/RemoveMetadata"}};
-		auto *pSecretProperties = m_pThis->mp_Database.m_Secrets.f_FindEqual(_ID);
-		if (pSecretProperties)
-			fsp_AddPermissionQueryIndexedByPermission("Write", pSecretProperties->m_SemanticID, pSecretProperties->m_Tags, Permissions);
+		while (true)
+		{
+			Permissions.f_Clear();
+			Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/RemoveMetadata"}};
+			pSecretProperties = m_pThis->mp_Database.m_Secrets.f_FindEqual(_ID);
+			auto PermissionInputs = fg_GetPermissionInputs(pSecretProperties);
+			if (pSecretProperties)
+				fsp_AddPermissionQueryIndexedByPermission("Write", pSecretProperties->m_SemanticID, pSecretProperties->m_Tags, Permissions);
 
-		auto HasPermissions = co_await (This.mp_Permissions.f_HasPermissions("Remove metadata in SecretsManager", Permissions) % "Permission denied removing metadata" % Auditor);
+			HasPermissions = co_await (This.mp_Permissions.f_HasPermissions("Remove metadata in SecretsManager", Permissions) % "Permission denied removing metadata" % Auditor);
+
+			// The secret can have been changed or removed while checking the permissions, if so check them again
+			pSecretProperties = m_pThis->mp_Database.m_Secrets.f_FindEqual(_ID);
+			if (fg_GetPermissionInputs(pSecretProperties) == PermissionInputs)
+				break;
+		}
 
 		if (!HasPermissions["Command"])
 			co_return Auditor.f_AccessDenied("(RemoveMetadata, command)", Permissions["Command"]);
@@ -719,13 +799,26 @@ namespace NMib::NCloud::NSecretsManager
 			co_return fg_Move(pError);
 
 		NContainer::TCMap<CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
+		NContainer::TCMap<CStr, bool> HasPermissions;
+		CSecretPropertiesInternal *pSecretProperties = nullptr;
 
-		Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/RemoveSecret"}};
-		auto *pSecretProperties = m_pThis->mp_Database.m_Secrets.f_FindEqual(_ID);
-		if (pSecretProperties)
-			fsp_AddPermissionQueryIndexedByPermission("Write", pSecretProperties->m_SemanticID, pSecretProperties->m_Tags, Permissions);
+		while (true)
+		{
+			Permissions.f_Clear();
+			Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/RemoveSecret"}};
+			pSecretProperties = m_pThis->mp_Database.m_Secrets.f_FindEqual(_ID);
+			auto PermissionInputs = fg_GetPermissionInputs(pSecretProperties);
+			if (pSecretProperties)
+				fsp_AddPermissionQueryIndexedByPermission("Write", pSecretProperties->m_SemanticID, pSecretProperties->m_Tags, Permissions);
 
-		auto HasPermissions = co_await (This.mp_Permissions.f_HasPermissions("Remove secret in SecretsManager", Permissions) % "Permission denied removing secret" % Auditor);
+			HasPermissions = co_await (This.mp_Permissions.f_HasPermissions("Remove secret in SecretsManager", Permissions) % "Permission denied removing secret" % Auditor);
+
+			// The secret can have been changed or removed while checking the permissions, if so check them again
+			pSecretProperties = m_pThis->mp_Database.m_Secrets.f_FindEqual(_ID);
+			if (fg_GetPermissionInputs(pSecretProperties) == PermissionInputs)
+				break;
+		}
+
 		if (!HasPermissions["Command"])
 			co_return Auditor.f_AccessDenied("(RemoveSecret, command)", Permissions["Command"]);
 
