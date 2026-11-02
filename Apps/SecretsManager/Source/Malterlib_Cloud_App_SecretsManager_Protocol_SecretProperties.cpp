@@ -367,7 +367,7 @@ namespace NMib::NCloud::NSecretsManager
 		{
 			// Must have permission to write to the old secret
 			fsp_AddPermissionQueryIndexedByPermission("Write", pSecretProperties->m_SemanticID, pSecretProperties->m_Tags, Permissions);
-			// As well as the the new seamtic ID/tags combo
+			// As well as the new semantic ID/tags combo
 			if (_Secret.m_SemanticID || _Secret.m_Tags)
 			{
 				fsp_AddPermissionQueryIndexedByPermission

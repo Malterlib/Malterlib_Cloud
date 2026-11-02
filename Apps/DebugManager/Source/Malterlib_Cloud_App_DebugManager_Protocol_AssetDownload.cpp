@@ -14,7 +14,7 @@ namespace NMib::NCloud::NDebugManager
 	{
 		auto pThis = m_pThis;
 		auto CallingHostInfo = fg_GetCallingHostInfo();
-		auto OnResume = co_await pThis->f_CheckDestroyedOnResume();
+		auto OnResume = co_await pThis->fp_CheckStoppedOrDestroyedOnResume();
 		auto Auditor = pThis->mp_State.f_Auditor({}, CallingHostInfo);
 
 		TCSharedPointer<CAssetDownload> pParams = fg_Construct(fg_Move(_Params));
@@ -25,7 +25,7 @@ namespace NMib::NCloud::NDebugManager
 		if (!bHasPermissions)
 			co_return Auditor.f_AccessDenied("(Download asset)", Permissions);
 
-		auto DownloadID = fg_RandomID(pThis->mp_Downloads);
+		auto const DownloadID = fg_RandomID(pThis->mp_Downloads);
 		auto &Download = pThis->mp_Downloads[DownloadID];
 
 		auto Cleanup = g_OnScopeExit / [&]

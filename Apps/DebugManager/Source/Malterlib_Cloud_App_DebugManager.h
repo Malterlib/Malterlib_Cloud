@@ -74,7 +74,7 @@ namespace NMib::NCloud::NDebugManager
 		TCFuture<void> fp_StopApp() override;
 		TCFuture<void> fp_Destroy() override;
 
-		TCFuture<void> fp_DestroyAll();
+		DMibActorPhase(Destroy, StopApp) TCFuture<void> fp_DestroyAll();
 
 		void fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine) override;
 
@@ -93,7 +93,7 @@ namespace NMib::NCloud::NDebugManager
 
 		CTrustedPermissionSubscription mp_Permissions;
 
-		TCMap<CStr, CDownload> mp_Downloads;
+		DMibActorEntries(Destroy, StopApp, Owner) TCMap<CStr, CDownload> mp_Downloads;
 		TCMap<CStr, CUpload> mp_Uploads;
 
 		TCActor<CDebugDatabase> mp_DebugDatabase;
