@@ -431,6 +431,10 @@ namespace NMib::NCloud::NCloudManager
 			;
 		}
 
+		pAppManager = pThis->mp_AppManagers.f_FindEqual(AppManagerID);
+		if (!pAppManager || pAppManager->m_RegisterSequence != RegisterSequence)
+			co_return {};
+
 		if (UpdateNotificationsSubscription)
 		{
 			pAppManager->m_UpdateNotificationsSubscription = fg_Move(*UpdateNotificationsSubscription);
