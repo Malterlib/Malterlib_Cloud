@@ -186,11 +186,11 @@ namespace NMib::NCloud::NAppManager
 	{
 		using namespace NStr;
 
-		auto &DownloadState = mp_Downloads.f_Insert();
-		auto pDownloadState = &DownloadState;
-		auto pCleanup = g_OnScopeExitActor / [this, pDownloadState]
+		auto const DownloadID = fg_RandomID(mp_Downloads);
+		auto &DownloadState = mp_Downloads[DownloadID];
+		auto pCleanup = g_OnScopeExitActor / [this, DownloadID]
 			{
-				mp_Downloads.f_Remove(*pDownloadState);
+				mp_Downloads.f_Remove(DownloadID);
 			}
 		;
 
@@ -219,7 +219,7 @@ namespace NMib::NCloud::NAppManager
 			if (!Result.m_FilesGenerator)
 				co_return DMibErrorInstance("Internal error: invalid files generator");
 
-			pDownloadState->m_Subscription = fg_Move(Result.m_Subscription);
+			DownloadState.m_Subscription = fg_Move(Result.m_Subscription);
 
 			auto ReceiveResult = co_await
 				(
@@ -235,8 +235,8 @@ namespace NMib::NCloud::NAppManager
 				.f_Wrap()
 			;
 
-			if (pDownloadState->m_Subscription)
-				(void)co_await fg_Exchange(pDownloadState->m_Subscription, nullptr)->f_Destroy().f_Wrap();
+			if (DownloadState.m_Subscription)
+				(void)co_await fg_Exchange(DownloadState.m_Subscription, nullptr)->f_Destroy().f_Wrap();
 
 			if (!ReceiveResult)
 				co_return ReceiveResult.f_GetException();
@@ -272,12 +272,12 @@ namespace NMib::NCloud::NAppManager
 				)
 			;
 
-			pDownloadState->m_Subscription = fg_Move(Result.m_Subscription);
+			DownloadState.m_Subscription = fg_Move(Result.m_Subscription);
 
-			auto ReceiveResult = co_await pDownloadState->m_DownloadVersionReceive(&CFileTransferReceive::f_GetResultDeprecated).f_Wrap();
+			auto ReceiveResult = co_await DownloadState.m_DownloadVersionReceive(&CFileTransferReceive::f_GetResultDeprecated).f_Wrap();
 
-			if (pDownloadState->m_Subscription)
-				(void)co_await fg_Exchange(pDownloadState->m_Subscription, nullptr)->f_Destroy().f_Wrap();
+			if (DownloadState.m_Subscription)
+				(void)co_await fg_Exchange(DownloadState.m_Subscription, nullptr)->f_Destroy().f_Wrap();
 
 			if (!ReceiveResult)
 				co_return ReceiveResult.f_GetException();

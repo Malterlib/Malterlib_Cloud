@@ -1013,7 +1013,7 @@ namespace NMib::NCloud::NAppManager
 		CActorSubscription mp_CleanupTimerSubscription;
 		uint64 mp_RetentionDays = 0;
 
-		TCLinkedList<CVersionManagerDownloadState> mp_Downloads;
+		DMibActorEntries(Owner) TCMap<CStr, CVersionManagerDownloadState> mp_Downloads;
 
 		TCMap<CStr, CVersionManagerApplication> mp_VersionManagerApplications;
 		TCMap<TCDistributedActor<CVersionManager>, CVersionManagerState> mp_VersionManagers;
