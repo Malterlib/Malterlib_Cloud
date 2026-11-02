@@ -219,7 +219,18 @@ namespace NMib::NCloud
 					}
 				;
 
-				Connection.m_Socket = co_await (NewConnection.f_Accept(fg_Move(SocketCallbacks)) % AppAuditor);
+				auto Socket = co_await (NewConnection.f_Accept(fg_Move(SocketCallbacks)) % AppAuditor);
+
+				// The connection can have been closed while accepting it
+				auto *pConnection = Internal.m_Connections.f_FindEqual(ConnectionID);
+				if (!pConnection)
+				{
+					co_await fg_Move(Socket).f_Destroy();
+
+					co_return DMibErrorInstance("Connection was closed");
+				}
+
+				pConnection->m_Socket = fg_Move(Socket);
 
 				Cleanup->f_Clear();
 
