@@ -38,7 +38,9 @@ namespace NMib::NCloud::NTunnelProxyManager
 
 			if (auto const *pPublish = mp_State.m_ConfigDatabase.m_Data.f_GetMember("Publish"))
 			{
-				for (auto &PublishEntry : pPublish->f_Object())
+				// Copy, the config can be reloaded while suspended
+				auto Publish = *pPublish;
+				for (auto &PublishEntry : Publish.f_Object())
 				{
 					auto &TunnelName = PublishEntry.f_Name();
 					auto &Host = PublishEntry.f_Value()["Host"].f_String();
@@ -106,7 +108,9 @@ namespace NMib::NCloud::NTunnelProxyManager
 
 			if (auto const *pSubscribe = mp_State.m_ConfigDatabase.m_Data.f_GetMember("Subscribe"))
 			{
-				for (auto &SubscribeEntry : pSubscribe->f_Object())
+				// Copy, the config can be reloaded while suspended
+				auto Subscribe = *pSubscribe;
+				for (auto &SubscribeEntry : Subscribe.f_Object())
 				{
 					auto &TunnelName = SubscribeEntry.f_Name();
 					auto &ListenHost = SubscribeEntry.f_Value()["Listen"].f_String();
