@@ -4,6 +4,7 @@
 #include <Mib/Core/Core>
 #include <Mib/Network/AsyncSocket>
 #include <Mib/Concurrency/ActorSubscription>
+#include <Mib/Concurrency/AsyncDestroy>
 #include <Mib/Concurrency/LogError>
 
 #include "Malterlib_Cloud_NetworkTunnelsClient.h"
@@ -274,10 +275,15 @@ namespace NMib::NCloud
 			}
 		;
 
-		auto Cleanup = g_OnScopeExit / [&]
-			{
-				fg_Exchange(TunnelSubscription, nullptr)->f_Destroy() > fg_LogError("Network tunnel client", "Failed to destroy tunnel");
-			}
+		auto Cleanup = co_await fg_AsyncDestroy
+			(
+				[&]() -> TCFuture<void>
+				{
+					co_await fg_Exchange(TunnelSubscription, nullptr)->f_Destroy().f_Wrap() > fg_LogError("Network tunnel client", "Failed to destroy tunnel");
+
+					co_return {};
+				}
+			)
 		;
 
 		pTunnel->m_TunnelName = _OpenTunnel.m_TunnelName;
