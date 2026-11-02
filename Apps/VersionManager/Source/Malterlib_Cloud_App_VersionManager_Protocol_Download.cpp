@@ -75,9 +75,10 @@ namespace NMib::NCloud::NVersionManager
 
 		Download.m_FileTransferSend = fg_ConstructActor<CFileTransferSend>(VersionPath);
 		Download.m_Desc = fg_Format("{}", pParams->m_VersionIDAndPlatform);
+		CStr DownloadDesc = Download.m_Desc;
 
 		Cleanup.f_Clear();
-		Auditor.f_Info(fg_Format("'{}' Starting download of version", Download.m_Desc));
+		Auditor.f_Info(fg_Format("'{}' Starting download of version", DownloadDesc));
 
 		auto VersionInfo = pVersion->m_VersionInfo;
 
@@ -89,7 +90,7 @@ namespace NMib::NCloud::NVersionManager
 				co_return Auditor.f_Exception
 					(
 						{
-							fg_Format("'{}' Failed to send files. Check Version Manager log for more info.", Download.m_Desc)
+							fg_Format("'{}' Failed to send files. Check Version Manager log for more info.", DownloadDesc)
 							, fg_Format("Error: {}", SendResult.f_GetExceptionStr())
 						}
 					)
@@ -104,7 +105,7 @@ namespace NMib::NCloud::NVersionManager
 			if (!pDownload)
 				co_return DMibErrorInstance("Download aborted");
 
-			fg_Move(SendResult->m_Result) > [pThis, DownloadID, Desc = Download.m_Desc, Auditor, pParams](TCAsyncResult<CFileTransferResult> &&_Result)
+			fg_Move(SendResult->m_Result) > [pThis, DownloadID, Desc = DownloadDesc, Auditor, pParams](TCAsyncResult<CFileTransferResult> &&_Result)
 				{
 					if (!_Result)
 						Auditor.f_Error(fg_Format("'{}' Failed to transfer version (download): {}", Desc, _Result.f_GetExceptionStr()));
@@ -140,7 +141,7 @@ namespace NMib::NCloud::NVersionManager
 				co_return Auditor.f_Exception
 					(
 						{
-							fg_Format("'{}' Failed to send files. Check Version Manager log for more info.", Download.m_Desc)
+							fg_Format("'{}' Failed to send files. Check Version Manager log for more info.", DownloadDesc)
 							, fg_Format("Error: {}", SendResult.f_GetExceptionStr())
 						}
 					)
@@ -154,7 +155,7 @@ namespace NMib::NCloud::NVersionManager
 			if (!pDownload)
 				co_return DMibErrorInstance("Download aborted");
 
-			fg_Move(SendResult->m_Result) > [pThis, DownloadID, Desc = Download.m_Desc, Auditor, pParams](TCAsyncResult<CFileTransferResult> &&_Result)
+			fg_Move(SendResult->m_Result) > [pThis, DownloadID, Desc = DownloadDesc, Auditor, pParams](TCAsyncResult<CFileTransferResult> &&_Result)
 				{
 					if (!_Result)
 						Auditor.f_Error(fg_Format("'{}' Failed to transfer version (download): {}", Desc, _Result.f_GetExceptionStr()));
