@@ -135,7 +135,12 @@ namespace NMib::NCloud
 					Change.m_Tunnels[TunnelName].m_Metadata = Tunnel.m_Metadata;
 				}
 
-				co_await (Subscription.m_Subscription.m_fOnTunnelChange(fg_Move(Change)) % AppAuditor);
+				// The subscription can have been removed while checking permissions
+				auto *pSubscription = Internal.m_ChangeSubscriptions.f_FindEqual(SubscriptionID);
+				if (!pSubscription)
+					co_return DMibErrorInstance("Subscription was removed");
+
+				co_await (pSubscription->m_Subscription.m_fOnTunnelChange(fg_Move(Change)) % AppAuditor);
 
 				AppAuditor.f_Info("Subscribed to tunnels");
 
