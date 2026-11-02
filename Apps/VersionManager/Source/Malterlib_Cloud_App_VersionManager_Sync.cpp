@@ -85,19 +85,30 @@ namespace NMib::NCloud::NVersionManager
 
 	TCFuture<void> CVersionManagerDaemonActor::CServer::fp_SyncRegisterSensors()
 	{
+		// Collect first: the sources can change while the reporters are opened
+		TCVector<CStr> ToRegister;
 		for (auto &SyncSource : mp_SyncSources)
 		{
-			if (SyncSource.m_bSensorsRegistered)
-				continue;
+			if (!SyncSource.m_bSensorsRegistered)
+				ToRegister.f_Insert(SyncSource.f_GetName());
+		}
 
+		for (auto &Name : ToRegister)
+		{
 			CDistributedAppSensorReporter::CSensorInfo SensorInfo;
 			SensorInfo.m_Identifier = "org.malterlib.cloud.versionmanager.sync.status";
-			SensorInfo.m_IdentifierScope = SyncSource.f_GetName();
-			SensorInfo.m_Name = "Version Manager Sync Status ({})"_f << SyncSource.f_GetName();
+			SensorInfo.m_IdentifierScope = Name;
+			SensorInfo.m_Name = "Version Manager Sync Status ({})"_f << Name;
 			SensorInfo.m_Type = CDistributedAppSensorReporter::ESensorDataType_Status;
 
-			SyncSource.m_SensorReporter_Status = co_await mp_AppState.f_OpenSensorReporter(fg_Move(SensorInfo));
-			SyncSource.m_bSensorsRegistered = true;
+			auto SensorReporter = co_await mp_AppState.f_OpenSensorReporter(fg_Move(SensorInfo));
+
+			auto *pSyncSource = mp_SyncSources.f_FindEqual(Name);
+			if (!pSyncSource || pSyncSource->m_bSensorsRegistered)
+				continue;
+
+			pSyncSource->m_SensorReporter_Status = fg_Move(SensorReporter);
+			pSyncSource->m_bSensorsRegistered = true;
 		}
 
 		co_return {};
