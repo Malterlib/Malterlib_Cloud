@@ -56,22 +56,22 @@ struct CVersionManager_Refresh_Tests : public NMib::NTest::CTest
 			CStr VersionManagerPath = State.m_VersionManagerDirectory / "VersionManager";
 			CStr VersionManagerDirectory = State.m_VersionManagerDirectory;
 
-			auto fRefreshVersions = [&]() -> TCFuture<CRefreshResult>
+			auto fRefreshVersions = [AppManagerTestHelper, VersionManagerPath, VersionManagerDirectory]() mutable -> TCFuture<CRefreshResult>
 				{
 					CStr Output = co_await AppManagerTestHelper.f_LaunchTool(VersionManagerPath, {"--refresh-versions"}, VersionManagerDirectory);
 					co_return CRefreshResult::fs_Parse(Output);
 				}
 			;
 
-			auto fListVersions = [&](CStr _Application) -> TCFuture<CVersionManager::CListVersions::CResult>
+			auto fListVersions = [pState = AppManagerTestHelper.m_pState](CStr _Application) -> TCFuture<CVersionManager::CListVersions::CResult>
 				{
 					CVersionManager::CListVersions Params;
 					Params.m_ForApplication = _Application;
-					co_return co_await State.m_VersionManager.f_CallActor(&CVersionManager::f_ListVersions)(Params).f_Timeout(g_Timeout, "Timed out waiting for ListVersions");
+					co_return co_await pState->m_VersionManager.f_CallActor(&CVersionManager::f_ListVersions)(Params).f_Timeout(g_Timeout, "Timed out waiting for ListVersions");
 				}
 			;
 
-			auto fCreateVersionOnDisk = [&](CStr _App, CVersionManager::CVersionIDAndPlatform _VersionID, CVersionManager::CVersionInformation _Info) -> TCFuture<void>
+			auto fCreateVersionOnDisk = [VersionManagerDirectory](CStr _App, CVersionManager::CVersionIDAndPlatform _VersionID, CVersionManager::CVersionInformation _Info) -> TCFuture<void>
 				{
 					auto BlockingActorCheckout = fg_BlockingActor();
 
@@ -109,7 +109,7 @@ struct CVersionManager_Refresh_Tests : public NMib::NTest::CTest
 				}
 			;
 
-			auto fDeleteVersionFromDisk = [&](CStr _App, CVersionManager::CVersionIDAndPlatform _VersionID) -> TCFuture<void>
+			auto fDeleteVersionFromDisk = [VersionManagerDirectory](CStr _App, CVersionManager::CVersionIDAndPlatform _VersionID) -> TCFuture<void>
 				{
 					auto BlockingActorCheckout = fg_BlockingActor();
 
@@ -133,7 +133,7 @@ struct CVersionManager_Refresh_Tests : public NMib::NTest::CTest
 				}
 			;
 
-			auto fModifyVersionOnDisk = [&](CStr _App, CVersionManager::CVersionIDAndPlatform _VersionID, CVersionManager::CVersionInformation _Info) -> TCFuture<void>
+			auto fModifyVersionOnDisk = [VersionManagerDirectory](CStr _App, CVersionManager::CVersionIDAndPlatform _VersionID, CVersionManager::CVersionInformation _Info) -> TCFuture<void>
 				{
 					auto BlockingActorCheckout = fg_BlockingActor();
 
@@ -257,24 +257,25 @@ struct CVersionManager_Refresh_Tests : public NMib::NTest::CTest
 			CStr VersionManagerPath = State.m_VersionManagerDirectory / "VersionManager";
 			CStr VersionManagerDirectory = State.m_VersionManagerDirectory;
 
-			auto fRefreshVersions = [&]() -> TCFuture<CRefreshResult>
+			auto fRefreshVersions = [AppManagerTestHelper, VersionManagerPath, VersionManagerDirectory]() mutable -> TCFuture<CRefreshResult>
 				{
 					CStr Output = co_await AppManagerTestHelper.f_LaunchTool(VersionManagerPath, {"--refresh-versions"}, VersionManagerDirectory);
 					co_return CRefreshResult::fs_Parse(Output);
 				}
 			;
 
-			auto fListVersions = [&](CStr _Application) -> TCFuture<CVersionManager::CListVersions::CResult>
+			auto fListVersions = [pState = AppManagerTestHelper.m_pState](CStr _Application) -> TCFuture<CVersionManager::CListVersions::CResult>
 				{
 					CVersionManager::CListVersions Params;
 					Params.m_ForApplication = _Application;
-					co_return co_await State.m_VersionManager.f_CallActor(&CVersionManager::f_ListVersions)(Params).f_Timeout(g_Timeout, "Timed out waiting for ListVersions");
+					co_return co_await pState->m_VersionManager.f_CallActor(&CVersionManager::f_ListVersions)(Params).f_Timeout(g_Timeout, "Timed out waiting for ListVersions");
 				}
 			;
 
-			auto fUploadVersion = [&](CVersionManager::CVersionIDAndPlatform _VersionID, CVersionManager::CVersionInformation _VersionInfo) -> TCFuture<CVersionManagerHelper::CUploadResult>
+			auto fUploadVersion = [pState = AppManagerTestHelper.m_pState]
+				(CVersionManager::CVersionIDAndPlatform _VersionID, CVersionManager::CVersionInformation _VersionInfo) -> TCFuture<CVersionManagerHelper::CUploadResult>
 				{
-					co_return co_await State.m_VersionManagerHelper.f_Upload(State.m_VersionManager, "TestApp", _VersionID, _VersionInfo, State.m_TestAppArchive);
+					co_return co_await pState->m_VersionManagerHelper.f_Upload(pState->m_VersionManager, "TestApp", _VersionID, _VersionInfo, pState->m_TestAppArchive);
 				}
 			;
 
@@ -411,16 +412,17 @@ struct CVersionManager_Refresh_Tests : public NMib::NTest::CTest
 			CStr VersionManagerPath = State.m_VersionManagerDirectory / "VersionManager";
 			CStr VersionManagerDirectory = State.m_VersionManagerDirectory;
 
-			auto fRefreshVersions = [&]() -> TCFuture<CRefreshResult>
+			auto fRefreshVersions = [AppManagerTestHelper, VersionManagerPath, VersionManagerDirectory]() mutable -> TCFuture<CRefreshResult>
 				{
 					CStr Output = co_await AppManagerTestHelper.f_LaunchTool(VersionManagerPath, {"--refresh-versions"}, VersionManagerDirectory);
 					co_return CRefreshResult::fs_Parse(Output);
 				}
 			;
 
-			auto fUploadVersion = [&](CVersionManager::CVersionIDAndPlatform _VersionID, CVersionManager::CVersionInformation _VersionInfo) -> TCFuture<CVersionManagerHelper::CUploadResult>
+			auto fUploadVersion = [pState = AppManagerTestHelper.m_pState]
+				(CVersionManager::CVersionIDAndPlatform _VersionID, CVersionManager::CVersionInformation _VersionInfo) -> TCFuture<CVersionManagerHelper::CUploadResult>
 				{
-					co_return co_await State.m_VersionManagerHelper.f_Upload(State.m_VersionManager, "TestApp", _VersionID, _VersionInfo, State.m_TestAppArchive);
+					co_return co_await pState->m_VersionManagerHelper.f_Upload(pState->m_VersionManager, "TestApp", _VersionID, _VersionInfo, pState->m_TestAppArchive);
 				}
 			;
 
@@ -496,22 +498,22 @@ struct CVersionManager_Refresh_Tests : public NMib::NTest::CTest
 			CStr VersionManagerPath = State.m_VersionManagerDirectory / "VersionManager";
 			CStr VersionManagerDirectory = State.m_VersionManagerDirectory;
 
-			auto fRefreshVersions = [&]() -> TCFuture<CRefreshResult>
+			auto fRefreshVersions = [AppManagerTestHelper, VersionManagerPath, VersionManagerDirectory]() mutable -> TCFuture<CRefreshResult>
 				{
 					CStr Output = co_await AppManagerTestHelper.f_LaunchTool(VersionManagerPath, {"--refresh-versions"}, VersionManagerDirectory);
 					co_return CRefreshResult::fs_Parse(Output);
 				}
 			;
 
-			auto fListVersions = [&](CStr _Application) -> TCFuture<CVersionManager::CListVersions::CResult>
+			auto fListVersions = [pState = AppManagerTestHelper.m_pState](CStr _Application) -> TCFuture<CVersionManager::CListVersions::CResult>
 				{
 					CVersionManager::CListVersions Params;
 					Params.m_ForApplication = _Application;
-					co_return co_await State.m_VersionManager.f_CallActor(&CVersionManager::f_ListVersions)(Params).f_Timeout(g_Timeout, "Timed out waiting for ListVersions");
+					co_return co_await pState->m_VersionManager.f_CallActor(&CVersionManager::f_ListVersions)(Params).f_Timeout(g_Timeout, "Timed out waiting for ListVersions");
 				}
 			;
 
-			auto fCreateVersionDirOnly = [&](CStr _App, CVersionManager::CVersionIDAndPlatform _VersionID) -> TCFuture<void>
+			auto fCreateVersionDirOnly = [VersionManagerDirectory](CStr _App, CVersionManager::CVersionIDAndPlatform _VersionID) -> TCFuture<void>
 				{
 					auto BlockingActorCheckout = fg_BlockingActor();
 
@@ -536,7 +538,7 @@ struct CVersionManager_Refresh_Tests : public NMib::NTest::CTest
 				}
 			;
 
-			auto fCreateVersionWithCorruptJson = [&](CStr _App, CVersionManager::CVersionIDAndPlatform _VersionID) -> TCFuture<void>
+			auto fCreateVersionWithCorruptJson = [VersionManagerDirectory](CStr _App, CVersionManager::CVersionIDAndPlatform _VersionID) -> TCFuture<void>
 				{
 					auto BlockingActorCheckout = fg_BlockingActor();
 
@@ -630,14 +632,15 @@ struct CVersionManager_Refresh_Tests : public NMib::NTest::CTest
 			CStr VersionManagerPath = State.m_VersionManagerDirectory / "VersionManager";
 			CStr VersionManagerDirectory = State.m_VersionManagerDirectory;
 
-			auto fRefreshVersions = [&]() -> TCFuture<CRefreshResult>
+			auto fRefreshVersions = [AppManagerTestHelper, VersionManagerPath, VersionManagerDirectory]() mutable -> TCFuture<CRefreshResult>
 				{
 					CStr Output = co_await AppManagerTestHelper.f_LaunchTool(VersionManagerPath, {"--refresh-versions"}, VersionManagerDirectory);
 					co_return CRefreshResult::fs_Parse(Output);
 				}
 			;
 
-			auto fChangeTags = [&](CStr _App, CVersionManager::CVersionIDAndPlatform _VersionID, TCSet<CStr> _AddTags, TCSet<CStr> _RemoveTags) -> TCFuture<void>
+			auto fChangeTags = [pState = AppManagerTestHelper.m_pState]
+				(CStr _App, CVersionManager::CVersionIDAndPlatform _VersionID, TCSet<CStr> _AddTags, TCSet<CStr> _RemoveTags) -> TCFuture<void>
 				{
 					CVersionManager::CChangeTags Params;
 					Params.m_Application = _App;
@@ -645,16 +648,16 @@ struct CVersionManager_Refresh_Tests : public NMib::NTest::CTest
 					Params.m_Platform = _VersionID.m_Platform;
 					Params.m_AddTags = _AddTags;
 					Params.m_RemoveTags = _RemoveTags;
-					co_await State.m_VersionManager.f_CallActor(&CVersionManager::f_ChangeTags)(fg_Move(Params)).f_Timeout(g_Timeout, "Timed out waiting for ChangeTags");
+					co_await pState->m_VersionManager.f_CallActor(&CVersionManager::f_ChangeTags)(fg_Move(Params)).f_Timeout(g_Timeout, "Timed out waiting for ChangeTags");
 					co_return {};
 				}
 			;
 
-			auto fListVersions = [&](CStr _Application) -> TCFuture<CVersionManager::CListVersions::CResult>
+			auto fListVersions = [pState = AppManagerTestHelper.m_pState](CStr _Application) -> TCFuture<CVersionManager::CListVersions::CResult>
 				{
 					CVersionManager::CListVersions Params;
 					Params.m_ForApplication = _Application;
-					co_return co_await State.m_VersionManager.f_CallActor(&CVersionManager::f_ListVersions)(Params).f_Timeout(g_Timeout, "Timed out waiting for ListVersions");
+					co_return co_await pState->m_VersionManager.f_CallActor(&CVersionManager::f_ListVersions)(Params).f_Timeout(g_Timeout, "Timed out waiting for ListVersions");
 				}
 			;
 
@@ -713,14 +716,14 @@ struct CVersionManager_Refresh_Tests : public NMib::NTest::CTest
 			CStr VersionManagerPath = State.m_VersionManagerDirectory / "VersionManager";
 			CStr VersionManagerDirectory = State.m_VersionManagerDirectory;
 
-			auto fRefreshVersions = [&]() -> TCFuture<CRefreshResult>
+			auto fRefreshVersions = [AppManagerTestHelper, VersionManagerPath, VersionManagerDirectory]() mutable -> TCFuture<CRefreshResult>
 				{
 					CStr Output = co_await AppManagerTestHelper.f_LaunchTool(VersionManagerPath, {"--refresh-versions"}, VersionManagerDirectory);
 					co_return CRefreshResult::fs_Parse(Output);
 				}
 			;
 
-			auto fCreateVersionOnDisk = [&](CStr _App, CVersionManager::CVersionIDAndPlatform _VersionID, CVersionManager::CVersionInformation _Info) -> TCFuture<void>
+			auto fCreateVersionOnDisk = [VersionManagerDirectory](CStr _App, CVersionManager::CVersionIDAndPlatform _VersionID, CVersionManager::CVersionInformation _Info) -> TCFuture<void>
 				{
 					auto BlockingActorCheckout = fg_BlockingActor();
 
