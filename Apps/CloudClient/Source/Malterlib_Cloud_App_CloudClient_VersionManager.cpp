@@ -1157,6 +1157,9 @@ namespace NMib::NCloud::NCloudClient
 		if (!pDestVersionManager)
 			co_return DMibErrorInstance("Error finding destination version manager '{}': {}. Connection might have failed. Use --log-to-stderr to see more info."_f << DestHost << Error);
 
+		auto SourceVersionManager = pSourceVersionManager->m_Actor;
+		auto DestVersionManager = pDestVersionManager->m_Actor;
+
 		CVersionManager::CListVersions SourceQuery;
 		CVersionManager::CListVersions DestQuery;
 		if (ApplicationFilters.f_GetLen() == 1 && !bApplicationFiltersHaveWildcards)
@@ -1165,11 +1168,11 @@ namespace NMib::NCloud::NCloudClient
 			DestQuery.m_ForApplication = ApplicationFilters[0];
 		}
 
-		auto SourceVersionsFuture = pSourceVersionManager->m_Actor.f_CallActor(&CVersionManager::f_ListVersions)
+		auto SourceVersionsFuture = SourceVersionManager.f_CallActor(&CVersionManager::f_ListVersions)
 			(fg_Move(SourceQuery))
 			.f_Timeout(mp_Timeout, "Timed out waiting for source version manager to reply")
 		;
-		auto DestVersionsFuture = pDestVersionManager->m_Actor.f_CallActor(&CVersionManager::f_ListVersions)
+		auto DestVersionsFuture = DestVersionManager.f_CallActor(&CVersionManager::f_ListVersions)
 			(fg_Move(DestQuery))
 			.f_Timeout(mp_Timeout, "Timed out waiting for destination version manager to reply")
 		;
@@ -1388,7 +1391,7 @@ namespace NMib::NCloud::NCloudClient
 
 			auto DownloadResult = co_await mp_VersionManagerHelper.f_Download
 				(
-					pSourceVersionManager->m_Actor
+					SourceVersionManager
 					, Version.m_Application
 					, Version.m_VersionIDAndPlatform
 					, TempDir
@@ -1473,7 +1476,7 @@ namespace NMib::NCloud::NCloudClient
 
 			auto UploadResult = co_await mp_VersionManagerHelper.f_Upload
 				(
-					pDestVersionManager->m_Actor
+					DestVersionManager
 					, Version.m_Application
 					, Version.m_VersionIDAndPlatform
 					, DestVersionInfo

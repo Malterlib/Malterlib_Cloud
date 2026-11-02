@@ -325,9 +325,11 @@ namespace NMib::NCloud::NCloudClient
 		if (!pBackupManager)
 			co_return DMibErrorInstance(fg_Format("Error selecting backup manager: {}. Connection might have failed. Use --log-to-stderr to see more info.", Error));
 
+		auto BackupManager = pBackupManager->m_Actor;
+
 		if (bFindClosestSnapshot && BackupTime.f_IsValid())
 		{
-			auto Backups = co_await (pBackupManager->m_Actor.f_CallActor(&CBackupManager::f_ListBackups)(BackupSource) % "Failed to list backups");
+			auto Backups = co_await (BackupManager.f_CallActor(&CBackupManager::f_ListBackups)(BackupSource) % "Failed to list backups");
 
 			CTime BestMatch;
 			for (auto &BackupInfo : Backups)
@@ -365,7 +367,7 @@ namespace NMib::NCloud::NCloudClient
 
 		CDirectorySyncReceive::CSyncResult Result = co_await
 			(
-				fg_DownloadBackup(pBackupManager->m_Actor, BackupSource, BackupTime, fg_Move(Config), fg_Reference(mp_DownloadBackupSubscription)) % "Failed to download backup"
+				fg_DownloadBackup(BackupManager, BackupSource, BackupTime, fg_Move(Config), fg_Reference(mp_DownloadBackupSubscription)) % "Failed to download backup"
 			)
 		;
 
