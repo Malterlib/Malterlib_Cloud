@@ -213,7 +213,7 @@ namespace NMib::NCloud::NAppDistributionManager
 
 		TCActor<CDeployDestination> fp_CreateDeploy(EDeployDestination _Type);
 
-		bool fsp_VersionMatchesSettings(CVersionManagerVersion const &_Version, CDistributionSettings const &_Settings);
+		static bool fsp_VersionMatchesSettings(CVersionManagerVersion const &_Version, CDistributionSettings const &_Settings);
 
 		TCSequencer<void> mp_DistributeSequencer{"AppDistributionManagerActor DistributeSequencer", 8}; // Max 8 distributions at the same time
 

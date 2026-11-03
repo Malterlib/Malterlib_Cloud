@@ -137,7 +137,7 @@ namespace NMib::NCloud::NSecretsManager
 		TCFuture<void> fp_WriteDatabase();
 
 #if DMibConfig_Tests_Enable
-		TCFuture<CEJsonSorted> f_SyncFileOperations();
+		TCFuture<CEJsonSorted> fp_SyncFileOperations();
 #endif
 		TCFuture<void> fp_SendSubscriptionInitial(CStr _SubscriptionID);
 		TCFuture<void> fp_UpdateSubscriptionsForChangedPermissions(CPermissionIdentifiers _Identity);

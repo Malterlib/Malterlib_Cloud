@@ -225,7 +225,7 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 		, mc_NoPermissions      = DMibBit(4)
 	};
 
-	umint fs_CountAvailableKeys(auto &_Container)
+	static umint fs_CountAvailableKeys(auto &_Container)
 	{
 		umint nAvailaible = 0;
 

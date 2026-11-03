@@ -168,7 +168,7 @@ namespace NMib::NCloud::NSecretsManager
 #if DMibConfig_Tests_Enable
 					if (auto *pPromise = pThis->mp_DownloadCompleted.f_FindEqual(_ID.m_Name))
 					{
-						pThis->f_SyncFileOperations() > *pPromise / [Promise = *pPromise]
+						pThis->fp_SyncFileOperations() > *pPromise / [Promise = *pPromise]
 							{
 								Promise.f_SetResult(); // Tell the test the transfer has completed and any file ops should have completed
 							}

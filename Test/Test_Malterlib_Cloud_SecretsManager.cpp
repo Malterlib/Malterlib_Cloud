@@ -136,6 +136,7 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 		};
 	}
 
+private:
 	void fp_DoGeneralTests()
 	{
 #ifdef DPlatformFamily_Windows

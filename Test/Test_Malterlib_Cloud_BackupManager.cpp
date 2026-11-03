@@ -523,6 +523,7 @@ struct CBackupManager_Tests : public NMib::NTest::CTest
 		NConcurrency::CActorSubscription m_ChangeSubscription;
 	};
 
+private:
 	void fp_DoGeneralTests()
 	{
 		return; // Buggy

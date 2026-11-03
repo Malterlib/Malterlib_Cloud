@@ -19,7 +19,7 @@ namespace NMib::NCloud::NVersionManager
 {
 	using namespace NMib::NStr;
 
-	bool CVersionManagerDaemonActor::CServer::fs_SyncMatchesFilter(CStr const &_Value, TCVector<CStr> const &_Filters)
+	bool CVersionManagerDaemonActor::CServer::fsp_SyncMatchesFilter(CStr const &_Value, TCVector<CStr> const &_Filters)
 	{
 		if (_Filters.f_IsEmpty())
 			return true;
@@ -31,7 +31,7 @@ namespace NMib::NCloud::NVersionManager
 		return false;
 	}
 
-	bool CVersionManagerDaemonActor::CServer::fs_SyncMatchesTagFilter(TCSet<CStr> const &_Tags, TCVector<CStr> const &_Filters)
+	bool CVersionManagerDaemonActor::CServer::fsp_SyncMatchesTagFilter(TCSet<CStr> const &_Tags, TCVector<CStr> const &_Filters)
 	{
 		if (_Filters.f_IsEmpty())
 			return true;
@@ -46,25 +46,25 @@ namespace NMib::NCloud::NVersionManager
 		return false;
 	}
 
-	bool CVersionManagerDaemonActor::CServer::fs_SyncNotificationMatchesConfigFilters(CVersionManager::CNewVersionNotification const &_Notification, CSyncSourceConfig const &_Config)
+	bool CVersionManagerDaemonActor::CServer::fsp_SyncNotificationMatchesConfigFilters(CVersionManager::CNewVersionNotification const &_Notification, CSyncSourceConfig const &_Config)
 	{
-		if (!fs_SyncMatchesFilter(_Notification.m_Application, _Config.m_ApplicationFilters))
+		if (!fsp_SyncMatchesFilter(_Notification.m_Application, _Config.m_ApplicationFilters))
 			return false;
 
-		if (!fs_SyncMatchesFilter(_Notification.m_VersionIDAndPlatform.m_Platform, _Config.m_PlatformFilters))
+		if (!fsp_SyncMatchesFilter(_Notification.m_VersionIDAndPlatform.m_Platform, _Config.m_PlatformFilters))
 			return false;
 
 		CStr VersionIDStr = CStr::fs_ToStr(_Notification.m_VersionIDAndPlatform.m_VersionID);
-		if (!fs_SyncMatchesFilter(VersionIDStr, _Config.m_VersionFilters))
+		if (!fsp_SyncMatchesFilter(VersionIDStr, _Config.m_VersionFilters))
 			return false;
 
-		if (!fs_SyncMatchesTagFilter(_Notification.m_VersionInfo.m_Tags, _Config.m_TagFilters))
+		if (!fsp_SyncMatchesTagFilter(_Notification.m_VersionInfo.m_Tags, _Config.m_TagFilters))
 			return false;
 
 		return true;
 	}
 
-	TCSet<CStr> CVersionManagerDaemonActor::CServer::fs_SyncGetConfigOwnedTags(TCMap<CStr, CStr> const &_CopyTagMappings)
+	TCSet<CStr> CVersionManagerDaemonActor::CServer::fsp_SyncGetConfigOwnedTags(TCMap<CStr, CStr> const &_CopyTagMappings)
 	{
 		TCSet<CStr> OwnedTags;
 		for (auto &Mapping : _CopyTagMappings)
@@ -72,7 +72,7 @@ namespace NMib::NCloud::NVersionManager
 		return OwnedTags;
 	}
 
-	TCSet<CStr> CVersionManagerDaemonActor::CServer::fs_SyncGetPresentTags(TCSet<CStr> const &_SourceTags, TCMap<CStr, CStr> const &_CopyTagMappings)
+	TCSet<CStr> CVersionManagerDaemonActor::CServer::fsp_SyncGetPresentTags(TCSet<CStr> const &_SourceTags, TCMap<CStr, CStr> const &_CopyTagMappings)
 	{
 		TCSet<CStr> PresentTags;
 		for (auto &Tag : _SourceTags)
@@ -498,7 +498,7 @@ namespace NMib::NCloud::NVersionManager
 
 				for (auto const &Notification : _Notifications.m_NewVersions)
 				{
-					if (!fs_SyncNotificationMatchesConfigFilters(Notification, Config))
+					if (!fsp_SyncNotificationMatchesConfigFilters(Notification, Config))
 						continue;
 
 					VersionsByApp[Notification.m_Application].f_InsertLast(&Notification);
@@ -605,7 +605,7 @@ namespace NMib::NCloud::NVersionManager
 			if (!Config.m_SyncHosts.f_FindEqual(_HostID))
 				continue;
 
-			if (!fs_SyncNotificationMatchesConfigFilters(_Notification, Config))
+			if (!fsp_SyncNotificationMatchesConfigFilters(_Notification, Config))
 				continue;
 
 			if (Config.m_StartSyncDate.f_IsValid() && _Notification.m_VersionInfo.m_Time.f_IsValid())
@@ -648,8 +648,8 @@ namespace NMib::NCloud::NVersionManager
 			if (Matching.m_pConfig->m_bPretend)
 				continue;
 
-			AllOwnedTags = AllOwnedTags | fs_SyncGetConfigOwnedTags(Matching.m_pConfig->m_CopyTagMappings);
-			ShouldBePresentTags = ShouldBePresentTags | fs_SyncGetPresentTags(_Notification.m_VersionInfo.m_Tags, Matching.m_pConfig->m_CopyTagMappings);
+			AllOwnedTags = AllOwnedTags | fsp_SyncGetConfigOwnedTags(Matching.m_pConfig->m_CopyTagMappings);
+			ShouldBePresentTags = ShouldBePresentTags | fsp_SyncGetPresentTags(_Notification.m_VersionInfo.m_Tags, Matching.m_pConfig->m_CopyTagMappings);
 
 			if (Matching.m_pConfig->m_bSyncRetrySequence)
 				bAnySyncRetrySequence = true;
@@ -762,7 +762,7 @@ namespace NMib::NCloud::NVersionManager
 		{
 			if (Matching.m_pConfig->m_bPretend)
 			{
-				auto PresentTags = fs_SyncGetPresentTags(_Notification.m_VersionInfo.m_Tags, Matching.m_pConfig->m_CopyTagMappings);
+				auto PresentTags = fsp_SyncGetPresentTags(_Notification.m_VersionInfo.m_Tags, Matching.m_pConfig->m_CopyTagMappings);
 				DMibLogWithCategory
 					(
 						Malterlib/Cloud/VersionManager/Sync

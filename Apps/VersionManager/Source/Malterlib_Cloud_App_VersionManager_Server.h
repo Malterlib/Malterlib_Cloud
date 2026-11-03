@@ -225,11 +225,11 @@ namespace NMib::NCloud::NVersionManager
 		;
 
 		// Sync helpers
-		static bool fs_SyncMatchesFilter(CStr const &_Value, TCVector<CStr> const &_Filters);
-		static bool fs_SyncMatchesTagFilter(TCSet<CStr> const &_Tags, TCVector<CStr> const &_Filters);
-		static bool fs_SyncNotificationMatchesConfigFilters(CVersionManager::CNewVersionNotification const &_Notification, CSyncSourceConfig const &_Config);
-		static TCSet<CStr> fs_SyncGetConfigOwnedTags(TCMap<CStr, CStr> const &_CopyTagMappings);
-		static TCSet<CStr> fs_SyncGetPresentTags(TCSet<CStr> const &_SourceTags, TCMap<CStr, CStr> const &_CopyTagMappings);
+		static bool fsp_SyncMatchesFilter(CStr const &_Value, TCVector<CStr> const &_Filters);
+		static bool fsp_SyncMatchesTagFilter(TCSet<CStr> const &_Tags, TCVector<CStr> const &_Filters);
+		static bool fsp_SyncNotificationMatchesConfigFilters(CVersionManager::CNewVersionNotification const &_Notification, CSyncSourceConfig const &_Config);
+		static TCSet<CStr> fsp_SyncGetConfigOwnedTags(TCMap<CStr, CStr> const &_CopyTagMappings);
+		static TCSet<CStr> fsp_SyncGetPresentTags(TCSet<CStr> const &_SourceTags, TCMap<CStr, CStr> const &_CopyTagMappings);
 
 		static constexpr uint32 mcp_MaxQueueSize = NFile::gc_IdealNetworkQueueSize;
 

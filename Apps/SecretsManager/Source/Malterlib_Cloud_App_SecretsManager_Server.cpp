@@ -471,7 +471,7 @@ namespace NMib::NCloud::NSecretsManager
 	}
 
 #if DMibConfig_Tests_Enable
-	TCFuture<CEJsonSorted> CSecretsManagerDaemonActor::CServer::f_SyncFileOperations()
+	TCFuture<CEJsonSorted> CSecretsManagerDaemonActor::CServer::fp_SyncFileOperations()
 	{
 		auto SequenceSubscription = co_await mp_FileSequencer.f_Sequence();
 

@@ -372,6 +372,7 @@ namespace NVersionManagerSyncTests
 			TCDistributedActor<CVersionManager> m_VersionManager;
 		};
 
+	private:
 		// Setup a version manager with given config and name suffix
 		TCFuture<CVersionManagerSetupResult> fp_SetupVersionManager(CStr _NameSuffix, CEJsonSorted _Config)
 		{
@@ -440,6 +441,7 @@ namespace NVersionManagerSyncTests
 			co_return Result;
 		}
 
+	public:
 		// Info needed for bidirectional trust setup
 		struct CManagerTrustInfo
 		{

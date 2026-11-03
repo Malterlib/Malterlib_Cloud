@@ -309,6 +309,7 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		TCVector<TCPromise<void>> mp_WaitForProvide;
 	};
 
+private:
 	void fp_RunUpgradeTests(CStr const &_AppManagerPackage, CStr const &_VersionManagerPackage, CStr const &_KeyManagerPackage, CStr const &_UniqueName)
 	{
 		auto fPermissions = [](auto &&_HostID, auto &&_Permissions)
