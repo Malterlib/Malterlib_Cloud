@@ -17,7 +17,6 @@ namespace NMib::NCloud::NBackupManager
 {
 	struct CBackupManagerServer : public CActor
 	{
-	public:
 		using CActorHolder = CDelegatedActorHolder;
 
 		CBackupManagerServer(CDistributedAppState &_AppState);
