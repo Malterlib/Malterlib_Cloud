@@ -15,7 +15,7 @@
 
 namespace NMib::NCloud
 {
-	enum
+	enum ECloudManagerProtocolVersion
 	{
 		ECloudManagerProtocolVersion_Min = 0x101
 
@@ -48,7 +48,7 @@ namespace NMib::NCloud
 
 	struct CAppManagerCloudManagerInterface : public NConcurrency::CActor
 	{
-		enum : uint32
+		enum EProtocolVersion : uint32
 		{
 			EProtocolVersion_Min       = ECloudManagerProtocolVersion_Min
 			, EProtocolVersion_Current = ECloudManagerProtocolVersion_Current
@@ -63,7 +63,7 @@ namespace NMib::NCloud
 	{
 		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/CloudManager";
 
-		enum : uint32
+		enum EProtocolVersion : uint32
 		{
 			EProtocolVersion_Min       = ECloudManagerProtocolVersion_Min
 			, EProtocolVersion_Current = ECloudManagerProtocolVersion_Current

@@ -2105,9 +2105,9 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 			// Test 2-4: Run parallel downloads in different permission modes
 			enum class EParallelTestMode
 			{
-				ESucceed
-				, EFail
-				, EMixed
+				mc_Succeed
+				, mc_Fail
+				, mc_Mixed
 			};
 
 			auto fParallelDownloadTest = [&](EParallelTestMode _Mode, CStr _TestName) -> TCUnsafeFuture<void>
@@ -2124,9 +2124,9 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 						bool bShouldSucceed;
 						switch (_Mode)
 						{
-						case EParallelTestMode::ESucceed: bShouldSucceed = true; break;
-						case EParallelTestMode::EFail: bShouldSucceed = false; break;
-						case EParallelTestMode::EMixed: bShouldSucceed = (i % 2 == 0); break; // alternating
+						case EParallelTestMode::mc_Succeed: bShouldSucceed = true; break;
+						case EParallelTestMode::mc_Fail: bShouldSucceed = false; break;
+						case EParallelTestMode::mc_Mixed: bShouldSucceed = (i % 2 == 0); break; // alternating
 						}
 
 						auto const &User = bShouldSucceed ? UserInfo : UserInfoNoPerms;
@@ -2197,11 +2197,11 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 			;
 
 			DMibTestMark;
-			fParallelDownloadTest(EParallelTestMode::ESucceed, "AllSucceed").f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+			fParallelDownloadTest(EParallelTestMode::mc_Succeed, "AllSucceed").f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 			DMibTestMark;
-			fParallelDownloadTest(EParallelTestMode::EFail, "AllFail").f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+			fParallelDownloadTest(EParallelTestMode::mc_Fail, "AllFail").f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 			DMibTestMark;
-			fParallelDownloadTest(EParallelTestMode::EMixed, "Mixed").f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+			fParallelDownloadTest(EParallelTestMode::mc_Mixed, "Mixed").f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 		}
 
 		DMibLogWithCategory(Test, Info, "Multi-Auth Compatibility Tests Complete");

@@ -54,7 +54,7 @@ namespace NMib::NCloud::NPrivate
 			CIntrusiveRefCountWithWeak m_RefCount;
 			CStr m_FileName;
 			TCBinaryStreamFile<> m_File;
-			CBinaryStreamSubStream<> m_LimitedFile;
+			TCBinaryStreamSubStream<> m_LimitedFile;
 			TCUniquePointer<CRSyncServer> m_pRSyncServer;
 			COnScopeExitShared m_pOnScopeExit;
 			TCSharedPointer<CCanDestroyTracker> m_pCanDestroyTracker;
@@ -65,7 +65,7 @@ namespace NMib::NCloud::NPrivate
 		struct CManifestSyncState
 		{
 			CIntrusiveRefCountWithWeak m_RefCount;
-			CBinaryStreamMemory<> m_ManifestStream;
+			TCBinaryStreamMemory<> m_ManifestStream;
 			TCUniquePointer<CRSyncServer> m_pRSyncServer;
 			CActorSubscription m_RSyncSubscription;
 			bool m_bDone = false;

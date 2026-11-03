@@ -8,7 +8,7 @@
 
 namespace NMib::NCloud::NAppManagerDatabase
 {
-	enum
+	enum EAppManagerDatabaseVersion
 	{
 		EAppManagerDatabaseVersion_Current = 0x101
 	};

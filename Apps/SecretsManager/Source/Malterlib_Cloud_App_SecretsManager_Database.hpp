@@ -29,9 +29,9 @@ namespace NMib::NCloud::NSecretsManager
 	template <typename tf_CStream>
 	void CSecretsDatabase::f_Stream(tf_CStream &_Stream)
 	{
-		uint32 Version = ESecretsManagerDatabaseVersion;
+		uint32 Version = mc_SecretsManagerDatabaseVersion;
 		_Stream % Version;
-		if (Version < 0x101 || Version > ESecretsManagerDatabaseVersion)
+		if (Version < 0x101 || Version > mc_SecretsManagerDatabaseVersion)
 			DMibError("Invalid secrets database version");
 		DMibBinaryStreamVersion(_Stream, Version);
 
@@ -41,9 +41,9 @@ namespace NMib::NCloud::NSecretsManager
 	template <typename tf_CStream>
 	void CSecretsDatabaseIV::f_Stream(tf_CStream &_Stream)
 	{
-		uint32 Version = ESecretsManagerDatabaseIVVersion;
+		uint32 Version = mc_SecretsManagerDatabaseIVVersion;
 		_Stream % Version;
-		if (Version < 0x101 || Version > ESecretsManagerDatabaseIVVersion)
+		if (Version < 0x101 || Version > mc_SecretsManagerDatabaseIVVersion)
 			DMibError("Invalid secrets database IV version");
 		DMibBinaryStreamVersion(_Stream, Version);
 

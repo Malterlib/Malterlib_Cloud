@@ -15,7 +15,7 @@ namespace NMib::NCloud::NAppManager
 		CAppManagerCoordinationInterface();
 		~CAppManagerCoordinationInterface();
 
-		enum : uint32
+		enum EProtocolVersion : uint32
 		{
 			EProtocolVersion_Min       = 0x103
 			, EProtocolVersion_Current = 0x104

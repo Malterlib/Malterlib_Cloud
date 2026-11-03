@@ -278,7 +278,7 @@ namespace NMib::NCloud::NSecretsManager
 				if (_FileType & EDirectorySyncStreamType_Manifest)
 				{
 					// The secrets manager is only transfering a single file, the manifest file will be small, so we use a memory stream
-					TCUniquePointer<CBinaryStreamMemory<>> pStream = fg_Construct();
+					TCUniquePointer<TCBinaryStreamMemory<>> pStream = fg_Construct();
 					return pStream;
 				}
 

@@ -110,7 +110,7 @@ namespace NMib::NCloud
 
 						ch8 PlainTextCheck[32];
 						CDatabase Database;
-						NStream::CBinaryStreamMemoryPtr<> Stream;
+						NStream::TCBinaryStreamMemoryPtr<> Stream;
 						Stream.f_OpenRead(RawDatabase.f_GetArray(), RawDatabase.f_GetLen());
 						Stream.f_ConsumeBytes(PlainTextCheck, 32);
 
@@ -132,7 +132,7 @@ namespace NMib::NCloud
 	private:
 		static void fsp_WriteDatabase(NStorage::TCSharedPointer<NCryptography::CEncryptAES> const &_pAESContext, CDatabase const &_Database, NStr::CStr const &_Path)
 		{
-			NStream::CBinaryStreamMemory<NStream::CBinaryStreamDefault, NContainer::CSecureByteVector> Stream;
+			NStream::TCBinaryStreamMemory<NStream::CBinaryStreamDefault, NContainer::CSecureByteVector> Stream;
 			Stream.f_FeedBytes(mc_pPlainTextCheck, 32);
 			Stream << _Database;
 			NStream::fg_PadAlignStream(Stream, 32);

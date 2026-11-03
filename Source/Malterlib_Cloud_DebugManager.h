@@ -16,7 +16,7 @@ namespace NMib::NCloud
 	{
 		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/DebugManager";
 
-		enum : uint32
+		enum EProtocolVersion : uint32
 		{
 			EProtocolVersion_Min       = 0x101
 			, EProtocolVersion_Current = 0x101

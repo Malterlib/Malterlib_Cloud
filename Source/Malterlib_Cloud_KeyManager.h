@@ -12,7 +12,7 @@
 
 namespace NMib::NCloud
 {
-	enum : uint32
+	enum EKeyManagerProtocolVersion : uint32
 	{
 		EKeyManagerProtocolVersion_Min                           = 0x101
 		, EKeyManagerProtocolVersion_SupportServerSync           = 0x102
@@ -25,7 +25,7 @@ namespace NMib::NCloud
 	{
 		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/KeyManager/ServerSync";
 
-		enum : uint32
+		enum EProtocolVersion : uint32
 		{
 			EProtocolVersion_Min       = EKeyManagerProtocolVersion_Min
 			, EProtocolVersion_Current = EKeyManagerProtocolVersion_Current
@@ -129,7 +129,7 @@ namespace NMib::NCloud
 	{
 		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/KeyManager";
 
-		enum : uint32
+		enum EProtocolVersion : uint32
 		{
 			EProtocolVersion_Min       = EKeyManagerProtocolVersion_Min
 			, EProtocolVersion_Current = EKeyManagerProtocolVersion_Current

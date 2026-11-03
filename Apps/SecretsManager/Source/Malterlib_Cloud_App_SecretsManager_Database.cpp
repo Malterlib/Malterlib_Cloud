@@ -32,7 +32,7 @@ namespace NMib::NCloud::NSecretsManager
 
 	CSecureByteVector CSecretsManagerServerDatabase::fsp_ComputeSalt(CSecretsDatabaseIV const &_Salt)
 	{
-		CBinaryStreamMemory<CBinaryStreamDefault, CSecureByteVector> Stream;
+		TCBinaryStreamMemory<CBinaryStreamDefault, CSecureByteVector> Stream;
 		Stream << _Salt.m_InternalSalt;
 		Stream << _Salt.m_ExternalSalt;
 		return Stream.f_MoveVector();
@@ -143,7 +143,7 @@ namespace NMib::NCloud::NSecretsManager
 			BaseStream << _State.m_IVSalt;
 			auto BasePosition = BaseStream.f_GetPosition();
 
-			CBinaryStreamSubStream<> SubStream;
+			TCBinaryStreamSubStream<> SubStream;
 			SubStream.f_Open(&BaseStream, BasePosition);
 
 			CSecureByteVector Salt{fsp_ComputeSalt(_State.m_IVSalt)};
@@ -176,7 +176,7 @@ namespace NMib::NCloud::NSecretsManager
 		BaseStream >> SaltIV;
 		auto BasePosition = BaseStream.f_GetPosition();
 
-		CBinaryStreamSubStream<> SubStream;
+		TCBinaryStreamSubStream<> SubStream;
 		SubStream.f_Open(&BaseStream, BasePosition, BaseStream.f_GetLength() - BasePosition);
 
 		CSecureByteVector Salt{fsp_ComputeSalt(SaltIV)};

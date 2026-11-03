@@ -8,7 +8,7 @@
 
 namespace NMib::NCloud::NHostMonitorDatabase
 {
-	enum
+	enum EHostMonitorDatabaseVersion
 	{
 		EHostMonitorDatabaseVersion_Current = 0x101
 	};

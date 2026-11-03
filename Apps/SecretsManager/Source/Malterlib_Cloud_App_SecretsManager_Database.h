@@ -37,10 +37,7 @@ namespace NMib::NCloud::NSecretsManager
 
 	struct CSecretsDatabase
 	{
-		enum
-		{
-			ESecretsManagerDatabaseVersion = 0x102
-		};
+		static constexpr uint32 mc_SecretsManagerDatabaseVersion = 0x102;
 
 		template <typename tf_CStream>
 		void f_Stream(tf_CStream &_Stream);
@@ -50,10 +47,7 @@ namespace NMib::NCloud::NSecretsManager
 
 	struct CSecretsDatabaseIV
 	{
-		enum
-		{
-			ESecretsManagerDatabaseIVVersion = 0x101
-		};
+		static constexpr uint32 mc_SecretsManagerDatabaseIVVersion = 0x101;
 
 		template <typename tf_CStream>
 		void f_Stream(tf_CStream &_Stream);

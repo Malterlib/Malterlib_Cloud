@@ -14,7 +14,7 @@
 
 namespace NMib::NCloud
 {
-	enum
+	enum EBackupManagerProtocolVersion
 	{
 		EBackupManagerProtocolVersion_Min              = 0x101
 		, EBackupManagerProtocolVersion_UseSHA256      = 0x106
@@ -37,7 +37,7 @@ namespace NMib::NCloud
 
 	struct CBackupManagerBackup : public NConcurrency::CActor
 	{
-		enum : uint32
+		enum EProtocolVersion : uint32
 		{
 			EProtocolVersion_Min       = EBackupManagerProtocolVersion_Min
 			, EProtocolVersion_Current = EBackupManagerProtocolVersion_Current
@@ -175,7 +175,7 @@ namespace NMib::NCloud
 	{
 		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/BackupManager";
 
-		enum : uint32
+		enum EProtocolVersion : uint32
 		{
 			EProtocolVersion_Min       = EBackupManagerProtocolVersion_Min
 			, EProtocolVersion_Current = EBackupManagerProtocolVersion_Current
