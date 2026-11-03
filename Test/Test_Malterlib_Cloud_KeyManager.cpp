@@ -21,7 +21,7 @@ using namespace NMib::NStorage;
 using namespace NMib::NStr;
 using namespace NMib::NTest;
 
-static fp64 g_Timeout = 60.0 * NMib::NTest::gc_TimeoutMultiplier;
+static fp64 gs_Timeout = 60.0 * NMib::NTest::gc_TimeoutMultiplier;
 
 struct CKeyManager_Tests : public NMib::NTest::CTest
 {
@@ -89,10 +89,10 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 
 		TCFuture<void> f_ConnectTrustManagers(TCActor<CDistributedActorTrustManager> _ServerTrustManager, TCActor<CDistributedActorTrustManager> _ClientTrustManager)
 		{
-			CStr ServerHostID = co_await _ServerTrustManager(&CDistributedActorTrustManager::f_GetHostID).f_Timeout(g_Timeout, "Timeout");
+			CStr ServerHostID = co_await _ServerTrustManager(&CDistributedActorTrustManager::f_GetHostID).f_Timeout(gs_Timeout, "Timeout");
 
-			auto Ticket = co_await _ServerTrustManager(&CDistributedActorTrustManager::f_GenerateConnectionTicket, m_ServerAddress, nullptr, nullptr).f_Timeout(g_Timeout, "Timeout");
-			auto HostInfo = co_await _ClientTrustManager(&CDistributedActorTrustManager::f_AddClientConnection, fg_Move(Ticket.m_Ticket), g_Timeout, 1, 0).f_Timeout(g_Timeout, "Timeout");
+			auto Ticket = co_await _ServerTrustManager(&CDistributedActorTrustManager::f_GenerateConnectionTicket, m_ServerAddress, nullptr, nullptr).f_Timeout(gs_Timeout, "Timeout");
+			auto HostInfo = co_await _ClientTrustManager(&CDistributedActorTrustManager::f_AddClientConnection, fg_Move(Ticket.m_Ticket), gs_Timeout, 1, 0).f_Timeout(gs_Timeout, "Timeout");
 
 			co_await _ClientTrustManager
 				(
@@ -113,7 +113,7 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 			m_Helper1TrustManager = m_Helper1TrustManagerState.f_TrustManager("TestHelper1");
 
 			m_ServerAddress.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath("{}/server.sock"_f << m_RootDirectory);
-			co_await m_ServerTrustManager(&CDistributedActorTrustManager::f_AddListen, m_ServerAddress, 0).f_Timeout(g_Timeout, "Timeout");
+			co_await m_ServerTrustManager(&CDistributedActorTrustManager::f_AddListen, m_ServerAddress, 0).f_Timeout(gs_Timeout, "Timeout");
 
 			co_await f_ConnectTrustManagers(m_ServerTrustManager, m_Helper0TrustManager);
 			co_await f_ConnectTrustManagers(m_ServerTrustManager, m_Helper1TrustManager);
@@ -125,7 +125,7 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 		{
 			co_await f_ConnectTrustManagers(m_ServerTrustManager, _pClient->m_ServerTrustManager);
 
-			CStr ClientHostID = co_await _pClient->m_ServerTrustManager(&CDistributedActorTrustManager::f_GetHostID).f_Timeout(g_Timeout, "Timeout");
+			CStr ClientHostID = co_await _pClient->m_ServerTrustManager(&CDistributedActorTrustManager::f_GetHostID).f_Timeout(gs_Timeout, "Timeout");
 
 			if (!_bAddPermissions)
 				co_return {};
@@ -164,7 +164,7 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 		auto HostID0 = co_await Helper0TrustManager(&CDistributedActorTrustManager::f_GetHostID);
 		auto HostID1 = co_await Helper1TrustManager(&CDistributedActorTrustManager::f_GetHostID);
 
-		co_await _Database(&ICKeyManagerServerDatabase::f_Initialize).f_Timeout(g_Timeout, "Timeout");
+		co_await _Database(&ICKeyManagerServerDatabase::f_Initialize).f_Timeout(gs_Timeout, "Timeout");
 
 		DMibTestMark;
 
@@ -179,20 +179,20 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 		;
 		auto AsyncDestroyServer = co_await fg_AsyncDestroy(KeyManagerServer);
 
-		co_await KeyManagerServer(&CKeyManagerServer::f_Init, g_Timeout / 2);
+		co_await KeyManagerServer(&CKeyManagerServer::f_Init, gs_Timeout / 2);
 
 		CTrustedSubscriptionTestHelper TestHelper0(Helper0TrustManager);
 		DMibTestMark;
 		TCDistributedActor<CKeyManager> KeyManager = co_await TestHelper0.f_SubscribeAsync<CKeyManager>();
 		DMibTestMark;
 
-		CSymmetricKey Key0 = co_await KeyManager.f_CallActor(&CKeyManager::f_RequestKey)("TestKey0", 32).f_Timeout(g_Timeout, "Timeout");
+		CSymmetricKey Key0 = co_await KeyManager.f_CallActor(&CKeyManager::f_RequestKey)("TestKey0", 32).f_Timeout(gs_Timeout, "Timeout");
 		DMibTestMark;
-		CSymmetricKey Key1 = co_await KeyManager.f_CallActor(&CKeyManager::f_RequestKey)("TestKey1", 32).f_Timeout(g_Timeout, "Timeout");
+		CSymmetricKey Key1 = co_await KeyManager.f_CallActor(&CKeyManager::f_RequestKey)("TestKey1", 32).f_Timeout(gs_Timeout, "Timeout");
 		DMibTestMark;
 
 		DMibExpect(Key0, !=, Key1);
-		auto Database = co_await _Database(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
+		auto Database = co_await _Database(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(gs_Timeout, "Timeout");
 		DMibExpect(Key0, ==, Database.m_Clients[HostID0].m_Keys["TestKey0"].m_Key);
 		DMibExpect(Key1, ==, Database.m_Clients[HostID0].m_Keys["TestKey1"].m_Key);
 
@@ -201,14 +201,14 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 		TCDistributedActor<CKeyManager> KeyManager2 = co_await TestHelper1.f_SubscribeAsync<CKeyManager>();
 		DMibTestMark;
 
-		CSymmetricKey SecondKey0 = co_await KeyManager2.f_CallActor(&CKeyManager::f_RequestKey)("TestKey0", 32).f_Timeout(g_Timeout, "Timeout");
+		CSymmetricKey SecondKey0 = co_await KeyManager2.f_CallActor(&CKeyManager::f_RequestKey)("TestKey0", 32).f_Timeout(gs_Timeout, "Timeout");
 		DMibTestMark;
-		CSymmetricKey SecondKey1 = co_await KeyManager2.f_CallActor(&CKeyManager::f_RequestKey)("TestKey1", 32).f_Timeout(g_Timeout, "Timeout");
+		CSymmetricKey SecondKey1 = co_await KeyManager2.f_CallActor(&CKeyManager::f_RequestKey)("TestKey1", 32).f_Timeout(gs_Timeout, "Timeout");
 
 		DMibExpect(SecondKey0, !=, SecondKey1);
 		DMibExpect(SecondKey0, !=, Key0);
 		DMibExpect(SecondKey1, !=, Key1);
-		Database = co_await _Database(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
+		Database = co_await _Database(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(gs_Timeout, "Timeout");
 		DMibExpect(SecondKey0, ==, Database.m_Clients[HostID1].m_Keys["TestKey0"].m_Key);
 		DMibExpect(SecondKey1, ==, Database.m_Clients[HostID1].m_Keys["TestKey1"].m_Key);
 
@@ -260,7 +260,7 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 		TCActor<CKeyManagerServer> KeyManagerServer0;
 		NConcurrency::TCActor<ICKeyManagerServerDatabase> DatabaseActor0 = fg_ConstructActor<CKeyManagerServerDatabaseImpl>();
 		{
-			co_await DatabaseActor0(&ICKeyManagerServerDatabase::f_Initialize).f_Timeout(g_Timeout, "Timeout");
+			co_await DatabaseActor0(&ICKeyManagerServerDatabase::f_Initialize).f_Timeout(gs_Timeout, "Timeout");
 			KeyManagerServer0 = fg_ConstructActor<CKeyManagerServer>
 				(
 					CKeyManagerServerConfig
@@ -276,7 +276,7 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 		TCActor<CKeyManagerServer> KeyManagerServer1;
 		NConcurrency::TCActor<ICKeyManagerServerDatabase> DatabaseActor1 = fg_ConstructActor<CKeyManagerServerDatabaseImpl>();
 		{
-			co_await DatabaseActor1(&ICKeyManagerServerDatabase::f_Initialize).f_Timeout(g_Timeout, "Timeout");
+			co_await DatabaseActor1(&ICKeyManagerServerDatabase::f_Initialize).f_Timeout(gs_Timeout, "Timeout");
 			KeyManagerServer1 = fg_ConstructActor<CKeyManagerServer>
 				(
 					CKeyManagerServerConfig
@@ -291,15 +291,15 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 
 		if (fg_IsSet(_Test, EServerSyncTestFlag::mc_InvertInitOrder))
 		{
-			co_await KeyManagerServer1(&CKeyManagerServer::f_Init, g_Timeout / 2);
-			co_await KeyManagerServer0(&CKeyManagerServer::f_Init, g_Timeout / 2);
+			co_await KeyManagerServer1(&CKeyManagerServer::f_Init, gs_Timeout / 2);
+			co_await KeyManagerServer0(&CKeyManagerServer::f_Init, gs_Timeout / 2);
 		}
 		else if (fg_IsSet(_Test, EServerSyncTestFlag::mc_InitAfterCreate))
-			co_await KeyManagerServer0(&CKeyManagerServer::f_Init, g_Timeout / 2);
+			co_await KeyManagerServer0(&CKeyManagerServer::f_Init, gs_Timeout / 2);
 		else
 		{
-			co_await KeyManagerServer0(&CKeyManagerServer::f_Init, g_Timeout / 2);
-			co_await KeyManagerServer1(&CKeyManagerServer::f_Init, g_Timeout / 2);
+			co_await KeyManagerServer0(&CKeyManagerServer::f_Init, gs_Timeout / 2);
+			co_await KeyManagerServer1(&CKeyManagerServer::f_Init, gs_Timeout / 2);
 		}
 
 		DMibTestMark;
@@ -309,14 +309,14 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 
 		if (!fg_IsSet(_Test, EServerSyncTestFlag::mc_PreCreateKeysAfter))
 		{
-			co_await KeyManagerServer0(&CKeyManagerServer::f_PreCreateKeys, 32, 4).f_Timeout(g_Timeout, "Timeout");
-			co_await KeyManagerServer0(&CKeyManagerServer::f_PreCreateKeys, 64, 4).f_Timeout(g_Timeout, "Timeout");
-			co_await KeyManagerServer0(&CKeyManagerServer::f_PreCreateKeys, 128, 4).f_Timeout(g_Timeout, "Timeout");
+			co_await KeyManagerServer0(&CKeyManagerServer::f_PreCreateKeys, 32, 4).f_Timeout(gs_Timeout, "Timeout");
+			co_await KeyManagerServer0(&CKeyManagerServer::f_PreCreateKeys, 64, 4).f_Timeout(gs_Timeout, "Timeout");
+			co_await KeyManagerServer0(&CKeyManagerServer::f_PreCreateKeys, 128, 4).f_Timeout(gs_Timeout, "Timeout");
 		}
 
-		CSymmetricKey Key0 = co_await KeyManager0.f_CallActor(&CKeyManager::f_RequestKey)("TestKey0", 32).f_Timeout(g_Timeout, "Timeout");
+		CSymmetricKey Key0 = co_await KeyManager0.f_CallActor(&CKeyManager::f_RequestKey)("TestKey0", 32).f_Timeout(gs_Timeout, "Timeout");
 		DMibTestMark;
-		CSymmetricKey Key1 = co_await KeyManager0.f_CallActor(&CKeyManager::f_RequestKey)("TestKey1", 32).f_Timeout(g_Timeout, "Timeout");
+		CSymmetricKey Key1 = co_await KeyManager0.f_CallActor(&CKeyManager::f_RequestKey)("TestKey1", 32).f_Timeout(gs_Timeout, "Timeout");
 		DMibTestMark;
 
 		DMibExpect(Key0, !=, Key1);
@@ -333,16 +333,16 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 
 		if (fg_IsSet(_Test, EServerSyncTestFlag::mc_PreCreateKeysAfter))
 		{
-			co_await KeyManagerServer0(&CKeyManagerServer::f_PreCreateKeys, 32, 4).f_Timeout(g_Timeout, "Timeout");
-			co_await KeyManagerServer0(&CKeyManagerServer::f_PreCreateKeys, 64, 4).f_Timeout(g_Timeout, "Timeout");
-			co_await KeyManagerServer0(&CKeyManagerServer::f_PreCreateKeys, 128, 4).f_Timeout(g_Timeout, "Timeout");
+			co_await KeyManagerServer0(&CKeyManagerServer::f_PreCreateKeys, 32, 4).f_Timeout(gs_Timeout, "Timeout");
+			co_await KeyManagerServer0(&CKeyManagerServer::f_PreCreateKeys, 64, 4).f_Timeout(gs_Timeout, "Timeout");
+			co_await KeyManagerServer0(&CKeyManagerServer::f_PreCreateKeys, 128, 4).f_Timeout(gs_Timeout, "Timeout");
 		}
 
 		if (fg_IsSet(_Test, EServerSyncTestFlag::mc_InitAfterCreate))
-			co_await KeyManagerServer1(&CKeyManagerServer::f_Init, g_Timeout / 2);
+			co_await KeyManagerServer1(&CKeyManagerServer::f_Init, gs_Timeout / 2);
 
-		auto Database0 = co_await DatabaseActor0(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
-		auto Database1 = co_await DatabaseActor1(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
+		auto Database0 = co_await DatabaseActor0(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(gs_Timeout, "Timeout");
+		auto Database1 = co_await DatabaseActor1(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(gs_Timeout, "Timeout");
 
 		if (fg_IsSet(_Test, EServerSyncTestFlag::mc_NoPermissions))
 			DMibExpect(Database0.m_Clients, !=, Database1.m_Clients);
@@ -371,27 +371,27 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 
 		if (!fg_IsSet(_Test, EServerSyncTestFlag::mc_PreCreateKeysAfter))
 		{
-			co_await KeyManagerServer1(&CKeyManagerServer::f_PreCreateKeys, 32, 4).f_Timeout(g_Timeout, "Timeout");
-			co_await KeyManagerServer1(&CKeyManagerServer::f_PreCreateKeys, 64, 4).f_Timeout(g_Timeout, "Timeout");
-			co_await KeyManagerServer1(&CKeyManagerServer::f_PreCreateKeys, 128, 4).f_Timeout(g_Timeout, "Timeout");
+			co_await KeyManagerServer1(&CKeyManagerServer::f_PreCreateKeys, 32, 4).f_Timeout(gs_Timeout, "Timeout");
+			co_await KeyManagerServer1(&CKeyManagerServer::f_PreCreateKeys, 64, 4).f_Timeout(gs_Timeout, "Timeout");
+			co_await KeyManagerServer1(&CKeyManagerServer::f_PreCreateKeys, 128, 4).f_Timeout(gs_Timeout, "Timeout");
 		}
 
-		CSymmetricKey SecondKey0 = co_await KeyManager1.f_CallActor(&CKeyManager::f_RequestKey)("TestKey0", 32).f_Timeout(g_Timeout, "Timeout");
+		CSymmetricKey SecondKey0 = co_await KeyManager1.f_CallActor(&CKeyManager::f_RequestKey)("TestKey0", 32).f_Timeout(gs_Timeout, "Timeout");
 		DMibTestMark;
-		CSymmetricKey SecondKey1 = co_await KeyManager1.f_CallActor(&CKeyManager::f_RequestKey)("TestKey1", 32).f_Timeout(g_Timeout, "Timeout");
+		CSymmetricKey SecondKey1 = co_await KeyManager1.f_CallActor(&CKeyManager::f_RequestKey)("TestKey1", 32).f_Timeout(gs_Timeout, "Timeout");
 		DMibTestMark;
 
 		if (fg_IsSet(_Test, EServerSyncTestFlag::mc_PreCreateKeysAfter))
 		{
-			co_await KeyManagerServer1(&CKeyManagerServer::f_PreCreateKeys, 32, 4).f_Timeout(g_Timeout, "Timeout");
-			co_await KeyManagerServer1(&CKeyManagerServer::f_PreCreateKeys, 64, 4).f_Timeout(g_Timeout, "Timeout");
-			co_await KeyManagerServer1(&CKeyManagerServer::f_PreCreateKeys, 128, 4).f_Timeout(g_Timeout, "Timeout");
+			co_await KeyManagerServer1(&CKeyManagerServer::f_PreCreateKeys, 32, 4).f_Timeout(gs_Timeout, "Timeout");
+			co_await KeyManagerServer1(&CKeyManagerServer::f_PreCreateKeys, 64, 4).f_Timeout(gs_Timeout, "Timeout");
+			co_await KeyManagerServer1(&CKeyManagerServer::f_PreCreateKeys, 128, 4).f_Timeout(gs_Timeout, "Timeout");
 		}
 
 		if (fg_IsSet(_Test, EServerSyncTestFlag::mc_SimultaneousCreate))
 		{
-			TCFuture<CSymmetricKey> Key0Future = KeyManager0.f_CallActor(&CKeyManager::f_RequestKey)("TestKey2", 32).f_Timeout(g_Timeout, "Timeout");
-			TCFuture<CSymmetricKey> Key1Future = KeyManager1.f_CallActor(&CKeyManager::f_RequestKey)("TestKey2", 32).f_Timeout(g_Timeout, "Timeout");
+			TCFuture<CSymmetricKey> Key0Future = KeyManager0.f_CallActor(&CKeyManager::f_RequestKey)("TestKey2", 32).f_Timeout(gs_Timeout, "Timeout");
+			TCFuture<CSymmetricKey> Key1Future = KeyManager1.f_CallActor(&CKeyManager::f_RequestKey)("TestKey2", 32).f_Timeout(gs_Timeout, "Timeout");
 			CSymmetricKey ThirdKey0 = co_await fg_Move(Key0Future);
 			DMibTestMark;
 			CSymmetricKey ThirdKey1 = co_await fg_Move(Key1Future);
@@ -404,7 +404,7 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 		DMibExpect(SecondKey0, !=, Key0)(ETestFlag_NoValues);
 		DMibExpect(SecondKey1, !=, Key1)(ETestFlag_NoValues);
 
-		auto DatabaseAfter0 = co_await DatabaseActor0(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
+		auto DatabaseAfter0 = co_await DatabaseActor0(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(gs_Timeout, "Timeout");
 		DMibExpect(Key0, ==, DatabaseAfter0.m_Clients[HostID0].m_Keys["TestKey0"].m_Key);
 		DMibExpect(Key1, ==, DatabaseAfter0.m_Clients[HostID0].m_Keys["TestKey1"].m_Key);
 
@@ -419,7 +419,7 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 			DMibExpect(SecondKey1, ==, DatabaseAfter0.m_Clients[HostID1].m_Keys["TestKey1"].m_Key);
 		}
 
-		auto DatabaseAfter1 = co_await DatabaseActor1(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
+		auto DatabaseAfter1 = co_await DatabaseActor1(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(gs_Timeout, "Timeout");
 		if (fg_IsSet(_Test, EServerSyncTestFlag::mc_NoPermissions))
 		{
 			DMibExpectTrue(DatabaseAfter1.m_Clients[HostID0].m_Keys["TestKey0"].m_Key.f_IsEmpty());
@@ -450,14 +450,14 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 		if (fg_IsSet(_Test, EServerSyncTestFlag::mc_NoPermissions))
 			co_return {};
 
-		auto Result0 = co_await KeyManagerServer0(&CKeyManagerServer::f_RemoveVerifiedHosts, TCSet<CStr>{ServerHostID0}).f_Timeout(g_Timeout, "Timeout").f_Wrap();
+		auto Result0 = co_await KeyManagerServer0(&CKeyManagerServer::f_RemoveVerifiedHosts, TCSet<CStr>{ServerHostID0}).f_Timeout(gs_Timeout, "Timeout").f_Wrap();
 		DMibExpectException(Result0.f_Get(), DMibErrorInstance("The host ID {} you are trying to remove is still running"_f << ServerHostID0));
 
-		auto Result1 = co_await KeyManagerServer1(&CKeyManagerServer::f_RemoveVerifiedHosts, TCSet<CStr>{ServerHostID0}).f_Timeout(g_Timeout, "Timeout").f_Wrap();
+		auto Result1 = co_await KeyManagerServer1(&CKeyManagerServer::f_RemoveVerifiedHosts, TCSet<CStr>{ServerHostID0}).f_Timeout(gs_Timeout, "Timeout").f_Wrap();
 		DMibExpectException(Result1.f_Get(), DMibErrorInstance("The host ID {} you are trying to remove is still running"_f << ServerHostID0));
 
-		auto DatabaseAfterRemove0 = co_await DatabaseActor0(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
-		auto DatabaseAfterRemove1 = co_await DatabaseActor1(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
+		auto DatabaseAfterRemove0 = co_await DatabaseActor0(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(gs_Timeout, "Timeout");
+		auto DatabaseAfterRemove1 = co_await DatabaseActor1(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(gs_Timeout, "Timeout");
 
 		DMibExpect(DatabaseAfterRemove0.m_Clients[HostID0].m_Keys["TestKey0"].m_VerifiedOnServers, ==, (TCSet<CStr>{ServerHostID0, ServerHostID1}));
 
@@ -468,10 +468,10 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 
 		{
 			DMibTestPath("Remove one size");
-			co_await KeyManagerServer0(&CKeyManagerServer::f_RemovePreCreatedKeys, 64).f_Timeout(g_Timeout, "Timeout");
+			co_await KeyManagerServer0(&CKeyManagerServer::f_RemovePreCreatedKeys, 64).f_Timeout(gs_Timeout, "Timeout");
 
-			auto DatabaseAfterPreRemove0 = co_await DatabaseActor0(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
-			auto DatabaseAfterPreRemove1 = co_await DatabaseActor1(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
+			auto DatabaseAfterPreRemove0 = co_await DatabaseActor0(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(gs_Timeout, "Timeout");
+			auto DatabaseAfterPreRemove1 = co_await DatabaseActor1(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(gs_Timeout, "Timeout");
 
 			ExpectedAvailableKeys -= 4;
 
@@ -481,10 +481,10 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 
 		{
 			DMibTestPath("Remove all");
-			co_await KeyManagerServer0(&CKeyManagerServer::f_RemovePreCreatedKeys, fg_Default()).f_Timeout(g_Timeout, "Timeout");
+			co_await KeyManagerServer0(&CKeyManagerServer::f_RemovePreCreatedKeys, fg_Default()).f_Timeout(gs_Timeout, "Timeout");
 
-			auto DatabaseAfterPreRemove0 = co_await DatabaseActor0(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
-			auto DatabaseAfterPreRemove1 = co_await DatabaseActor1(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
+			auto DatabaseAfterPreRemove0 = co_await DatabaseActor0(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(gs_Timeout, "Timeout");
+			auto DatabaseAfterPreRemove1 = co_await DatabaseActor1(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(gs_Timeout, "Timeout");
 
 			ExpectedAvailableKeys = 0;
 
@@ -494,10 +494,10 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 
 		{
 			DMibTestPath("Remove all empty");
-			co_await KeyManagerServer0(&CKeyManagerServer::f_RemovePreCreatedKeys, fg_Default()).f_Timeout(g_Timeout, "Timeout");
+			co_await KeyManagerServer0(&CKeyManagerServer::f_RemovePreCreatedKeys, fg_Default()).f_Timeout(gs_Timeout, "Timeout");
 
-			auto DatabaseAfterPreRemove0 = co_await DatabaseActor0(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
-			auto DatabaseAfterPreRemove1 = co_await DatabaseActor1(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
+			auto DatabaseAfterPreRemove0 = co_await DatabaseActor0(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(gs_Timeout, "Timeout");
+			auto DatabaseAfterPreRemove1 = co_await DatabaseActor1(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(gs_Timeout, "Timeout");
 
 			ExpectedAvailableKeys = 0;
 
@@ -507,9 +507,9 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 
 		co_await fg_Move(KeyManagerServer1).f_Destroy();
 
-		co_await KeyManagerServer0(&CKeyManagerServer::f_RemoveVerifiedHosts, TCSet<CStr>{ServerHostID1}).f_Timeout(g_Timeout, "Timeout");
+		co_await KeyManagerServer0(&CKeyManagerServer::f_RemoveVerifiedHosts, TCSet<CStr>{ServerHostID1}).f_Timeout(gs_Timeout, "Timeout");
 
-		auto DatabaseAfterRemoveSuccess0 = co_await DatabaseActor0(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
+		auto DatabaseAfterRemoveSuccess0 = co_await DatabaseActor0(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(gs_Timeout, "Timeout");
 
 		DMibExpect(DatabaseAfterRemoveSuccess0.m_Clients[HostID0].m_Keys["TestKey0"].m_VerifiedOnServers, ==, TCSet<CStr>{ServerHostID0});
 		co_return {};
@@ -539,7 +539,7 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 		TCActor<CKeyManagerServer> KeyManagerServer0;
 		NConcurrency::TCActor<ICKeyManagerServerDatabase> DatabaseActor0 = fg_ConstructActor<CKeyManagerServerDatabaseImpl>();
 		{
-			co_await DatabaseActor0(&ICKeyManagerServerDatabase::f_Initialize).f_Timeout(g_Timeout, "Timeout");
+			co_await DatabaseActor0(&ICKeyManagerServerDatabase::f_Initialize).f_Timeout(gs_Timeout, "Timeout");
 			KeyManagerServer0 = fg_ConstructActor<CKeyManagerServer>
 				(
 					CKeyManagerServerConfig
@@ -556,7 +556,7 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 		TCActor<CKeyManagerServer> KeyManagerServer1;
 		NConcurrency::TCActor<ICKeyManagerServerDatabase> DatabaseActor1 = fg_ConstructActor<CKeyManagerServerDatabaseImpl>();
 		{
-			co_await DatabaseActor1(&ICKeyManagerServerDatabase::f_Initialize).f_Timeout(g_Timeout, "Timeout");
+			co_await DatabaseActor1(&ICKeyManagerServerDatabase::f_Initialize).f_Timeout(gs_Timeout, "Timeout");
 			KeyManagerServer1 = fg_ConstructActor<CKeyManagerServer>
 				(
 					CKeyManagerServerConfig
@@ -570,25 +570,25 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 		}
 		auto AsyncDestroyServer1 = co_await fg_AsyncDestroy(KeyManagerServer1);
 
-		co_await KeyManagerServer0(&CKeyManagerServer::f_Init, g_Timeout / 2);
+		co_await KeyManagerServer0(&CKeyManagerServer::f_Init, gs_Timeout / 2);
 
 		DMibTestMark;
 		CTrustedSubscriptionTestHelper TestHelper0(Helper0TrustManager);
 		TCDistributedActor<CKeyManager> KeyManager0 = co_await TestHelper0.f_SubscribeAsync<CKeyManager>();
 		DMibTestMark;
 
-		co_await KeyManagerServer0(&CKeyManagerServer::f_PreCreateKeys, 32, 2).f_Timeout(g_Timeout, "Timeout");
+		co_await KeyManagerServer0(&CKeyManagerServer::f_PreCreateKeys, 32, 2).f_Timeout(gs_Timeout, "Timeout");
 
 		{
 			DMibTestPath("Use available key");
 
 			DMibExpectException
 				(
-					KeyManager0.f_CallActor(&CKeyManager::f_RequestKey)("TestKey0", 32).f_CallSync(g_Timeout)
+					KeyManager0.f_CallActor(&CKeyManager::f_RequestKey)("TestKey0", 32).f_CallSync(gs_Timeout)
 					, DMibErrorInstance("Only 1 of 2 key managers available to verify available key use")
 				)
 			;
-			auto Database0 = co_await DatabaseActor0(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
+			auto Database0 = co_await DatabaseActor0(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(gs_Timeout, "Timeout");
 
 			DMibExpect(fs_CountAvailableKeys(Database0.m_AvailableKeys), ==, 2);
 		}
@@ -599,12 +599,12 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 
 			DMibExpectException
 				(
-					KeyManager0.f_CallActor(&CKeyManager::f_RequestKey)("TestKey0", 16).f_CallSync(g_Timeout)
+					KeyManager0.f_CallActor(&CKeyManager::f_RequestKey)("TestKey0", 16).f_CallSync(gs_Timeout)
 					, DMibErrorInstance("Key has only been verified on 1 of 2 required servers")
 				)
 			;
 
-			auto Database0 = co_await DatabaseActor0(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
+			auto Database0 = co_await DatabaseActor0(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(gs_Timeout, "Timeout");
 
 			DMibExpect(fs_CountAvailableKeys(Database0.m_AvailableKeys), ==, 2);
 			DMibAssert(Database0.m_Clients.f_GetLen(), ==, 1);
@@ -618,9 +618,9 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 		{
 			DMibTestPath("Connect second server");
 
-			co_await KeyManagerServer1(&CKeyManagerServer::f_Init, g_Timeout / 2);
-			auto Database0 = co_await DatabaseActor0(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
-			auto Database1 = co_await DatabaseActor1(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
+			co_await KeyManagerServer1(&CKeyManagerServer::f_Init, gs_Timeout / 2);
+			auto Database0 = co_await DatabaseActor0(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(gs_Timeout, "Timeout");
+			auto Database1 = co_await DatabaseActor1(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(gs_Timeout, "Timeout");
 
 			DMibExpect(Database0.m_Clients, ==, Database1.m_Clients);
 			DMibExpect(Database0.m_AvailableKeys, ==, Database1.m_AvailableKeys);
@@ -634,19 +634,19 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 		{
 			DMibTestPath("Direct retrieve after connect");
 
-			auto Key0 = co_await KeyManager0.f_CallActor(&CKeyManager::f_RequestKey)("TestKey0", 16).f_Timeout(g_Timeout, "Timeout");
+			auto Key0 = co_await KeyManager0.f_CallActor(&CKeyManager::f_RequestKey)("TestKey0", 16).f_Timeout(gs_Timeout, "Timeout");
 			DMibExpect(Key0, ==, DirectCreateKey);
 		}
 
 		{
 			DMibTestPath("Use available key after connect");
 
-			auto Key1 = co_await KeyManager0.f_CallActor(&CKeyManager::f_RequestKey)("TestKey1", 32).f_Timeout(g_Timeout, "Timeout");
+			auto Key1 = co_await KeyManager0.f_CallActor(&CKeyManager::f_RequestKey)("TestKey1", 32).f_Timeout(gs_Timeout, "Timeout");
 
 			DMibExpect(Key1.f_GetLen(), ==, 32);
 
-			auto Database0 = co_await DatabaseActor0(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
-			auto Database1 = co_await DatabaseActor1(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
+			auto Database0 = co_await DatabaseActor0(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(gs_Timeout, "Timeout");
+			auto Database1 = co_await DatabaseActor1(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(gs_Timeout, "Timeout");
 
 			DMibExpect(fs_CountAvailableKeys(Database0.m_AvailableKeys), ==, 1);
 
@@ -689,8 +689,8 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 				CFile::fs_DeleteFile(DatabasePath);
 
 			auto DatabaseActor = fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>(DatabasePath, Password, NContainer::CSecureByteVector{});
-			co_await DatabaseActor(&ICKeyManagerServerDatabase::f_Initialize).f_Timeout(g_Timeout, "Timeout");
-			auto Database = co_await DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
+			co_await DatabaseActor(&ICKeyManagerServerDatabase::f_Initialize).f_Timeout(gs_Timeout, "Timeout");
+			auto Database = co_await DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(gs_Timeout, "Timeout");
 			DMibExpect(Database.m_Clients.f_GetLen(), ==, 0);
 
 			co_await f_TestCloudKeyManager(DatabaseActor, pTestState);
@@ -701,7 +701,7 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 			auto HostID0 = co_await Helper0TrustManager(&CDistributedActorTrustManager::f_GetHostID);
 			auto HostID1 = co_await Helper1TrustManager(&CDistributedActorTrustManager::f_GetHostID);
 
-			Database = co_await DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
+			Database = co_await DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(gs_Timeout, "Timeout");
 
 			DMibExpect(Database.m_Clients.f_GetLen(), ==, 2);
 			DMibExpect(Database.m_Clients[HostID0].m_Keys.f_GetLen(), ==, 2);
@@ -710,8 +710,8 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 				DMibTestPath("ExistingKeys");
 
 				auto DatabaseActor2 = fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>(DatabasePath, Password, NContainer::CSecureByteVector{});
-				co_await DatabaseActor2(&ICKeyManagerServerDatabase::f_Initialize).f_Timeout(g_Timeout, "Timeout");
-				auto Database2 = co_await DatabaseActor2(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
+				co_await DatabaseActor2(&ICKeyManagerServerDatabase::f_Initialize).f_Timeout(gs_Timeout, "Timeout");
+				auto Database2 = co_await DatabaseActor2(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(gs_Timeout, "Timeout");
 
 				auto fTestDatabase = [&]
 					{
@@ -737,7 +737,7 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 
 				{
 					DMibTestPath("After running");
-					Database2 = co_await DatabaseActor2(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
+					Database2 = co_await DatabaseActor2(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(gs_Timeout, "Timeout");
 					fTestDatabase();
 				}
 
@@ -747,7 +747,7 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 
 					DMibTest
 						(
-							DMibExpr(NMib::NTest::TCThrowsException<NException::CException>()) == DMibLExpr(DatabaseActor3(&ICKeyManagerServerDatabase::f_Initialize).f_CallSync(g_Timeout))
+							DMibExpr(NMib::NTest::TCThrowsException<NException::CException>()) == DMibLExpr(DatabaseActor3(&ICKeyManagerServerDatabase::f_Initialize).f_CallSync(gs_Timeout))
 						)
 					;
 				}
@@ -756,12 +756,12 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 				DMibTestPath("ChangePassword");
 
 				CStrSecure NewPassword = "Password123";
-				co_await DatabaseActor(&ICKeyManagerServerDatabase::f_ChangePassword, NewPassword, NContainer::CSecureByteVector{}).f_Timeout(g_Timeout, "Timeout");
-				co_await DatabaseActor(&ICKeyManagerServerDatabase::f_WriteDatabase, Database).f_Timeout(g_Timeout, "Timeout");
+				co_await DatabaseActor(&ICKeyManagerServerDatabase::f_ChangePassword, NewPassword, NContainer::CSecureByteVector{}).f_Timeout(gs_Timeout, "Timeout");
+				co_await DatabaseActor(&ICKeyManagerServerDatabase::f_WriteDatabase, Database).f_Timeout(gs_Timeout, "Timeout");
 
 				auto DatabaseActor2 = fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>(DatabasePath, NewPassword, NContainer::CSecureByteVector{});
-				co_await DatabaseActor2(&ICKeyManagerServerDatabase::f_Initialize).f_Timeout(g_Timeout, "Timeout");
-				auto Database2 = co_await DatabaseActor2(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
+				co_await DatabaseActor2(&ICKeyManagerServerDatabase::f_Initialize).f_Timeout(gs_Timeout, "Timeout");
+				auto Database2 = co_await DatabaseActor2(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(gs_Timeout, "Timeout");
 
 				auto fTestDatabase = [&]
 					{
@@ -787,7 +787,7 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 
 				{
 					DMibTestPath("After running");
-					Database2 = co_await DatabaseActor2(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
+					Database2 = co_await DatabaseActor2(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(gs_Timeout, "Timeout");
 					fTestDatabase();
 				}
 			}
@@ -815,7 +815,7 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 
 			auto DatabaseActor = fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>(DatabasePath, Password, NContainer::CSecureByteVector{});
 
-			co_await DatabaseActor(&ICKeyManagerServerDatabase::f_Initialize).f_Timeout(g_Timeout, "Timeout");
+			co_await DatabaseActor(&ICKeyManagerServerDatabase::f_Initialize).f_Timeout(gs_Timeout, "Timeout");
 
 			TCActor<CKeyManagerServer> KeyManagerServer = fg_ConstructActor<CKeyManagerServer>
 				(
@@ -828,14 +828,14 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 			;
 			auto AsyncDestroyServer = co_await fg_AsyncDestroy(KeyManagerServer);
 
-			co_await KeyManagerServer(&CKeyManagerServer::f_Init, g_Timeout / 2);
-			co_await KeyManagerServer(&CKeyManagerServer::f_PreCreateKeys, 32, 2).f_Timeout(g_Timeout, "Timeout");
+			co_await KeyManagerServer(&CKeyManagerServer::f_Init, gs_Timeout / 2);
+			co_await KeyManagerServer(&CKeyManagerServer::f_PreCreateKeys, 32, 2).f_Timeout(gs_Timeout, "Timeout");
 
 			CSymmetricKey AvailableKey;
 			CSymmetricKey NextKey;
 			{
 				DMibTestPath("After initial keys pre created");
-				auto Database = co_await DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
+				auto Database = co_await DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(gs_Timeout, "Timeout");
 				DMibAssert(Database.m_AvailableKeys.f_GetLen(), ==, 1);
 				DMibAssert(Database.m_AvailableKeys[32u].f_GetLen(), ==, 2);
 				AvailableKey = *Database.m_AvailableKeys[32u].f_FindLargest();
@@ -845,22 +845,22 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 			CTrustedSubscriptionTestHelper TestHelper0(Helper0TrustManager);
 			TCDistributedActor<CKeyManager> KeyManager = co_await TestHelper0.f_SubscribeAsync<CKeyManager>();
 
-			CSymmetricKey FirstKey = co_await KeyManager.f_CallActor(&CKeyManager::f_RequestKey)("TestKey0", 32).f_Timeout(g_Timeout, "Timeout");
+			CSymmetricKey FirstKey = co_await KeyManager.f_CallActor(&CKeyManager::f_RequestKey)("TestKey0", 32).f_Timeout(gs_Timeout, "Timeout");
 			DMibExpect(FirstKey, ==, NextKey);
 
 			{
 				DMibTestPath("After first key popped");
-				auto Database = co_await DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
+				auto Database = co_await DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(gs_Timeout, "Timeout");
 				DMibAssert(Database.m_AvailableKeys.f_GetLen(), ==, 1);
 				DMibAssert(Database.m_AvailableKeys[32u].f_GetLen(), ==, 1);
 				DMibExpect(*Database.m_AvailableKeys[32u].f_FindSmallest(), ==, AvailableKey);
 			}
 
-			co_await KeyManagerServer(&CKeyManagerServer::f_PreCreateKeys, 32, 2).f_Timeout(g_Timeout, "Timeout");
+			co_await KeyManagerServer(&CKeyManagerServer::f_PreCreateKeys, 32, 2).f_Timeout(gs_Timeout, "Timeout");
 
 			{
 				DMibTestPath("After second round of keys generated");
-				auto Database = co_await DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
+				auto Database = co_await DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(gs_Timeout, "Timeout");
 				DMibAssert(Database.m_AvailableKeys.f_GetLen(), ==, 1);
 				DMibAssert(Database.m_AvailableKeys[32u].f_GetLen(), ==, 2);
 				DMibExpectTrue(Database.m_AvailableKeys[32u].f_FindEqual(AvailableKey));
@@ -868,29 +868,29 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 
 			{
 				DMibTestPath("Request key not pre created");
-				CSymmetricKey NotPreCreateKey = co_await KeyManager.f_CallActor(&CKeyManager::f_RequestKey)("TestKey1", 64).f_Timeout(g_Timeout, "Timeout");
-				CSymmetricKey NotPreCreateKey2 = co_await KeyManager.f_CallActor(&CKeyManager::f_RequestKey)("TestKey2", 64).f_Timeout(g_Timeout, "Timeout");
+				CSymmetricKey NotPreCreateKey = co_await KeyManager.f_CallActor(&CKeyManager::f_RequestKey)("TestKey1", 64).f_Timeout(gs_Timeout, "Timeout");
+				CSymmetricKey NotPreCreateKey2 = co_await KeyManager.f_CallActor(&CKeyManager::f_RequestKey)("TestKey2", 64).f_Timeout(gs_Timeout, "Timeout");
 				DMibExpect(NotPreCreateKey, !=, NotPreCreateKey2);
 
-				auto Database = co_await DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
+				auto Database = co_await DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(gs_Timeout, "Timeout");
 				DMibAssert(Database.m_AvailableKeys.f_GetLen(), ==, 1);
 				DMibAssert(Database.m_AvailableKeys[32u].f_GetLen(), ==, 2);
 				DMibExpectTrue(Database.m_AvailableKeys[32u].f_FindEqual(AvailableKey));
 			}
 
-			co_await KeyManagerServer(&CKeyManagerServer::f_RemovePreCreatedKeys, 64).f_Timeout(g_Timeout, "Timeout");
+			co_await KeyManagerServer(&CKeyManagerServer::f_RemovePreCreatedKeys, 64).f_Timeout(gs_Timeout, "Timeout");
 			{
 				DMibTestPath("After removing wrong size keys");
-				auto Database = co_await DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
+				auto Database = co_await DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(gs_Timeout, "Timeout");
 				DMibAssert(Database.m_AvailableKeys.f_GetLen(), ==, 1);
 				DMibAssert(Database.m_AvailableKeys[32u].f_GetLen(), ==, 2);
 				DMibExpectTrue(Database.m_AvailableKeys[32u].f_FindEqual(AvailableKey));
 			}
 
-			co_await KeyManagerServer(&CKeyManagerServer::f_RemovePreCreatedKeys, fg_Default()).f_Timeout(g_Timeout, "Timeout");
+			co_await KeyManagerServer(&CKeyManagerServer::f_RemovePreCreatedKeys, fg_Default()).f_Timeout(gs_Timeout, "Timeout");
 			{
 				DMibTestPath("After removing keys");
-				auto Database = co_await DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
+				auto Database = co_await DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(gs_Timeout, "Timeout");
 				DMibAssert(Database.m_AvailableKeys.f_GetLen(), ==, 0);
 			}
 
@@ -898,11 +898,11 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 		};
 		DMibTestSuite("ServerSync") -> TCFuture<void>
 		{
-			for (umint i = 0; i < 1; ++i)
+			for (umint iVariant = 0; iVariant < 1; ++iVariant)
 			{
-				DMibTestPath(i == 0 ? "PreCreate Before" : "PreCreate After");
+				DMibTestPath(iVariant == 0 ? "PreCreate Before" : "PreCreate After");
 
-				auto Flags = i == 0 ? EServerSyncTestFlag::mc_None : EServerSyncTestFlag::mc_PreCreateKeysAfter;
+				auto Flags = iVariant == 0 ? EServerSyncTestFlag::mc_None : EServerSyncTestFlag::mc_PreCreateKeysAfter;
 
 				{
 					DMibTestPath("Normal");

@@ -172,14 +172,14 @@ namespace NMib::NCloud::NAppManager
 		;
 	}
 
-	static constexpr double c_InProgressWaitTimeout = 120_seconds;
+	static constexpr double gc_InProgressWaitTimeout = 120_seconds;
 
 	TCFuture<CActorSubscription> CAppManagerActor::fp_SetInProgressWithWait(TCSharedPointer<CApplication> _pApplication, CStr _Description)
 	{
 		if (_pApplication->f_IsInProgress())
 		{
 			CStopwatch WaitTime{true};
-			fp64 TimeoutTime = c_InProgressWaitTimeout;
+			fp64 TimeoutTime = gc_InProgressWaitTimeout;
 			while (_pApplication->f_IsInProgress())
 			{
 				CStr ErrorMessage = "Timed out waiting for in progress application operation to finish: {}"_f << _pApplication->f_InProgressDescription();
@@ -207,7 +207,7 @@ namespace NMib::NCloud::NAppManager
 			%= "Application has an operation '{}' that has been in progress for {}. Will wait for operation to finish for {} before timing out.\n"_f
 			<< (*pApplication)->f_InProgressDescription()
 			<< NTime::fg_SecondsDurationToHumanReadable((*pApplication)->f_InProgressTime())
-			<< NTime::fg_SecondsDurationToHumanReadable(c_InProgressWaitTimeout)
+			<< NTime::fg_SecondsDurationToHumanReadable(gc_InProgressWaitTimeout)
 		;
 	}
 

@@ -165,6 +165,7 @@ namespace NMib::NCloud
 			)
 			-> TCFuture<void>
 		{
+			// NOLINTNEXTLINE(malterlib-variable-naming): the check takes the placeholder _ for a name
 			auto [Ticket, _, _] = co_await
 				(
 					_pVersionManagerTrust->f_CallActor(&CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket)
@@ -195,6 +196,7 @@ namespace NMib::NCloud
 			)
 			-> TCFuture<void>
 		{
+			// NOLINTNEXTLINE(malterlib-variable-naming): the check takes the placeholder _ for a name
 			auto [Ticket, _, _, _, _] = co_await
 				(
 					_pCloudManagerTrust->f_CallActor(&CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket)
@@ -527,7 +529,7 @@ namespace NMib::NCloud
 		State.m_nAppManagers = _nAppManagers;
 		CProcessLaunch::fs_KillProcessesInDirectory("*", {}, State.m_RootDirectory, 10.0);
 
-		for (umint i = 0; i < 5; ++i)
+		for (umint iTry = 0; iTry < 5; ++iTry)
 		{
 			try
 			{

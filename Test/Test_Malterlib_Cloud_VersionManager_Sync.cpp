@@ -798,14 +798,14 @@ namespace NVersionManagerSyncTests
 				{
 					DMibTestPath("SyncMultipleVersions");
 
-					for (umint i = 0; i < 3; ++i)
+					for (umint iVersion = 0; iVersion < 3; ++iVersion)
 					{
-						DMibTestPath("{}"_f << i);
+						DMibTestPath("{}"_f << iVersion);
 
 						CVersionManager::CVersionIDAndPlatform VersionID;
 						VersionID.m_VersionID.m_Branch = SourceState.m_PackageInfo.m_VersionID.m_VersionID.m_Branch;
 						VersionID.m_VersionID.m_Major = 3;
-						VersionID.m_VersionID.m_Minor = (uint32)i;
+						VersionID.m_VersionID.m_Minor = (uint32)iVersion;
 						VersionID.m_VersionID.m_Revision = 0;
 						VersionID.m_Platform = SourceState.m_PackageInfo.m_VersionID.m_Platform;
 
@@ -1603,12 +1603,12 @@ namespace NVersionManagerSyncTests
 					TCFutureVector<CVersionManagerHelper::CUploadResult> UploadFutures;
 
 					// Upload 5 versions rapidly
-					for (umint i = 0; i < 5; ++i)
+					for (umint iVersion = 0; iVersion < 5; ++iVersion)
 					{
 						CVersionManager::CVersionIDAndPlatform VersionID;
 						VersionID.m_VersionID.m_Branch = SourceState.m_PackageInfo.m_VersionID.m_VersionID.m_Branch;
 						VersionID.m_VersionID.m_Major = 8;
-						VersionID.m_VersionID.m_Minor = (uint32)i;
+						VersionID.m_VersionID.m_Minor = (uint32)iVersion;
 						VersionID.m_VersionID.m_Revision = 0;
 						VersionID.m_Platform = SourceState.m_PackageInfo.m_VersionID.m_Platform;
 
@@ -1625,14 +1625,14 @@ namespace NVersionManagerSyncTests
 					DMibAssertNoException(UploadResults.f_Access());
 
 					// Verify all versions synced to destination (sync completes when uploads return)
-					for (umint i = 0; i < 5; ++i)
+					for (umint iVersion = 0; iVersion < 5; ++iVersion)
 					{
-						DMibTestPath("{}"_f << i);
+						DMibTestPath("{}"_f << iVersion);
 
 						CVersionManager::CVersionIDAndPlatform VersionID;
 						VersionID.m_VersionID.m_Branch = SourceState.m_PackageInfo.m_VersionID.m_VersionID.m_Branch;
 						VersionID.m_VersionID.m_Major = 8;
-						VersionID.m_VersionID.m_Minor = (uint32)i;
+						VersionID.m_VersionID.m_Minor = (uint32)iVersion;
 						VersionID.m_VersionID.m_Revision = 0;
 						VersionID.m_Platform = SourceState.m_PackageInfo.m_VersionID.m_Platform;
 

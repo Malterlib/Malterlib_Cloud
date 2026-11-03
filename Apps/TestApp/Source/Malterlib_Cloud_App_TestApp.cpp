@@ -92,7 +92,7 @@ namespace NMib::NCloud::NTest
 					umint nReadings = _Params["NumReadings"].f_Integer();
 
 					TCVector<CDistributedAppSensorReporter::CSensorReading> Readings;
-					for (umint i = 0; i < nReadings; ++i)
+					for (umint iReading = 0; iReading < nReadings; ++iReading)
 					{
 						CDistributedAppSensorReporter::CSensorReading SensorReading;
 						if (bIsVersion)
@@ -109,7 +109,7 @@ namespace NMib::NCloud::NTest
 							{
 								Version.m_Major = 13;
 								Version.m_Minor = 3;
-								Version.m_Revision = i;
+								Version.m_Revision = iReading;
 							}
 							SensorReading.m_Data = fg_Move(Version);
 						}
@@ -118,7 +118,7 @@ namespace NMib::NCloud::NTest
 							if (bRandomValues)
 								SensorReading.m_Data = fg_GetRandomFloat().f_Pow(10) * 1024.0 * 1024.0 * 1024.0 * 1024.0 * 1024.0;
 							else
-								SensorReading.m_Data = fp64(i);
+								SensorReading.m_Data = fp64(iReading);
 						}
 						Readings.f_Insert(fg_Move(SensorReading));
 					}
@@ -217,10 +217,10 @@ namespace NMib::NCloud::NTest
 
 					TCVector<CDistributedAppLogReporter::CLogEntry> LogEntries;
 
-					for (umint i = 0; i < nEntries; ++i)
+					for (umint iEntry = 0; iEntry < nEntries; ++iEntry)
 					{
 						CDistributedAppLogReporter::CLogEntry LogEntry;
-						LogEntry.m_Data.m_Message = "Test Log {}"_f << i;
+						LogEntry.m_Data.m_Message = "Test Log {}"_f << iEntry;
 						LogEntries.f_Insert(fg_Move(LogEntry));
 					}
 
@@ -263,12 +263,12 @@ namespace NMib::NCloud::NTest
 
 					auto Auditor = mp_State.f_Auditor();
 
-					for (umint i = 0; i < nEntries; ++i)
+					for (umint iEntry = 0; iEntry < nEntries; ++iEntry)
 					{
 						if (bError)
-							Auditor.f_Error("Test Log {}"_f << i);
+							Auditor.f_Error("Test Log {}"_f << iEntry);
 						else
-							Auditor.f_Info("Test Log {}"_f << i);
+							Auditor.f_Info("Test Log {}"_f << iEntry);
 					}
 
 					co_return 0;
@@ -351,7 +351,7 @@ namespace NMib::NCloud::NTest
 
 					TCVector<CDistributedAppLogReporter::CLogEntry> LogEntries;
 
-					for (umint i = 0; i < nEntries; ++i)
+					for (umint iEntry = 0; iEntry < nEntries; ++iEntry)
 					{
 						CDistributedAppLogReporter::CLogEntry LogEntry;
 						for (umint iData = 0; iData < EntrySize;)

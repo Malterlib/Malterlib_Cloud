@@ -21,7 +21,7 @@ namespace NMib::NCloud::NCloudManagerDatabase
 
 		CEJsonSorted f_ToJson() const;
 
-		static CStr const mc_Prefix;
+		static CStr const mc_Prefix; // NOLINT(malterlib-variable-naming): defined constexpr in the .cpp, which the check doesn't see from here
 
 		CStr m_Prefix = mc_Prefix;
 	};
@@ -48,7 +48,7 @@ namespace NMib::NCloud::NCloudManagerDatabase
 
 		CEJsonSorted f_ToJson() const;
 
-		static CStr const mc_Prefix;
+		static CStr const mc_Prefix; // NOLINT(malterlib-variable-naming): defined constexpr in the .cpp, which the check doesn't see from here
 
 		CStr m_Prefix = mc_Prefix;
 		CStr m_HostID;
@@ -80,7 +80,7 @@ namespace NMib::NCloud::NCloudManagerDatabase
 
 		CEJsonSorted f_ToJson() const;
 
-		static CStr const mc_Prefix;
+		static CStr const mc_Prefix; // NOLINT(malterlib-variable-naming): defined constexpr in the .cpp, which the check doesn't see from here
 
 		CStr m_Prefix = mc_Prefix;
 		CStr m_AppManagerHostID;
@@ -104,7 +104,7 @@ namespace NMib::NCloud::NCloudManagerDatabase
 		{
 		}
 
-		static CStr const mc_Prefix;
+		static CStr const mc_Prefix; // NOLINT(malterlib-variable-naming): defined constexpr in the .cpp, which the check doesn't see from here
 	};
 
 	struct CApplicationUpdateStateStage
@@ -144,7 +144,7 @@ namespace NMib::NCloud::NCloudManagerDatabase
 		CSensorKey f_SensorKey() const &;
 		CSensorKey f_SensorKey() &&;
 
-		static NStr::CStr const mc_Prefix;
+		static NStr::CStr const mc_Prefix; // NOLINT(malterlib-variable-naming): defined constexpr in the .cpp, which the check doesn't see from here
 	};
 
 	struct CSensorNotificationStateNotificationStatus
@@ -193,7 +193,7 @@ namespace NMib::NCloud::NCloudManagerDatabase
 
 		CEJsonSorted f_ToJson() const;
 
-		static CStr const mc_Prefix;
+		static CStr const mc_Prefix; // NOLINT(malterlib-variable-naming): defined constexpr in the .cpp, which the check doesn't see from here
 
 		CStr m_Prefix = mc_Prefix;
 		CStr m_OsName;

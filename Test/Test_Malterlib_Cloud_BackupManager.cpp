@@ -35,7 +35,7 @@ using namespace NMib::NTime;
 using namespace NMib::NNetwork;
 using namespace NMib::NTest;
 
-static fp64 g_Timeout = NSys::fg_System_BeingDebugged() ? 600.0 : 60.0 * gc_TimeoutMultiplier;
+static fp64 gs_Timeout = NSys::fg_System_BeingDebugged() ? 600.0 : 60.0 * gc_TimeoutMultiplier;
 
 struct CBackupManager_Tests : public NMib::NTest::CTest
 {
@@ -188,7 +188,7 @@ struct CBackupManager_Tests : public NMib::NTest::CTest
 				if constexpr (tf_Notification == CBackupManagerClient::ENotification_None)
 					return;
 
-				if (f_Wait(g_Timeout / 2.0))
+				if (f_Wait(gs_Timeout / 2.0))
 					DMibError("Timed out waiting for backup notification. Other notifications {vs}"_f << o_OtherNotifications.m_Notifications);
 			}
 		}
@@ -214,13 +214,13 @@ struct CBackupManager_Tests : public NMib::NTest::CTest
 		~CBackupClientHelper()
 		{
 			if (m_BackupInterface)
-				m_BackupInterface.f_Destroy().f_CallSync(m_pRunLoop, g_Timeout);
+				m_BackupInterface.f_Destroy().f_CallSync(m_pRunLoop, gs_Timeout);
 
 			if (m_ChangeSubscription)
-				m_ChangeSubscription->f_Destroy().f_CallSync(m_pRunLoop, g_Timeout);
+				m_ChangeSubscription->f_Destroy().f_CallSync(m_pRunLoop, gs_Timeout);
 
 			if (m_BackupClient)
-				fg_Move(m_BackupClient).f_Destroy().f_CallSync(m_pRunLoop, g_Timeout);
+				fg_Move(m_BackupClient).f_Destroy().f_CallSync(m_pRunLoop, gs_Timeout);
 		}
 
 		template <CBackupManagerClient::ENotification tf_Notification>
@@ -325,10 +325,10 @@ struct CBackupManager_Tests : public NMib::NTest::CTest
 						co_return {};
 					}
 				)
-				.f_CallSync(m_pRunLoop, g_Timeout)
+				.f_CallSync(m_pRunLoop, gs_Timeout)
 			;
-			m_BackupClient(&CBackupManagerClient::f_StartBackup).f_CallSync(m_pRunLoop, g_Timeout);
-			ReceivedManifestFinished.f_MoveFuture().f_CallSync(m_pRunLoop, g_Timeout);
+			m_BackupClient(&CBackupManagerClient::f_StartBackup).f_CallSync(m_pRunLoop, gs_Timeout);
+			ReceivedManifestFinished.f_MoveFuture().f_CallSync(m_pRunLoop, gs_Timeout);
 
 			m_BackupInterface = fg_Move(*pBackupInterface);
 
@@ -344,8 +344,8 @@ struct CBackupManager_Tests : public NMib::NTest::CTest
 			umint BufferSize = fg_AlignUp(_Size, 4);
 			Data.f_SetLen(BufferSize);
 
-			for (umint i = 0; i < BufferSize; i += 4)
-				*((uint32 *)(Data.f_GetArray() + i)) = NMisc::fg_GetRandomUnsigned();
+			for (umint iByte = 0; iByte < BufferSize; iByte += 4)
+				*((uint32 *)(Data.f_GetArray() + iByte)) = NMisc::fg_GetRandomUnsigned();
 
 			Data.f_SetLen(_Size);
 
@@ -405,7 +405,7 @@ struct CBackupManager_Tests : public NMib::NTest::CTest
 			DMibCloudBackupManagerDebugOut("Rename file      {} -> {}\n", _FromName, _ToName);
 
 #ifdef DPlatformFamily_Windows
-			for (umint i = 0; i < 200; ++i)
+			for (umint iAttempt = 0; iAttempt < 200; ++iAttempt)
 			{
 				try
 				{
@@ -414,7 +414,7 @@ struct CBackupManager_Tests : public NMib::NTest::CTest
 				}
 				catch (CExceptionFile const &)
 				{
-					if (i == 199)
+					if (iAttempt == 199)
 						throw;
 					else
 						NSys::fg_Thread_Sleep(0.01f);
@@ -479,8 +479,8 @@ struct CBackupManager_Tests : public NMib::NTest::CTest
 			umint BufferSize = fg_AlignUp(_Size, 4);
 			Data.f_SetLen(BufferSize);
 
-			for (umint i = 0; i < BufferSize; i += 4)
-				*((uint32 *)(Data.f_GetArray() + i)) = NMisc::fg_GetRandomUnsigned();
+			for (umint iByte = 0; iByte < BufferSize; iByte += 4)
+				*((uint32 *)(Data.f_GetArray() + iByte)) = NMisc::fg_GetRandomUnsigned();
 
 			Data.f_SetLen(_Size);
 
@@ -550,22 +550,22 @@ private:
 			}
 		;
 
-		CStr TestHostID = TrustManager(&CDistributedActorTrustManager::f_GetHostID).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+		CStr TestHostID = TrustManager(&CDistributedActorTrustManager::f_GetHostID).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
 		CTrustedSubscriptionTestHelper Subscriptions{TrustManager};
 
 		CDistributedActorTrustManager_Address ServerAddress;
 
 		ServerAddress.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath(RootDirectory / "controller.sock");
-		TrustManager(&CDistributedActorTrustManager::f_AddListen, ServerAddress, 0).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+		TrustManager(&CDistributedActorTrustManager::f_AddListen, ServerAddress, 0).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
 
 		CDistributedApp_LaunchHelperDependencies Dependencies;
 		Dependencies.m_Address = ServerAddress.m_URL;
 		Dependencies.m_TrustManager = TrustManager;
-		Dependencies.m_DistributionManager = TrustManager(&CDistributedActorTrustManager::f_GetDistributionManager).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+		Dependencies.m_DistributionManager = TrustManager(&CDistributedActorTrustManager::f_GetDistributionManager).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
 
 		NMib::NConcurrency::CDistributedActorSecurity Security;
 		Security.m_AllowedIncomingConnectionNamespaces.f_Insert(CBackupManager::mc_pDefaultNamespace);
-		Dependencies.m_DistributionManager(&CActorDistributionManager::f_SetSecurity, Security).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+		Dependencies.m_DistributionManager(&CActorDistributionManager::f_SetSecurity, Security).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
 
 		TCActor<CDistributedApp_LaunchHelper> LaunchHelper = fg_ConstructActor<CDistributedApp_LaunchHelper>(Dependencies, !!(fg_TestReportFlags() & ETestReportFlag_EnableLogs));
 		auto Cleanup = g_OnScopeExit / [&]
@@ -583,14 +583,14 @@ private:
 		umint nBackupManagers = 1;
 		{
 			TCFutureVector<void> BackupManagerLaunchesResults;
-			for (umint i = 0; i < nBackupManagers; ++i)
+			for (umint iBackupManager = 0; iBackupManager < nBackupManagers; ++iBackupManager)
 			{
 				auto BlockingActorCheckout = fg_BlockingActor();
 				auto BlockingActor = BlockingActorCheckout.f_Actor();
 
 				g_Dispatch(BlockingActor) / [=, BlockingActorCheckout = fg_Move(BlockingActorCheckout)]
 					{
-						CStr BackupManagerName = "BackupManager{sf0,sl2}"_f << i;
+						CStr BackupManagerName = "BackupManager{sf0,sl2}"_f << iBackupManager;
 						CStr BackupManagerDirectory = RootDirectory + "/" + BackupManagerName;
 						CFile::fs_CreateDirectory(BackupManagerDirectory);
 						//CFile::fs_DiffCopyFileOrDirectory(ProgramDirectory + "/TestApps/BackupManager", BackupManagerDirectory, nullptr);
@@ -610,9 +610,9 @@ private:
 				BackupManagerLaunches.f_Clear();
 				BackupManagerLaunchesResults = {};
 
-				for (umint i = 0; i < nBackupManagers; ++i)
+				for (umint iBackupManager = 0; iBackupManager < nBackupManagers; ++iBackupManager)
 				{
-					CStr BackupManagerName = "BackupManager{sf0,sl2}"_f << i;
+					CStr BackupManagerName = "BackupManager{sf0,sl2}"_f << iBackupManager;
 					CStr BackupManagerDirectory = RootDirectory + "/" + BackupManagerName;
 					LaunchHelper
 						(
@@ -625,7 +625,7 @@ private:
 						> BackupManagerLaunchesResults
 					;
 				}
-				for (auto &LaunchResult : fg_AllDoneWrapped(BackupManagerLaunchesResults).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout))
+				for (auto &LaunchResult : fg_AllDoneWrapped(BackupManagerLaunchesResults).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout))
 					BackupManagerLaunches.f_Insert(fg_Move(*LaunchResult));
 			}
 		;
@@ -667,7 +667,7 @@ private:
 					;
 					++iBackupManager;
 				}
-				fg_CombineResults(fg_AllDoneWrapped(ListenResults).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout));
+				fg_CombineResults(fg_AllDoneWrapped(ListenResults).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout));
 			}
 		;
 		fSetupListen();
@@ -711,7 +711,7 @@ private:
 					{
 						auto &BackupManagerTrustInner = *pBackupManagerTrustInner;
 						BackupManagerTrustInner.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)
-							(CDistributedActorTrustManagerInterface::CAddClientConnection{.m_TrustTicket = _Ticket.m_Ticket, .m_Timeout = g_Timeout})
+							(CDistributedActorTrustManagerInterface::CAddClientConnection{.m_TrustTicket = _Ticket.m_Ticket, .m_Timeout = gs_Timeout})
 							> Promise.f_ReceiveAny()
 						;
 					}
@@ -720,7 +720,7 @@ private:
 			}
 		}
 
-		fg_AllDoneWrapped(SetupTrustResults).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+		fg_AllDoneWrapped(SetupTrustResults).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
 
 		{
 			CTrustedSubscriptionTestHelper Subscriptions{TrustManager};
@@ -1635,9 +1635,9 @@ private:
 
 				CDistributedAppInterfaceBackup::CManifestConfig ExtraManifestConfig;
 				ExtraManifestConfig.m_IncludeWildcards = {{"Dir1/^*", {}}};
-				BackupHelper.m_BackupInterface.f_CallActor(&CDistributedAppInterfaceBackup::f_AppendManifest)(ExtraManifestConfig).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+				BackupHelper.m_BackupInterface.f_CallActor(&CDistributedAppInterfaceBackup::f_AppendManifest)(ExtraManifestConfig).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
 
-				BackupFinishedSubscription->f_Destroy().f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+				BackupFinishedSubscription->f_Destroy().f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
 
 				COtherNotifications AppendManifestNotifications;
 				DMibTestMark;
@@ -1671,7 +1671,7 @@ private:
 				DMibTestPath("Downloads");
 				CBackupClientHelper BackupHelper{TestBackupDirectory, RunLoopHelper.m_pRunLoop};
 
-				auto BackupSources = BackupManager.f_CallActor(&CBackupManager::f_ListBackupSources)().f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+				auto BackupSources = BackupManager.f_CallActor(&CBackupManager::f_ListBackupSources)().f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
 
 				DMibAssert(BackupSources.f_GetLen(), ==, 1);
 
@@ -1683,7 +1683,7 @@ private:
 				CActorSubscription Subscription;
 				auto DownloadResult = fg_CurrentActor()
 					.f_Bind<fg_DownloadBackup>(BackupManager, BackupSources[0], CTime{}, fg_Move(Receive), fg_Reference(Subscription))
-					.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
+					.f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout)
 				;
 
 				DMibExpectTrue(BackupHelper.f_FileIsSame(TestDownloadDirectory, "Dir1/File1"));
@@ -1786,7 +1786,7 @@ private:
 
 				umint nRandomTests = 2000;
 
-				for (umint i = 0; i < nRandomTests; ++i)
+				for (umint iTest = 0; iTest < nRandomTests; ++iTest)
 				{
 					switch (Random.f_GetValue(26u))
 					{
@@ -1929,7 +1929,7 @@ private:
 					}
 				}
 
-				g_Timeout = nRandomTests * gc_TimeoutMultiplier;
+				gs_Timeout = nRandomTests * gc_TimeoutMultiplier;
 
 				COtherNotifications ActionNotifications;
 				DMibTestMark;

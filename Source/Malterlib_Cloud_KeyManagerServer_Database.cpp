@@ -50,7 +50,7 @@ namespace NMib::NCloud
 		NContainer::TCSet<CSymmetricKey> GeneratedKeys;
 
 		umint nKeysToAdd = _nKeys - CurrentKeys.f_GetLen();
-		for (umint i = 0; i < nKeysToAdd; ++i)
+		for (umint iKey = 0; iKey < nKeysToAdd; ++iKey)
 		{
 			CSymmetricKey ToAdd;
 			ToAdd.f_SetLen(_KeySize);

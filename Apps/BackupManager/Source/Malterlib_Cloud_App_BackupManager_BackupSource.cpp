@@ -304,7 +304,7 @@ namespace NMib::NCloud::NBackupManager
 				}
 
 #ifdef DPlatformFamily_Windows
-				for (umint i = 0; i < 200; ++i)
+				for (umint iAttempt = 0; iAttempt < 200; ++iAttempt)
 				{
 					try
 					{
@@ -322,7 +322,7 @@ namespace NMib::NCloud::NBackupManager
 						}
 						catch (CExceptionFile const &)
 						{
-							if (i == 199)
+							if (iAttempt == 199)
 								throw;
 							NSys::fg_Thread_Sleep(0.01f);
 						}

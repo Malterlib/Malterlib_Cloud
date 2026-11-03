@@ -21,7 +21,7 @@ namespace NMib::NCloud::NVersionManagerDatabase
 
 		NEncoding::CEJsonSorted f_ToJson() const;
 
-		static NStr::CStr const mc_Prefix;
+		static NStr::CStr const mc_Prefix; // NOLINT(malterlib-variable-naming): defined constexpr in the .cpp, which the check doesn't see from here
 
 		NStr::CStr m_Prefix = mc_Prefix;
 		NStr::CStr m_Application;

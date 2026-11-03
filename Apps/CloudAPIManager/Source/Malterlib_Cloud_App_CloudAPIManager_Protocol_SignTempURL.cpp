@@ -61,8 +61,8 @@ namespace NMib::NCloud::NCloudAPIManager
 
 					aint ValidTimeInSeconds = 60 * 60;
 
-					NTime::CTime EpochStart = NTime::CTimeConvert::fs_CreateTime(1970, 1, 1);
-					NTime::CTimeSpan TimeSinceEpoch = CTime::fs_NowUTC() - EpochStart;
+					static constexpr NTime::CTime c_EpochStart = NTime::CTimeConvert::fs_CreateTimeConstExpr(1970, 1, 1);
+					NTime::CTimeSpan TimeSinceEpoch = CTime::fs_NowUTC() - c_EpochStart;
 
 					int64 Expires = (TimeSinceEpoch.f_GetSeconds() + ValidTimeInSeconds) * constant_int64(1000);
 

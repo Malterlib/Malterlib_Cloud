@@ -7,7 +7,7 @@
 #	include <Windows.h>
 #endif
 
-static fp64 g_Timeout = 120.0 * NMib::NTest::gc_TimeoutMultiplier;
+static fp64 gs_Timeout = 120.0 * NMib::NTest::gc_TimeoutMultiplier;
 
 struct CAppManager_DistributedLog_Tests : public NMib::NTest::CTest
 {
@@ -23,7 +23,7 @@ private:
 			if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
 				Options |= CAppManagerTestHelper::EOption_EnableOtherOutput;
 
-			CAppManagerTestHelper AppManagerTestHelper("AppManagerDistributedLogTests", Options, g_Timeout);
+			CAppManagerTestHelper AppManagerTestHelper("AppManagerDistributedLogTests", Options, gs_Timeout);
 
 			auto AsyncDestroy = co_await fg_AsyncDestroy(AppManagerTestHelper);
 
@@ -339,7 +339,7 @@ private:
 		if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
 			Options |= CAppManagerTestHelper::EOption_EnableOtherOutput;
 
-		CAppManagerTestHelper AppManagerTestHelper("AppManagerDistributedLogTests{}"_f << _Name, Options, g_Timeout);
+		CAppManagerTestHelper AppManagerTestHelper("AppManagerDistributedLogTests{}"_f << _Name, Options, gs_Timeout);
 		auto AsyncDestroy = co_await fg_AsyncDestroy(AppManagerTestHelper);
 
 		co_await AppManagerTestHelper.f_Setup(1);
@@ -405,7 +405,7 @@ private:
 
 				co_await fg_Timeout(0.1);
 
-				if (Stopwatch.f_GetTime() > g_Timeout)
+				if (Stopwatch.f_GetTime() > gs_Timeout)
 					co_return DMibErrorInstance("Timeout waiting for cloud manager to be fully started");
 			}
 		}

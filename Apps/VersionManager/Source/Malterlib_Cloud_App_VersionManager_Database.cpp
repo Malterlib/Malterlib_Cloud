@@ -309,9 +309,9 @@ namespace NMib::NCloud::NVersionManager
 
 									Versions[VersionID] = fg_Move(OutVersion);
 								}
-								catch (NException::CException const &Exception)
+								catch (NException::CException const &_Exception)
 								{
-									DLogWithCategory(Malterlib/Cloud/VersionManager, Error, "Internal error reading version info: {}", Exception.f_GetErrorStr());
+									DLogWithCategory(Malterlib/Cloud/VersionManager, Error, "Internal error reading version info: {}", _Exception.f_GetErrorStr());
 								}
 							}
 						}

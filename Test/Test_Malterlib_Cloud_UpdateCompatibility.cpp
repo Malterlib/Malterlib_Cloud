@@ -51,8 +51,8 @@ using namespace NMib::NTime;
 
 #define DTestUpdateCompatibilityEnableOtherOutput 0
 
-static fp64 g_Timeout = 2_minutes * gc_TimeoutMultiplier;
-static uint32 g_CompressionLevel = 4;
+static fp64 gs_Timeout = 2_minutes * gc_TimeoutMultiplier;
+static uint32 gs_CompressionLevel = 4;
 
 static constexpr ch8 const *gc_AccessDeniedErrorMessage
 	= "Failed to download application from version manager: Failed to download the application from any manager: Failed to start download on remote server: Access denied"
@@ -97,6 +97,7 @@ namespace
 
 struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 {
+private:
 	static auto constexpr mcp_WaitForSubscriptions = EDistributedActorTrustManagerOrderingFlag_WaitForSubscriptions;
 
 	struct CPackageOptions
@@ -277,8 +278,8 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				}
 			;
 
-			auto LaunchSubscription = co_await LaunchActor(&CProcessLaunchActor::f_Launch, SimpleLaunch, fg_ThisActor(this)).f_Timeout(g_Timeout, "Timed out");
-			co_await LaunchFinished.f_MoveFuture().f_Timeout(g_Timeout, "Timed out");
+			auto LaunchSubscription = co_await LaunchActor(&CProcessLaunchActor::f_Launch, SimpleLaunch, fg_ThisActor(this)).f_Timeout(gs_Timeout, "Timed out");
+			co_await LaunchFinished.f_MoveFuture().f_Timeout(gs_Timeout, "Timed out");
 
 			co_return {};
 		}
@@ -309,7 +310,6 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		TCVector<TCPromise<void>> mp_WaitForProvide;
 	};
 
-private:
 	void fp_RunUpgradeTests(CStr const &_AppManagerPackage, CStr const &_VersionManagerPackage, CStr const &_KeyManagerPackage, CStr const &_UniqueName)
 	{
 		auto fPermissions = [](auto &&_HostID, auto &&_Permissions)
@@ -335,7 +335,7 @@ private:
 
 		CProcessLaunch::fs_KillProcessesInDirectory("*", {}, RootDirectory, 0.5);
 
-		for (umint i = 0; i < 5; ++i)
+		for (umint iTry = 0; iTry < 5; ++iTry)
 		{
 			try
 			{
@@ -364,7 +364,7 @@ private:
 			}
 		;
 
-		LogForwarder(&CDistributedAppLogForwarder::f_StartMonitoring).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+		LogForwarder(&CDistributedAppLogForwarder::f_StartMonitoring).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
 
 		CStr KeyManagerDir = RootDirectory / "KeyManager";
 		CStr VersionManagerDir = RootDirectory / "VersionManager";
@@ -464,23 +464,23 @@ private:
 			}
 		;
 
-		CStr TestHostID = TrustManager(&CDistributedActorTrustManager::f_GetHostID).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
-		CTrustedSubscriptionTestHelper Subscriptions{TrustManager, g_Timeout};
+		CStr TestHostID = TrustManager(&CDistributedActorTrustManager::f_GetHostID).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
+		CTrustedSubscriptionTestHelper Subscriptions{TrustManager, gs_Timeout};
 
 		CDistributedActorTrustManager_Address ServerAddress;
 
 		ServerAddress.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath("{}/controller.sock"_f << RootDirectory);
-		TrustManager(&CDistributedActorTrustManager::f_AddListen, ServerAddress, 0).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+		TrustManager(&CDistributedActorTrustManager::f_AddListen, ServerAddress, 0).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
 
 		CDistributedApp_LaunchHelperDependencies Dependencies;
 		Dependencies.m_Address = ServerAddress.m_URL;
 		Dependencies.m_TrustManager = TrustManager;
-		Dependencies.m_DistributionManager = TrustManager(&CDistributedActorTrustManager::f_GetDistributionManager).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+		Dependencies.m_DistributionManager = TrustManager(&CDistributedActorTrustManager::f_GetDistributionManager).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
 
 		NMib::NConcurrency::CDistributedActorSecurity Security;
 		Security.m_AllowedIncomingConnectionNamespaces.f_Insert(CVersionManager::mc_pDefaultNamespace);
 		Security.m_AllowedIncomingConnectionNamespaces.f_Insert(CAppManagerInterface::mc_pDefaultNamespace);
-		Dependencies.m_DistributionManager(&CActorDistributionManager::f_SetSecurity, Security).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+		Dependencies.m_DistributionManager(&CActorDistributionManager::f_SetSecurity, Security).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
 
 		TCActor<CDistributedApp_LaunchHelper> LaunchHelper = fg_ConstructActor<CDistributedApp_LaunchHelper>(Dependencies, DTestUpdateCompatibilityEnableOtherOutput);
 
@@ -530,7 +530,7 @@ private:
 				Environment["MalterlibAppManagerAutoUpdateDelay"] = "0.001";
 
 				return LaunchHelper(&CDistributedApp_LaunchHelper::f_LaunchWithParams, "AppManager_{}"_f << _Name, _Dir / "AppManager", fg_Move(ExtraParams), fg_Move(Environment))
-					.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
+					.f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout)
 				;
 			}
 		;
@@ -585,17 +585,17 @@ private:
 				Address.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath("{}/appmanager.sock"_f << _Directory);
 				_LaunchInfo.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)
 					(CDistributedActorTrustManagerInterface::CAddListen{.m_Address = Address})
-					.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
+					.f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout)
 				;
 				TrustManager.f_CallActor(&CDistributedActorTrustManager::f_AllowHostsForNamespace)
 					(CAppManagerInterface::mc_pDefaultNamespace, fg_CreateSet<CStr>(_LaunchInfo.m_HostID), mcp_WaitForSubscriptions)
-					.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
+					.f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout)
 				;
 				try
 				{
 					_LaunchInfo.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
 						(fPermissions(TestHostID, fg_CreateMap<CStr, CPermissionRequirements>("AppManager/VersionAppAll", "AppManager/CommandAll", "AppManager/AppAll")))
-						.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
+						.f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout)
 					;
 				}
 				catch (CException const &_Exception)
@@ -698,7 +698,7 @@ private:
 				CStopwatch Stopwatch{true};
 				CStr LastError;
 
-				while (Stopwatch.f_GetTime() < g_Timeout)
+				while (Stopwatch.f_GetTime() < gs_Timeout)
 				{
 					try
 					{
@@ -738,7 +738,7 @@ private:
 				fProvideKeyManagerPasswordIfNeeded();
 				{
 					DMibLogWithCategory(Test, Info, "Wait For Password Provide");
-					fg_Move(PasswordProvidedFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+					fg_Move(PasswordProvidedFuture).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
 				}
 
 				fAddListen(KeyManagerExecutable, true);
@@ -767,7 +767,7 @@ private:
 					DMibLogWithCategory(Test, Info, "Allow Hosts");
 					_AppManager.m_LaunchInfo.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace)
 						(fg_Move(Hosts))
-						.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
+						.f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout)
 					;
 				}
 
@@ -777,8 +777,8 @@ private:
 					{
 						DMibLogWithCategory(Test, Info, "Add Client Connection");
 						_AppManager.m_LaunchInfo.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)
-							(CDistributedActorTrustManagerInterface::CAddClientConnection{.m_TrustTicket = Ticket, .m_Timeout = g_Timeout})
-							.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
+							(CDistributedActorTrustManagerInterface::CAddClientConnection{.m_TrustTicket = Ticket, .m_Timeout = gs_Timeout})
+							.f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout)
 						;
 					}
 				}
@@ -806,7 +806,7 @@ private:
 
 					TrustManager.f_CallActor(&CDistributedActorTrustManager::f_AllowHostsForNamespace)
 						(CVersionManager::mc_pDefaultNamespace, fg_CreateSet<CStr>(VersionManagerHostID), mcp_WaitForSubscriptions)
-						.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
+						.f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout)
 					;
 				}
 
@@ -823,7 +823,7 @@ private:
 					auto Ticket = CDistributedActorTrustManager::CTrustTicket::fs_FromStringTicket(fGenerateTicket(VersionManagerExecutable));
 					{
 						DMibLogWithCategory(Test, Info, "Add Client Connection");
-						TrustManager.f_CallActor(&CDistributedActorTrustManager::f_AddClientConnection)(Ticket, g_Timeout, -1, 0).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+						TrustManager.f_CallActor(&CDistributedActorTrustManager::f_AddClientConnection)(Ticket, gs_Timeout, -1, 0).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
 					}
 				}
 
@@ -878,9 +878,9 @@ private:
 				DMibLogWithCategory(Test, Info, "Wait Version Available ({}, {})", CFile::fs_GetFile(_AppManager.m_RootPath), _Application);
 
 				CStopwatch Stopwatch{true};
-				while (_AppManager.m_AppManager.f_CallActor(&CAppManagerInterface::f_GetAvailableVersions)(_Application).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout).f_IsEmpty())
+				while (_AppManager.m_AppManager.f_CallActor(&CAppManagerInterface::f_GetAvailableVersions)(_Application).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout).f_IsEmpty())
 				{
-					if (Stopwatch.f_GetTime() > g_Timeout)
+					if (Stopwatch.f_GetTime() > gs_Timeout)
 						DMibError("Timed out waiting for version manager application to become available in AppManager");
 					RunLoopHelper.m_pRunLoop->f_Sleep(0.01f);
 				}
@@ -905,7 +905,7 @@ private:
 					DMibLogWithCategory(Test, Info, "Add");
 					_AppManager.m_AppManager.f_CallActor(&CAppManagerInterface::f_Add)
 						("SelfUpdate", fg_Move(Add), fg_Move(ApplicationSettings))
-						.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
+						.f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout)
 					;
 				}
 			}
@@ -929,7 +929,7 @@ private:
 					DMibLogWithCategory(Test, Info, "Add");
 					_AppManager.m_AppManager.f_CallActor(&CAppManagerInterface::f_Add)
 						(_Application, fg_Move(Add), fg_Move(ApplicationSettings))
-						.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
+						.f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout)
 					;
 				}
 			}
@@ -970,7 +970,7 @@ private:
 
 				CFile::fs_CreateDirectory(CFile::fs_GetPath(AppArchive));
 
-				auto PackageInfo = co_await VersionManagerHelper.f_CreatePackage(SourceTempPath, AppArchive, g_CompressionLevel);
+				auto PackageInfo = co_await VersionManagerHelper.f_CreatePackage(SourceTempPath, AppArchive, gs_CompressionLevel);
 
 				PackageInfo.m_VersionInfo.m_Tags = _Tags;
 				auto Flags = CVersionManager::CStartUploadVersion::EFlag_ForceOverwrite;
@@ -984,7 +984,7 @@ private:
 
 		auto fTagApp = [&](CStr _Name, CVersionManagerHelper::CPackageInfo _PackageInfo, TCSet<CStr> _Tags) -> TCUnsafeFuture<void>
 			{
-				for (umint i = 0; i < 3; ++i)
+				for (umint iTry = 0; iTry < 3; ++iTry)
 				{
 					DMibLogWithCategory(Test, Info, "Tag App ({})", _Name);
 					CVersionManager::CChangeTags ChangeTags;
@@ -992,12 +992,12 @@ private:
 					ChangeTags.m_Application = _Name;
 					ChangeTags.m_VersionID = _PackageInfo.m_VersionID.m_VersionID;
 
-					auto Result = co_await VersionManager.f_CallActor(&CVersionManager::f_ChangeTags)(fg_Move(ChangeTags)).f_Timeout(g_Timeout, "Timed out tagging app").f_Wrap();
+					auto Result = co_await VersionManager.f_CallActor(&CVersionManager::f_ChangeTags)(fg_Move(ChangeTags)).f_Timeout(gs_Timeout, "Timed out tagging app").f_Wrap();
 
 					if (Result)
 						co_return {};
 
-					if (i == 2)
+					if (iTry == 2)
 						co_return Result.f_GetException(); // Throw the last exception
 
 					DMibLogWithCategory(Test, Info, "Tag App ({}) failed, resubscribing...", _Name);
@@ -1031,7 +1031,7 @@ private:
 				;
 				while (!fVersionIsEqual())
 				{
-					if (Stopwatch.f_GetTime() > g_Timeout)
+					if (Stopwatch.f_GetTime() > gs_Timeout)
 					{
 						DMibError
 							(
@@ -1056,7 +1056,7 @@ private:
 					if (_ExpectedStatuses.f_Contains(AppInfo.m_Status) >= 0)
 						break;
 
-					if (Stopwatch.f_GetTime() > g_Timeout)
+					if (Stopwatch.f_GetTime() > gs_Timeout)
 					{
 						DMibError
 							(
@@ -1092,9 +1092,9 @@ private:
 			auto KeyManagerFuture = fSetupAppManager(KeyManagerDir);
 			auto VersionManagerFuture = fSetupAppManager(VersionManagerDir);
 			auto AppManagerFuture = fSetupAppManager(AppManagerDir);
-			fg_Move(KeyManagerFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
-			fg_Move(VersionManagerFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
-			fg_Move(AppManagerFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+			fg_Move(KeyManagerFuture).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
+			fg_Move(VersionManagerFuture).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
+			fg_Move(AppManagerFuture).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
 		}
 
 		auto AppManager_KeyManager = fInitAppManager("KeyManager", KeyManagerDir);
@@ -1120,19 +1120,19 @@ private:
 		auto KeyManagerPackageInfoFuture = fUploadPackage(_KeyManagerPackage, {"TestTag"});
 		if (bUpdatesOnFirstUpload)
 		{
-			AppManagerPackageInfo = fg_Move(AppManagerPackageInfoFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
-			KeyManagerPackageInfo = fg_Move(KeyManagerPackageInfoFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+			AppManagerPackageInfo = fg_Move(AppManagerPackageInfoFuture).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
+			KeyManagerPackageInfo = fg_Move(KeyManagerPackageInfoFuture).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
 		}
 
 		auto VersionManagerPackageInfoFuture = fUploadPackage(_VersionManagerPackage, {"VersionManagerTestTag"});
 
 		if (!bUpdatesOnFirstUpload)
 		{
-			AppManagerPackageInfo = fg_Move(AppManagerPackageInfoFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
-			KeyManagerPackageInfo = fg_Move(KeyManagerPackageInfoFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+			AppManagerPackageInfo = fg_Move(AppManagerPackageInfoFuture).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
+			KeyManagerPackageInfo = fg_Move(KeyManagerPackageInfoFuture).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
 		}
 
-		VersionManagerPackageInfo = fg_Move(VersionManagerPackageInfoFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+		VersionManagerPackageInfo = fg_Move(VersionManagerPackageInfoFuture).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
 
 		AppPackageInfos["AppManager"] = AppManagerPackageInfo;
 		AppPackageInfos["KeyManager"] = KeyManagerPackageInfo;
@@ -1171,21 +1171,21 @@ private:
 					auto KeyManagerPackageInfoFuture = fUpdateApp("KeyManager", {});
 					auto VersionManagerPackageInfoFuture = fUpdateApp("VersionManager", {});
 					auto AppManagerPackageInfoFuture = fUpdateApp("AppManager", {});
-					AppManagerPackageInfo = fg_Move(AppManagerPackageInfoFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
-					KeyManagerPackageInfo = fg_Move(KeyManagerPackageInfoFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
-					VersionManagerPackageInfo = fg_Move(VersionManagerPackageInfoFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+					AppManagerPackageInfo = fg_Move(AppManagerPackageInfoFuture).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
+					KeyManagerPackageInfo = fg_Move(KeyManagerPackageInfoFuture).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
+					VersionManagerPackageInfo = fg_Move(VersionManagerPackageInfoFuture).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
 				}
 
 				{
 					DMibLogWithCategory(Test, Info, "UpdateApps 0");
-					fTagApp("KeyManager", KeyManagerPackageInfo, {"TestTag"}).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+					fTagApp("KeyManager", KeyManagerPackageInfo, {"TestTag"}).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
 					fWaitForAppVersion(AppManager_KeyManager, "KeyManager", KeyManagerPackageInfo, {"Launched"});
 					fProvideKeyManagerPasswordIfNeeded();
 				}
 
 				{
 					DMibLogWithCategory(Test, Info, "UpdateApps 1");
-					fTagApp("VersionManager", VersionManagerPackageInfo, {"VersionManagerTestTag"}).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+					fTagApp("VersionManager", VersionManagerPackageInfo, {"VersionManagerTestTag"}).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
 					fWaitForAppVersion(AppManager_VersionManager, "VersionManager", VersionManagerPackageInfo, {"Launched"});
 				}
 
@@ -1195,7 +1195,7 @@ private:
 				}
 				{
 					DMibLogWithCategory(Test, Info, "UpdateApps 3");
-					fTagApp("AppManager", AppManagerPackageInfo, {"VersionManagerTestTag"}).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+					fTagApp("AppManager", AppManagerPackageInfo, {"VersionManagerTestTag"}).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
 					fResubscribeAppManager(AppManager_VersionManager);
 				}
 				{
@@ -1208,14 +1208,14 @@ private:
 				// Update app manager manager
 				{
 					DMibLogWithCategory(Test, Info, "UpdateApps 5");
-					fTagApp("AppManager", AppManagerPackageInfo, {"AppManagerTestTag"}).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+					fTagApp("AppManager", AppManagerPackageInfo, {"AppManagerTestTag"}).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
 					fWaitForAppVersion(AppManager_AppManager, "AppManager", AppManagerPackageInfo, {"Launched", "No exe", "No executable"});
 				}
 
 				// Update rest
 				{
 					DMibLogWithCategory(Test, Info, "UpdateApps 6");
-					fTagApp("AppManager", AppManagerPackageInfo, {"TestTag"}).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+					fTagApp("AppManager", AppManagerPackageInfo, {"TestTag"}).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
 					fResubscribeAppManager(AppManager_AppManager);
 					fResubscribeAppManager(AppManager_KeyManager);
 				}
@@ -1257,9 +1257,9 @@ private:
 					auto KeyManagerPackageInfoFuture = fUpdateApp("KeyManager", {});
 					auto VersionManagerPackageInfoFuture = fUpdateApp("VersionManager", {});
 					auto AppManagerPackageInfoFuture = fUpdateApp("AppManager", {});
-					AppManagerPackageInfo = fg_Move(AppManagerPackageInfoFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
-					KeyManagerPackageInfo = fg_Move(KeyManagerPackageInfoFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
-					VersionManagerPackageInfo = fg_Move(VersionManagerPackageInfoFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+					AppManagerPackageInfo = fg_Move(AppManagerPackageInfoFuture).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
+					KeyManagerPackageInfo = fg_Move(KeyManagerPackageInfoFuture).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
+					VersionManagerPackageInfo = fg_Move(VersionManagerPackageInfoFuture).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
 				}
 
 				{
@@ -1267,7 +1267,7 @@ private:
 					TCFutureVector<void> TagFutures;
 					for (auto &fTag : _DoTags)
 						fTag() > TagFutures;
-					fg_AllDone(TagFutures).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+					fg_AllDone(TagFutures).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
 
 					fResubscribeAppManager(AppManager_AppManager);
 					fResubscribeAppManager(AppManager_KeyManager);
@@ -1379,7 +1379,7 @@ private:
 
 		CProcessLaunch::fs_KillProcessesInDirectory("*", {}, RootDirectory, 0.5);
 
-		for (umint i = 0; i < 5; ++i)
+		for (umint iTry = 0; iTry < 5; ++iTry)
 		{
 			try
 			{
@@ -1408,7 +1408,7 @@ private:
 			}
 		;
 
-		LogForwarder(&CDistributedAppLogForwarder::f_StartMonitoring).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+		LogForwarder(&CDistributedAppLogForwarder::f_StartMonitoring).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
 
 		CStr VersionManagerDir = RootDirectory / "VersionManager";
 		CStr AppManagerDir = RootDirectory / "AppManager";
@@ -1512,23 +1512,23 @@ private:
 			}
 		;
 
-		CStr TestHostID = TrustManager(&CDistributedActorTrustManager::f_GetHostID).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
-		CTrustedSubscriptionTestHelper Subscriptions{TrustManager, g_Timeout};
+		CStr TestHostID = TrustManager(&CDistributedActorTrustManager::f_GetHostID).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
+		CTrustedSubscriptionTestHelper Subscriptions{TrustManager, gs_Timeout};
 
 		CDistributedActorTrustManager_Address ServerAddress;
 
 		ServerAddress.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath("{}/controller.sock"_f << RootDirectory);
-		TrustManager(&CDistributedActorTrustManager::f_AddListen, ServerAddress, 0).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+		TrustManager(&CDistributedActorTrustManager::f_AddListen, ServerAddress, 0).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
 
 		CDistributedApp_LaunchHelperDependencies Dependencies;
 		Dependencies.m_Address = ServerAddress.m_URL;
 		Dependencies.m_TrustManager = TrustManager;
-		Dependencies.m_DistributionManager = TrustManager(&CDistributedActorTrustManager::f_GetDistributionManager).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+		Dependencies.m_DistributionManager = TrustManager(&CDistributedActorTrustManager::f_GetDistributionManager).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
 
 		NMib::NConcurrency::CDistributedActorSecurity Security;
 		Security.m_AllowedIncomingConnectionNamespaces.f_Insert(CVersionManager::mc_pDefaultNamespace);
 		Security.m_AllowedIncomingConnectionNamespaces.f_Insert(CAppManagerInterface::mc_pDefaultNamespace);
-		Dependencies.m_DistributionManager(&CActorDistributionManager::f_SetSecurity, Security).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+		Dependencies.m_DistributionManager(&CActorDistributionManager::f_SetSecurity, Security).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
 
 		TCActor<CDistributedApp_LaunchHelper> LaunchHelper = fg_ConstructActor<CDistributedApp_LaunchHelper>(Dependencies, DTestUpdateCompatibilityEnableOtherOutput);
 
@@ -1579,7 +1579,7 @@ private:
 				Environment["MalterlibAppManagerAutoUpdateDelay"] = "0.001";
 
 				return LaunchHelper(&CDistributedApp_LaunchHelper::f_LaunchWithParams, "AppManager_{}"_f << _Name, _Dir / "AppManager", fg_Move(ExtraParams), fg_Move(Environment))
-					.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
+					.f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout)
 				;
 			}
 		;
@@ -1634,17 +1634,17 @@ private:
 				Address.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath("{}/appmanager.sock"_f << _Directory);
 				_LaunchInfo.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)
 					(CDistributedActorTrustManagerInterface::CAddListen{.m_Address = Address})
-					.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
+					.f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout)
 				;
 				TrustManager.f_CallActor(&CDistributedActorTrustManager::f_AllowHostsForNamespace)
 					(CAppManagerInterface::mc_pDefaultNamespace, fg_CreateSet<CStr>(_LaunchInfo.m_HostID), mcp_WaitForSubscriptions)
-					.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
+					.f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout)
 				;
 				try
 				{
 					_LaunchInfo.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
 						(fPermissions(TestHostID, fg_CreateMap<CStr, CPermissionRequirements>("AppManager/VersionAppAll", "AppManager/CommandAll", "AppManager/AppAll")))
-						.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
+						.f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout)
 					;
 				}
 				catch (CException const &_Exception)
@@ -1745,9 +1745,9 @@ private:
 
 				try
 				{
-					auto LaunchSubscription = LaunchActor(&CProcessLaunchActor::f_Launch, SimpleLaunch, _RunLoopHelper.m_HelperActor).f_CallSync(_RunLoopHelper.m_pRunLoop, g_Timeout);
-					LaunchFinished.f_MoveFuture().f_CallSync(_RunLoopHelper.m_pRunLoop, g_Timeout);
-					fg_Move(LaunchActor).f_Destroy().f_CallSync(_RunLoopHelper.m_pRunLoop, g_Timeout);
+					auto LaunchSubscription = LaunchActor(&CProcessLaunchActor::f_Launch, SimpleLaunch, _RunLoopHelper.m_HelperActor).f_CallSync(_RunLoopHelper.m_pRunLoop, gs_Timeout);
+					LaunchFinished.f_MoveFuture().f_CallSync(_RunLoopHelper.m_pRunLoop, gs_Timeout);
+					fg_Move(LaunchActor).f_Destroy().f_CallSync(_RunLoopHelper.m_pRunLoop, gs_Timeout);
 				}
 				catch (CException const &_Exception)
 				{
@@ -1806,7 +1806,7 @@ private:
 					DMibLogWithCategory(Test, Info, "Allow Hosts for namespace '{}'", _Namespace);
 					_AppManager.m_LaunchInfo.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace)
 						(fg_Move(Hosts))
-						.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
+						.f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout)
 					;
 				}
 
@@ -1819,7 +1819,7 @@ private:
 					DMibLogWithCategory(Test, Info, "Allow Hosts for authentication namespace");
 					_AppManager.m_LaunchInfo.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace)
 						(fg_Move(AuthHosts))
-						.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
+						.f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout)
 					;
 				}
 
@@ -1829,8 +1829,8 @@ private:
 					{
 						DMibLogWithCategory(Test, Info, "Add Client Connection");
 						_AppManager.m_LaunchInfo.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)
-							(CDistributedActorTrustManagerInterface::CAddClientConnection{.m_TrustTicket = Ticket, .m_Timeout = g_Timeout})
-							.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
+							(CDistributedActorTrustManagerInterface::CAddClientConnection{.m_TrustTicket = Ticket, .m_Timeout = gs_Timeout})
+							.f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout)
 						;
 					}
 				}
@@ -1867,7 +1867,7 @@ private:
 
 				// Wait for launch
 				CStopwatch Stopwatch{true};
-				while (Stopwatch.f_GetTime() < g_Timeout)
+				while (Stopwatch.f_GetTime() < gs_Timeout)
 				{
 					try
 					{
@@ -1890,7 +1890,7 @@ private:
 
 					TrustManager.f_CallActor(&CDistributedActorTrustManager::f_AllowHostsForNamespace)
 						(CVersionManager::mc_pDefaultNamespace, fg_CreateSet<CStr>(VersionManagerHostID), mcp_WaitForSubscriptions)
-						.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
+						.f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout)
 					;
 				}
 
@@ -1909,7 +1909,7 @@ private:
 					auto Ticket = CDistributedActorTrustManager::CTrustTicket::fs_FromStringTicket(fGenerateTicket(VersionManagerExecutable));
 					{
 						DMibLogWithCategory(Test, Info, "Add Client Connection");
-						TrustManager.f_CallActor(&CDistributedActorTrustManager::f_AddClientConnection)(Ticket, g_Timeout, -1, 0).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+						TrustManager.f_CallActor(&CDistributedActorTrustManager::f_AddClientConnection)(Ticket, gs_Timeout, -1, 0).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
 					}
 				}
 
@@ -2021,8 +2021,8 @@ private:
 			DMibLogWithCategory(Test, Info, "Setup App Managers");
 			auto VersionManagerFuture = fSetupAppManager(VersionManagerDir);
 			auto AppManagerFuture = fSetupAppManager(AppManagerDir);
-			fg_Move(VersionManagerFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
-			fg_Move(AppManagerFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+			fg_Move(VersionManagerFuture).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
+			fg_Move(AppManagerFuture).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
 		}
 
 		auto AppManager_VersionManager = fInitAppManager("VersionManager", VersionManagerDir);
@@ -2059,10 +2059,10 @@ private:
 		// Upload packages for testing
 		DMibTestMark;
 
-		auto AppManagerPackageInfo = fg_Move(fUploadPackage(_AppManagerPackage, {"TestTag", "VersionManagerTestTag", "AppManagerTestTag"})).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+		auto AppManagerPackageInfo = fg_Move(fUploadPackage(_AppManagerPackage, {"TestTag", "VersionManagerTestTag", "AppManagerTestTag"})).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
 		DMibTestMark;
 
-		auto VersionManagerPackageInfo = fg_Move(fUploadPackage(_VersionManagerPackage, {"VersionManagerTestTag"})).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+		auto VersionManagerPackageInfo = fg_Move(fUploadPackage(_VersionManagerPackage, {"VersionManagerTestTag"})).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
 
 		// Log version compatibility info
 		DMibLogWithCategory(Test, Info, "Multi-Auth Compatibility Test:");
@@ -2120,18 +2120,18 @@ private:
 					TCVector<CBlockingActorCheckout> Checkouts;
 					TCVector<TCVector<CStr>> ExpectedErrors;
 
-					for (umint i = 0; i < 5; ++i)
+					for (umint iApp = 0; iApp < 5; ++iApp)
 					{
 						bool bShouldSucceed;
 						switch (_Mode)
 						{
 						case EParallelTestMode::mc_Succeed: bShouldSucceed = true; break;
 						case EParallelTestMode::mc_Fail: bShouldSucceed = false; break;
-						case EParallelTestMode::mc_Mixed: bShouldSucceed = (i % 2 == 0); break; // alternating
+						case EParallelTestMode::mc_Mixed: bShouldSucceed = (iApp % 2 == 0); break; // alternating
 						}
 
 						auto const &User = bShouldSucceed ? UserInfo : UserInfoNoPerms;
-						CStr AppName = "ParallelTestApp{}_{}"_f << _TestName << i;
+						CStr AppName = "ParallelTestApp{}_{}"_f << _TestName << iApp;
 
 						auto &Checkout = Checkouts.f_Insert(fg_BlockingActor());
 
@@ -2184,12 +2184,12 @@ private:
 					}
 
 					// Wait for all downloads and verify expected results
-					for (umint i = 0; i < 5; ++i)
+					for (umint iApp = 0; iApp < 5; ++iApp)
 					{
-						CStr AppName = "ParallelTestApp{}_{}"_f << _TestName << i;
+						CStr AppName = "ParallelTestApp{}_{}"_f << _TestName << iApp;
 						DMibTestPath(AppName);
-						CStr Error = co_await fg_Move(Results[i]).f_Timeout(g_Timeout, "Parallel download timed out");
-						DMibExpect(ExpectedErrors[i].f_Contains(Error), >=, 0)(Error);
+						CStr Error = co_await fg_Move(Results[iApp]).f_Timeout(gs_Timeout, "Parallel download timed out");
+						DMibExpect(ExpectedErrors[iApp].f_Contains(Error), >=, 0)(Error);
 					}
 
 					DMibLogWithCategory(Test, Info, "Parallel downloads ({}) completed with expected results", _TestName);
@@ -2198,11 +2198,11 @@ private:
 			;
 
 			DMibTestMark;
-			fParallelDownloadTest(EParallelTestMode::mc_Succeed, "AllSucceed").f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+			fParallelDownloadTest(EParallelTestMode::mc_Succeed, "AllSucceed").f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
 			DMibTestMark;
-			fParallelDownloadTest(EParallelTestMode::mc_Fail, "AllFail").f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+			fParallelDownloadTest(EParallelTestMode::mc_Fail, "AllFail").f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
 			DMibTestMark;
-			fParallelDownloadTest(EParallelTestMode::mc_Mixed, "Mixed").f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+			fParallelDownloadTest(EParallelTestMode::mc_Mixed, "Mixed").f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
 		}
 
 		DMibLogWithCategory(Test, Info, "Multi-Auth Compatibility Tests Complete");
@@ -2257,7 +2257,7 @@ public:
 
 							CVersionManagerHelper VersionManagerHelper(BinaryDirectory);
 
-							co_await VersionManagerHelper.f_CreatePackage(SourceTempPath, o_PackagePath, g_CompressionLevel);
+							co_await VersionManagerHelper.f_CreatePackage(SourceTempPath, o_PackagePath, gs_CompressionLevel);
 
 							co_return {};
 						}
@@ -2269,9 +2269,9 @@ public:
 					auto VersionManagerFuture = fInitPackage(_VersionManager);
 					auto KeyManagerFuture = fInitPackage(_KeyManager);
 
-					fg_Move(AppManagerFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
-					fg_Move(VersionManagerFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
-					fg_Move(KeyManagerFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+					fg_Move(AppManagerFuture).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
+					fg_Move(VersionManagerFuture).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
+					fg_Move(KeyManagerFuture).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
 				}
 			;
 

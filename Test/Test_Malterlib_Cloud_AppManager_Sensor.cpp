@@ -152,7 +152,7 @@ struct CAppManager_Sensor_Tests : public NMib::NTest::CTest
 			;
 
 			CEJsonSorted ExpectedSensorReadings;
-			for (umint i = 0; i < 5; ++i)
+			for (umint iReading = 0; iReading < 5; ++iReading)
 			{
 				ExpectedSensorReadings.f_Array().f_Insert
 					(
@@ -164,8 +164,8 @@ struct CAppManager_Sensor_Tests : public NMib::NTest::CTest
 							, "Identifier"_= "org.malterlib.testapp.test"
 							, "IdentifierScope"_= ""
 							, "Name"_= "Test Sensor"
-							, "UniqueSequence"_= i + 1
-							, "Value"_= fp64(i)
+							, "UniqueSequence"_= iReading + 1
+							, "Value"_= fp64(iReading)
 							, "OutdatedStatus"_= "Ok"
 							, "OutdatedSeconds"_= fp64::fs_Inf()
 							, "SnoozeUntil"_= NTime::CTime()
@@ -183,7 +183,7 @@ struct CAppManager_Sensor_Tests : public NMib::NTest::CTest
 							, "Identifier"_= "org.malterlib.testapp.test.version"
 							, "IdentifierScope"_= ""
 							, "Name"_= "Test Sensor (version)"
-							, "UniqueSequence"_= i + 1
+							, "UniqueSequence"_= iReading + 1
 							, "Value"_= CEJsonUserTypeSorted
 							{
 								"Version"
@@ -192,7 +192,7 @@ struct CAppManager_Sensor_Tests : public NMib::NTest::CTest
 									"Identifier"_j= "Ident"
 									, "Major"_j= 13
 									, "Minor"_j= 3
-									, "Revision"_j= i
+									, "Revision"_j= iReading
 								}
 							}
 							, "OutdatedStatus"_= "Ok"

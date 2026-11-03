@@ -22,7 +22,7 @@ namespace NMib::NCloud::NAppManagerDatabase
 		template <typename tf_CStream>
 		void f_ConsumeLexicographic(tf_CStream &_Stream);
 
-		static CStr const mc_Prefix;
+		static CStr const mc_Prefix; // NOLINT(malterlib-variable-naming): defined constexpr in the .cpp, which the check doesn't see from here
 
 		CStr m_Prefix = mc_Prefix;
 	};
@@ -43,7 +43,7 @@ namespace NMib::NCloud::NAppManagerDatabase
 		template <typename tf_CStream>
 		void f_ConsumeLexicographic(tf_CStream &_Stream);
 
-		static CStr const mc_Prefix;
+		static CStr const mc_Prefix; // NOLINT(malterlib-variable-naming): defined constexpr in the .cpp, which the check doesn't see from here
 
 		CStr m_Prefix = mc_Prefix;
 		uint64 m_UniqueSequence = 0;

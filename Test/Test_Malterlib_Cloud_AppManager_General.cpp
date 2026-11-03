@@ -7,7 +7,7 @@
 #	include <Windows.h>
 #endif
 
-static fp64 g_Timeout = 120.0 * NMib::NTest::gc_TimeoutMultiplier;
+static fp64 gs_Timeout = 120.0 * NMib::NTest::gc_TimeoutMultiplier;
 
 static constexpr ch8 const gc_pFailingPreUpdateScript[] =
 	{
@@ -120,7 +120,7 @@ struct CAppManager_General_Tests : public NMib::NTest::CTest
 		TCFuture<bool> f_Wait()
 		{
 			auto Future = m_WaitingSignals.f_Insert().f_Future();
-			auto Result = co_await fg_Move(Future).f_Timeout(g_Timeout, "Timed out waiting for notification state").f_Wrap();
+			auto Result = co_await fg_Move(Future).f_Timeout(gs_Timeout, "Timed out waiting for notification state").f_Wrap();
 			co_return !Result;
 		}
 
@@ -146,7 +146,7 @@ struct CAppManager_General_Tests : public NMib::NTest::CTest
 			if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
 				Options |= CAppManagerTestHelper::EOption_EnableOtherOutput;
 
-			CAppManagerTestHelper AppManagerTestHelper("AppManagerTests", Options, g_Timeout);
+			CAppManagerTestHelper AppManagerTestHelper("AppManagerTests", Options, gs_Timeout);
 			auto AsyncDestroy = co_await fg_AsyncDestroy(AppManagerTestHelper);
 
 			auto RootDirectory = AppManagerTestHelper.f_RootDirectory();
@@ -178,7 +178,7 @@ struct CAppManager_General_Tests : public NMib::NTest::CTest
 								co_return {};
 							}
 						)
-						.f_Timeout(g_Timeout, "Timed out waiting for test app to update")
+						.f_Timeout(gs_Timeout, "Timed out waiting for test app to update")
 					;
 					co_return {};
 				}
@@ -190,7 +190,7 @@ struct CAppManager_General_Tests : public NMib::NTest::CTest
 					ChangeTags.m_AddTags = _Tags;
 					ChangeTags.m_Application = _Name;
 					ChangeTags.m_VersionID = PackageInfo.m_VersionID.m_VersionID;
-					co_await VersionManager.f_CallActor(&CVersionManager::f_ChangeTags)(fg_Move(ChangeTags)).f_Timeout(g_Timeout, "Timed out waiting change tags to finish");
+					co_await VersionManager.f_CallActor(&CVersionManager::f_ChangeTags)(fg_Move(ChangeTags)).f_Timeout(gs_Timeout, "Timed out waiting change tags to finish");
 
 					co_return {};
 				}
@@ -332,7 +332,7 @@ struct CAppManager_General_Tests : public NMib::NTest::CTest
 					++iAppManager;
 				}
 				DMibTestMark;
-				co_await fg_AllDone(AppCommandResults).f_Timeout(g_Timeout, "Timed out waiting update notification subscriptions");
+				co_await fg_AllDone(AppCommandResults).f_Timeout(gs_Timeout, "Timed out waiting update notification subscriptions");
 			}
 
 			auto fWaitForAllUpdated = [&](CStr _Application) -> CUnsafeFuture
@@ -343,7 +343,7 @@ struct CAppManager_General_Tests : public NMib::NTest::CTest
 					{
 						if (ApplicationState.m_nFinished == nAppManagers)
 							break;
-						if (Stopwatch.f_GetTime() > g_Timeout * 4.0)
+						if (Stopwatch.f_GetTime() > gs_Timeout * 4.0)
 							DMibError("Timed out waiting for all apps to update.\n{}\n"_f << ApplicationState);
 						co_await pUpdateNotificationsState->f_Wait();
 					}
@@ -366,7 +366,7 @@ struct CAppManager_General_Tests : public NMib::NTest::CTest
 
 						AppManager.m_Interface.f_CallActor(&CAppManagerInterface::f_ChangeSettings)(_AppName, ChangeSettings, Settings) > AppCommandResults;
 					}
-					co_await fg_AllDone(AppCommandResults).f_Timeout(g_Timeout, "Timed out waiting for update type change");
+					co_await fg_AllDone(AppCommandResults).f_Timeout(gs_Timeout, "Timed out waiting for update type change");
 					*pUpdateType = _UpdateType;
 
 					co_return {};
@@ -384,7 +384,7 @@ struct CAppManager_General_Tests : public NMib::NTest::CTest
 
 						AppManager.m_Interface.f_CallActor(&CAppManagerInterface::f_ChangeSettings)(_AppName, ChangeSettings, Settings) > AppCommandResults;
 					}
-					co_await fg_AllDone(AppCommandResults).f_Timeout(g_Timeout, "Timed out waiting for update group change");
+					co_await fg_AllDone(AppCommandResults).f_Timeout(gs_Timeout, "Timed out waiting for update group change");
 
 					co_return {};
 				}
@@ -401,7 +401,7 @@ struct CAppManager_General_Tests : public NMib::NTest::CTest
 
 						AppManager.m_Interface.f_CallActor(&CAppManagerInterface::f_ChangeSettings)(_AppName, ChangeSettings, Settings) > AppCommandResults;
 					}
-					co_await fg_AllDone(AppCommandResults).f_Timeout(g_Timeout, "Timed out waiting for pre update script change");
+					co_await fg_AllDone(AppCommandResults).f_Timeout(gs_Timeout, "Timed out waiting for pre update script change");
 
 					co_return {};
 				}
@@ -491,10 +491,10 @@ struct CAppManager_General_Tests : public NMib::NTest::CTest
 
 			co_await AppManagerTestHelper.f_InstallTestApp("TestApp2", "TestTag2", "TestGroup2");
 
-			for (umint i = 0; i < 2; ++i)
+			for (umint iVariant = 0; iVariant < 2; ++iVariant)
 			{
 				CStr Path;
-				if (i == 0)
+				if (iVariant == 0)
 				{
 					Path = "Same Update Group";
 					DMibTestMark;
@@ -526,7 +526,7 @@ struct CAppManager_General_Tests : public NMib::NTest::CTest
 					DMibTestMark;
 					co_await fWaitForAllUpdated("TestApp2");
 
-					if (i == 0)
+					if (iVariant == 0)
 						DMibExpect(UpdateNotificationState.m_nMaxAppsInProgress, ==, 2u);
 					else
 						DMibExpect(UpdateNotificationState.m_nMaxAppsInProgress, ==, 1u);
@@ -540,7 +540,7 @@ struct CAppManager_General_Tests : public NMib::NTest::CTest
 					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_MaxInStageCoordination[CAppManagerInterface::EUpdateStage_StopOldApp], ==, nAppManagers);
 
 					DMibExpect(UpdateNotificationState.m_AllApplications.m_nSuccess.f_Load(), ==, nAppManagers * 2u);
-					if (i == 0)
+					if (iVariant == 0)
 						DMibExpect(UpdateNotificationState.m_AllApplications.m_nMaxInProgress, ==, nAppManagers * 2u);
 					else
 						DMibExpect(UpdateNotificationState.m_AllApplications.m_nMaxInProgress, ==, nAppManagers);
@@ -672,7 +672,7 @@ struct CAppManager_General_Tests : public NMib::NTest::CTest
 					DMibTestMark;
 					co_await fWaitForAllUpdated("TestApp2");
 
-					if (i == 0)
+					if (iVariant == 0)
 						DMibExpect(UpdateNotificationState.m_nMaxAppsInProgressPerAppManager, ==, 2u);
 					else
 						DMibExpect(UpdateNotificationState.m_nMaxAppsInProgressPerAppManager, ==, 1u);

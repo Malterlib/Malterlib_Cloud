@@ -692,12 +692,12 @@ namespace NMib::NCloud
 
 		co_return co_await fg_Move(ReadTransaction).f_BlockingDispatch
 			(
-				[_Key = fg_Move(_Key)](CDatabaseActor::CTransactionRead _ReadTransaction) mutable -> TCFuture<CConfigFileContents>
+				[VersionKey = fg_Move(_Key)](CDatabaseActor::CTransactionRead _ReadTransaction) mutable -> TCFuture<CConfigFileContents>
 				{
 					CConfigFileHistoryEntryValue Value;
-					if (_Key.m_Sequence == TCLimitsInt<uint64>::mc_Max)
+					if (VersionKey.m_Sequence == TCLimitsInt<uint64>::mc_Max)
 					{
-						auto iConfigFile = _ReadTransaction.m_Transaction.f_ReadCursor(CConfigFileHistoryEntryKey::mc_Prefix, _Key.m_FileName);
+						auto iConfigFile = _ReadTransaction.m_Transaction.f_ReadCursor(CConfigFileHistoryEntryKey::mc_Prefix, VersionKey.m_FileName);
 						if (!iConfigFile.f_Last())
 							co_return DMibErrorInstance("File does not exist in database");
 
@@ -705,7 +705,7 @@ namespace NMib::NCloud
 					}
 					else
 					{
-						CConfigFileHistoryEntryKey Key = {.m_VersionKey = fg_Move(_Key)};
+						CConfigFileHistoryEntryKey Key = {.m_VersionKey = fg_Move(VersionKey)};
 
 						if (!_ReadTransaction.m_Transaction.f_Get(Key, Value))
 							co_return DMibErrorInstance("Version does not exist in database");

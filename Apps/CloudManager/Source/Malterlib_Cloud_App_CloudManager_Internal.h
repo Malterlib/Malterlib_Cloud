@@ -208,8 +208,8 @@ namespace NMib::NCloud::NCloudManager
 		static TCVector<CStr> fsp_SensorReadPermissions();
 		static TCVector<CStr> fsp_LogReadPermissions();
 
-		static CStr const mcp_DatabasePrefixLog;
-		static CStr const mcp_DatabasePrefixSensor;
+		static CStr const mcp_DatabasePrefixLog;    // NOLINT(malterlib-variable-naming): defined constexpr in the .cpp, which the check doesn't see from here
+		static CStr const mcp_DatabasePrefixSensor; // NOLINT(malterlib-variable-naming): defined constexpr in the .cpp, which the check doesn't see from here
 
 		TCDistributedActorInstance<CCloudManagerImplementation> mp_ProtocolInterface;
 		TCDistributedActorInstance<CDistributedAppSensorReporterImplementation> mp_SensorReporterInterface;

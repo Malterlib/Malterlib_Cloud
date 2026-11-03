@@ -316,12 +316,12 @@ struct CVersionManager_Refresh_Tests : public NMib::NTest::CTest
 
 				TCFutureVector<CVersionManagerHelper::CUploadResult> UploadFutures;
 
-				for (umint i = 0; i < 3; ++i)
+				for (umint iVersion = 0; iVersion < 3; ++iVersion)
 				{
 					CVersionManager::CVersionIDAndPlatform VersionID;
 					VersionID.m_VersionID.m_Branch = State.m_PackageInfo.m_VersionID.m_VersionID.m_Branch;
 					VersionID.m_VersionID.m_Major = 4;
-					VersionID.m_VersionID.m_Minor = (uint32)i;
+					VersionID.m_VersionID.m_Minor = (uint32)iVersion;
 					VersionID.m_VersionID.m_Revision = 0;
 					VersionID.m_Platform = State.m_PackageInfo.m_VersionID.m_Platform;
 
@@ -345,13 +345,13 @@ struct CVersionManager_Refresh_Tests : public NMib::NTest::CTest
 
 				// Verify all versions are present
 				auto Versions = co_await fg_CallSafe(fListVersions, "TestApp");
-				for (umint i = 0; i < 3; ++i)
+				for (umint iVersion = 0; iVersion < 3; ++iVersion)
 				{
-					DMibTestPath("{}"_f << i);
+					DMibTestPath("{}"_f << iVersion);
 					CVersionManager::CVersionIDAndPlatform VersionID;
 					VersionID.m_VersionID.m_Branch = State.m_PackageInfo.m_VersionID.m_VersionID.m_Branch;
 					VersionID.m_VersionID.m_Major = 4;
-					VersionID.m_VersionID.m_Minor = (uint32)i;
+					VersionID.m_VersionID.m_Minor = (uint32)iVersion;
 					VersionID.m_VersionID.m_Revision = 0;
 					VersionID.m_Platform = State.m_PackageInfo.m_VersionID.m_Platform;
 					DMibExpectTrue(Versions.m_Versions["TestApp"].f_Exists(VersionID));

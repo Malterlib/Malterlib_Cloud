@@ -77,7 +77,7 @@ namespace NMib::NCloud::NAppManager
 				co_return DMibErrorInstance("No key managers are connected, so key cannot be generated");
 
 			auto &KeyManagerInfo = *mp_KeyManagerSubscription.m_Actors.f_FindAny();
-			static umint const c_KeyBits = 512;
+			static constexpr umint c_KeyBits = 512;
 			Key = co_await KeyManagerInfo.m_Actor.f_CallActor(&CKeyManager::f_RequestKey)(pEncryptionApplication->m_Name, c_KeyBits / 8);
 		}
 
