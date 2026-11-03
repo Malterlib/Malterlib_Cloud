@@ -77,10 +77,7 @@ namespace NMib::NCloud
 			auto operator <=> (CNotification_BackupAborted const &_Right) const noexcept = default;
 
 			template <typename tf_CStr>
-			void f_Format(tf_CStr &o_String) const
-			{
-				o_String += "Backup Aborted";
-			}
+			void f_Format(tf_CStr &o_String) const;
 		};
 
 		struct CNotification_BackupError /// \brief Notification info for #ENotification_BackupError. \headerfile Mib/Cloud/BackupManagerClient
@@ -88,10 +85,7 @@ namespace NMib::NCloud
 			auto operator <=> (CNotification_BackupError const &_Right) const noexcept = default;
 
 			template <typename tf_CStr>
-			void f_Format(tf_CStr &o_String) const
-			{
-				o_String += typename tf_CStr::CFormat("Backup Error{}: {}") << (m_bFatal ? " (Fatal)" : "") << m_ErrorMessage;
-			}
+			void f_Format(tf_CStr &o_String) const;
 
 			NStr::CStr m_ErrorMessage; ///< The error from exception that caused the backup to fail
 			bool m_bFatal = false;     ///< If this is set to true the backup is in a fatal state, and cannot recover automatically.
@@ -102,10 +96,7 @@ namespace NMib::NCloud
 			auto operator <=> (CNotification_FileFinished const &_Right) const noexcept = default;
 
 			template <typename tf_CStr>
-			void f_Format(tf_CStr &o_String) const
-			{
-				o_String += typename tf_CStr::CFormat("File Finished: {}: {}") << m_FileName << m_TransferStats;
-			}
+			void f_Format(tf_CStr &o_String) const;
 
 			NStr::CStr m_FileName;              ///< The file that finished backing up. Relative to root.
 			CFileTransferStats m_TransferStats; ///< Statistics for the file transfer;
@@ -116,10 +107,7 @@ namespace NMib::NCloud
 			auto operator <=> (CNotification_Quiescent const &_Right) const noexcept = default;
 
 			template <typename tf_CStr>
-			void f_Format(tf_CStr &o_String) const
-			{
-				o_String += "Quiescent";
-			}
+			void f_Format(tf_CStr &o_String) const;
 		};
 
 		struct CNotification_Unquiescent /// \brief Notification info for #ENotification_Unquiescent. \headerfile Mib/Cloud/BackupManagerClient
@@ -127,10 +115,7 @@ namespace NMib::NCloud
 			auto operator <=> (CNotification_Unquiescent const &_Right) const noexcept = default;
 
 			template <typename tf_CStr>
-			void f_Format(tf_CStr &o_String) const
-			{
-				o_String += "Unquiescent";
-			}
+			void f_Format(tf_CStr &o_String) const;
 		};
 
 		struct CNotification_InitialFinished /// \brief Notification info for #ENotification_InitialFinished. \headerfile Mib/Cloud/BackupManagerClient
@@ -138,10 +123,7 @@ namespace NMib::NCloud
 			auto operator <=> (CNotification_InitialFinished const &_Right) const noexcept = default;
 
 			template <typename tf_CStr>
-			void f_Format(tf_CStr &o_String) const
-			{
-				o_String += typename tf_CStr::CFormat("Initial Finished: Added: {vs}   Removed: {vs}  Updated: {vs}") << m_AddedFiles << m_RemovedFiles << m_UpdatedFiles;
-			}
+			void f_Format(tf_CStr &o_String) const;
 
 			NContainer::TCVector<NStr::CStr> m_AddedFiles;
 			NContainer::TCVector<NStr::CStr> m_RemovedFiles;

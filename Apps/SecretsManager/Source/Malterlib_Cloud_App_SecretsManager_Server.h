@@ -70,10 +70,7 @@ namespace NMib::NCloud::NSecretsManager
 
 		struct CChangeSubscription
 		{
-			CStr const &f_GetSubscriptionID() const
-			{
-				return TCMap<CStr, CChangeSubscription>::fs_GetKey(*this);
-			}
+			CStr const &f_GetSubscriptionID() const;
 
 			NConcurrency::TCFuture<void> f_SendChanges(CSecretsManager::CSecretChanges &&_Changes) const;
 
@@ -175,4 +172,3 @@ namespace NMib::NCloud::NSecretsManager
 #endif
 	};
 }
-

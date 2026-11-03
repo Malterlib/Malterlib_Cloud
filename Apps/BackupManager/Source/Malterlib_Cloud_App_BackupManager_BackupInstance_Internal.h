@@ -13,10 +13,7 @@ namespace NMib::NCloud::NBackupManager
 	{
 		struct CRSyncContext
 		{
-			CStr const &f_GetSyncID() const
-			{
-				return TCMap<CStr, CRSyncContext>::fs_GetKey(*this);
-			}
+			CStr const &f_GetSyncID() const;
 
 			CStr m_RelativeFileName;
 			CStr m_AbsoluteFileName;

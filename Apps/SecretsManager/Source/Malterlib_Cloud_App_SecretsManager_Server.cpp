@@ -10,6 +10,11 @@
 
 namespace NMib::NCloud::NSecretsManager
 {
+	CStr const &CSecretsManagerDaemonActor::CServer::CChangeSubscription::f_GetSubscriptionID() const
+	{
+		return TCMap<CStr, CChangeSubscription>::fs_GetKey(*this);
+	}
+
 	CSecretsManagerDaemonActor::CServer::CServer(CDistributedAppState &_AppState, TCActor<CSecretsManagerServerDatabase> const &_DatabaseActor)
 		: mp_AppState(_AppState)
 		, mp_DatabaseActor(_DatabaseActor)

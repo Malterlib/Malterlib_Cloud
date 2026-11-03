@@ -75,16 +75,8 @@ namespace NMib::NCloud
 			CVersionIDAndPlatform &operator = (CVersionIDAndPlatform const &_Other) = default;
 			CVersionIDAndPlatform &operator = (CVersionIDAndPlatform &&_Other) = default;
 
-			CVersionIDAndPlatform(CVersionManager::CVersionIDAndPlatform const &_Other)
-				: CVersionManager::CVersionIDAndPlatform(_Other)
-			{
-			}
-
-			CVersionIDAndPlatform &operator = (CVersionManager::CVersionIDAndPlatform const &_Right)
-			{
-				static_cast<CVersionManager::CVersionIDAndPlatform &>(*this) = _Right;
-				return *this;
-			}
+			CVersionIDAndPlatform(CVersionManager::CVersionIDAndPlatform const &_Other);
+			CVersionIDAndPlatform &operator = (CVersionManager::CVersionIDAndPlatform const &_Right);
 
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
@@ -98,16 +90,8 @@ namespace NMib::NCloud
 			CVersionID &operator = (CVersionID const &_Other) = default;
 			CVersionID &operator = (CVersionID &&_Other) = default;
 
-			CVersionID(CVersionManager::CVersionID const &_Other)
-				: CVersionManager::CVersionID(_Other)
-			{
-			}
-
-			CVersionID &operator = (CVersionManager::CVersionID const &_Right)
-			{
-				static_cast<CVersionManager::CVersionID &>(*this) = _Right;
-				return *this;
-			}
+			CVersionID(CVersionManager::CVersionID const &_Other);
+			CVersionID &operator = (CVersionManager::CVersionID const &_Right);
 
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
@@ -121,16 +105,8 @@ namespace NMib::NCloud
 			CVersionInformation &operator = (CVersionInformation const &_Other) = default;
 			CVersionInformation &operator = (CVersionInformation &&_Other) = default;
 
-			CVersionInformation(CVersionManager::CVersionInformation const &_Other)
-				: CVersionManager::CVersionInformation(_Other)
-			{
-			}
-
-			CVersionInformation &operator = (CVersionManager::CVersionInformation const &_Right)
-			{
-				static_cast<CVersionManager::CVersionInformation &>(*this) = _Right;
-				return *this;
-			}
+			CVersionInformation(CVersionManager::CVersionInformation const &_Other);
+			CVersionInformation &operator = (CVersionManager::CVersionInformation const &_Right);
 
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
@@ -178,11 +154,7 @@ namespace NMib::NCloud
 			void f_Stream(tf_CStream &_Stream);
 
 			NEncoding::CEJsonSorted f_ToJson() const;
-
-			NStr::CStr const &f_GetName()
-			{
-				return NContainer::TCMap<NStr::CStr, CApplicationInfo>::fs_GetKey(*this);
-			}
+			NStr::CStr const &f_GetName();
 
 			// State
 			NStr::CStr m_Status;

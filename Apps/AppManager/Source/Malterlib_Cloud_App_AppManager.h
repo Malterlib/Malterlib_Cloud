@@ -153,11 +153,7 @@ namespace NMib::NCloud::NAppManager
 
 		struct CApplication
 		{
-			CApplication(CStr const &_Name, CAppManagerActor *_pThis)
-				: m_Name(_Name)
-				, m_pThis(_pThis)
-			{
-			}
+			CApplication(CStr const &_Name, CAppManagerActor *_pThis);
 
 			void f_Clear();
 			void f_Delete();
@@ -311,10 +307,7 @@ namespace NMib::NCloud::NAppManager
 		struct CVersionManagerApplication
 		{
 			CVersionManagerApplication(CAppManagerActor &_This);
-			CStr const &f_GetApplicationName() const
-			{
-				return TCMap<CStr, CVersionManagerApplication>::fs_GetKey(*this);
-			}
+			CStr const &f_GetApplicationName() const;
 
 			TCAVLTree<&CVersionManagerVersion::m_ApplicationTimeLink, CVersionManagerVersion::CCompareApplicationByTime> m_VersionsByTime;
 			TCAVLTree<&CVersionManagerVersion::m_ApplicationLink, CVersionManagerVersion::CCompareApplication> m_Versions;
@@ -323,10 +316,7 @@ namespace NMib::NCloud::NAppManager
 
 		struct CVersionManagerState
 		{
-			TCDistributedActor<CVersionManager> const &f_GetManager() const
-			{
-				return TCMap<TCDistributedActor<CVersionManager>, CVersionManagerState>::fs_GetKey(*this);
-			}
+			TCDistributedActor<CVersionManager> const &f_GetManager() const;
 
 			TCMap<CStr, TCMap<CVersionManager::CVersionIDAndPlatform, CVersionManagerVersion>> m_Versions;
 
@@ -343,10 +333,7 @@ namespace NMib::NCloud::NAppManager
 
 		struct CCloudManagerState
 		{
-			TCDistributedActor<CCloudManager> const &f_GetManager() const
-			{
-				return TCMap<TCDistributedActor<CCloudManager>, CCloudManagerState>::fs_GetKey(*this);
-			}
+			TCDistributedActor<CCloudManager> const &f_GetManager() const;
 
 			CTrustedActorInfo m_HostInfo;
 			TCDistributedActorInterface<CAppManagerCloudManagerInterface> m_AppManagerCloudManagerInterface;
@@ -447,26 +434,13 @@ namespace NMib::NCloud::NAppManager
 		struct CRemoteApplicationKey
 		{
 			CRemoteApplicationKey() = default;
-
-			CRemoteApplicationKey(CAppManagerCoordinationInterface::CAppInfo const &_AppInfo)
-				: m_Group(_AppInfo.m_Group)
-				, m_VersionManagerApplication(_AppInfo.m_VersionManagerApplication)
-			{
-			}
-
-			CRemoteApplicationKey(CApplicationSettings const &_Settings)
-				: m_Group(_Settings.m_UpdateGroup)
-				, m_VersionManagerApplication(_Settings.m_VersionManagerApplication)
-			{
-			}
+			CRemoteApplicationKey(CAppManagerCoordinationInterface::CAppInfo const &_AppInfo);
+			CRemoteApplicationKey(CApplicationSettings const &_Settings);
 
 			auto operator <=> (CRemoteApplicationKey const &_Right) const noexcept = default;
 
 			template <typename tf_CStr>
-			void f_Format(tf_CStr &o_Str) const
-			{
-				o_Str += typename tf_CStr::CFormat("{}/{}") << m_Group << m_VersionManagerApplication;
-			}
+			void f_Format(tf_CStr &o_Str) const;
 
 			CStr m_Group;
 			CStr m_VersionManagerApplication;
@@ -475,31 +449,15 @@ namespace NMib::NCloud::NAppManager
 		struct CRemoteApplicationWithTypeKey : public CRemoteApplicationKey
 		{
 			CRemoteApplicationWithTypeKey() = default;
+			CRemoteApplicationWithTypeKey(CAppManagerCoordinationInterface::CAppInfo const &_AppInfo, bool _bBypassCoordination);
+			CRemoteApplicationWithTypeKey(CApplication const &_Application, bool _bBypassCoordination);
 
-			CRemoteApplicationWithTypeKey(CAppManagerCoordinationInterface::CAppInfo const &_AppInfo, bool _bBypassCoordination)
-				: CRemoteApplicationKey(_AppInfo)
-				, m_UpdateType(_bBypassCoordination ? EDistributedAppUpdateType_Independent : _AppInfo.m_UpdateType)
-			{
-			}
-
-			CRemoteApplicationWithTypeKey(CApplication const &_Application, bool _bBypassCoordination)
-				: CRemoteApplicationKey(_Application.m_Settings)
-				, m_UpdateType(_Application.f_GetUpdateType(_bBypassCoordination))
-			{
-			}
-
-			CRemoteApplicationKey const &f_WithoutType() const
-			{
-				return *this;
-			}
+			CRemoteApplicationKey const &f_WithoutType() const;
 
 			auto operator <=> (CRemoteApplicationWithTypeKey const &_Right) const noexcept = default;
 
 			template <typename tf_CStr>
-			void f_Format(tf_CStr &o_Str) const
-			{
-				o_Str += typename tf_CStr::CFormat("{}/{}/{}") << m_Group << m_VersionManagerApplication << m_UpdateType;
-			}
+			void f_Format(tf_CStr &o_Str) const;
 
 			EDistributedAppUpdateType m_UpdateType = EDistributedAppUpdateType_Independent;
 		};
@@ -508,16 +466,10 @@ namespace NMib::NCloud::NAppManager
 		{
 			struct CCompareActor
 			{
-				auto &operator () (CRemoteAppManager const &_Node) const
-				{
-					return _Node.m_Actor;
-				}
+				auto &operator () (CRemoteAppManager const &_Node) const;
 			};
 
-			CStr const &f_GetHostID() const
-			{
-				return TCMap<CStr, CRemoteAppManager>::fs_GetKey(*this);
-			}
+			CStr const &f_GetHostID() const;
 
 			void f_Clear();
 
@@ -540,31 +492,9 @@ namespace NMib::NCloud::NAppManager
 			CUpdateApplicationState(CUpdateApplicationState const &_Other) = delete;
 			CUpdateApplicationState(CUpdateApplicationState &&_Other) = delete;
 
-			CExceptionPointer f_CheckAbort()
-			{
-				if (m_pApplication->m_bDeleted)
-					return DMibErrorInstance("Application has been deleted, aborting").f_ExceptionPointer();
-
-				if (m_bCancel)
-					return DMibErrorInstance("Update was cancelled").f_ExceptionPointer();
-
-				if (m_bCancelOnAppManagerStop)
-					return DMibErrorInstance("AppManager stopped").f_ExceptionPointer();
-
-				return nullptr;
-			}
-
+			CExceptionPointer f_CheckAbort();
 			template <typename tf_CType>
-			bool f_CheckAbort(TCPromise<tf_CType> const &o_Error)
-			{
-				if (auto pError = f_CheckAbort())
-				{
-					if (!o_Error.f_IsSet())
-						o_Error.f_SetException(pError);
-					return true;
-				}
-				return false;
-			}
+			bool f_CheckAbort(TCPromise<tf_CType> const &o_Error);
 
 			CIntrusiveRefCountWithWeak m_RefCount;
 			TCSharedPointer<CApplication> m_pApplication;
@@ -1080,3 +1010,5 @@ namespace NMib::NCloud::NAppManager
 
 	CStr fg_ConcatOutput(CStr const &_StdOut, CStr const &_StdErr);
 }
+
+#include "Malterlib_Cloud_App_AppManager.hpp"

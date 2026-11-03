@@ -13,6 +13,39 @@
 
 namespace NMib::NCloud::NVersionManager
 {
+	CStr const &CVersionManagerDaemonActor::CServer::CVersionDownload::f_GetDownloadID() const
+	{
+		return TCMap<CStr, CVersionDownload>::fs_GetKey(*this);
+	}
+
+	CStr const &CVersionManagerDaemonActor::CServer::CVersionUpload::f_GetUploadID() const
+	{
+		return TCMap<CStr, CVersionUpload>::fs_GetKey(*this);
+	}
+
+	CVersionManager::CVersionIDAndPlatform const &CVersionManagerDaemonActor::CServer::CVersion::f_GetIdentifier() const
+	{
+		return TCMap<CVersionManager::CVersionIDAndPlatform, CVersion>::fs_GetKey(*this);
+	}
+
+	COrdering_Partial CVersionManagerDaemonActor::CServer::CVersion::CCompareTime::operator () (CVersion const &_Left, CVersion const &_Right) const
+	{
+		if (auto Result = _Left.m_VersionInfo.m_Time.f_IsValid() <=> _Right.m_VersionInfo.m_Time.f_IsValid(); Result != 0)
+			return Result;
+
+		return NStorage::fg_TupleReferences(_Left.m_VersionInfo.m_Time, _Left.f_GetIdentifier()) <=> NStorage::fg_TupleReferences(_Right.m_VersionInfo.m_Time, _Right.f_GetIdentifier());
+	}
+
+	CStr const &CVersionManagerDaemonActor::CServer::CApplication::f_GetName() const
+	{
+		return TCMap<CStr, CApplication>::fs_GetKey(*this);
+	}
+
+	CStr const &CVersionManagerDaemonActor::CServer::CSubscription::f_GetSubscriptionID() const
+	{
+		return TCMap<CStr, CSubscription>::fs_GetKey(*this);
+	}
+
 	CVersionManagerDaemonActor::CServer::CServer(CDistributedAppState &_AppState)
 		: mp_AppState(_AppState)
 	{

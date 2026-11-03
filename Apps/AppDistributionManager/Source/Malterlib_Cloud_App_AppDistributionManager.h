@@ -75,10 +75,7 @@ namespace NMib::NCloud::NAppDistributionManager
 
 		struct CDistribution
 		{
-			CStr const &f_GetName() const
-			{
-				return TCMap<CStr, CDistribution>::fs_GetKey(*this);
-			}
+			CStr const &f_GetName() const;
 
 			// Permanent state
 			CDistributionSettings m_Settings;
@@ -123,10 +120,7 @@ namespace NMib::NCloud::NAppDistributionManager
 		{
 			CVersionManagerApplication(CAppDistributionManagerActor &_This);
 
-			CStr const &f_GetApplicationName() const
-			{
-				return TCMap<CStr, CVersionManagerApplication>::fs_GetKey(*this);
-			}
+			CStr const &f_GetApplicationName() const;
 
 			TCAVLTree<&CVersionManagerVersion::m_ApplicationTimeLink, CVersionManagerVersion::CCompareApplicationByTime> m_VersionsByTime;
 			TCAVLTree<&CVersionManagerVersion::m_ApplicationLink, CVersionManagerVersion::CCompareApplication> m_Versions;
@@ -135,10 +129,7 @@ namespace NMib::NCloud::NAppDistributionManager
 
 		struct CVersionManagerState
 		{
-			TCDistributedActor<CVersionManager> const &f_GetManager() const
-			{
-				return TCMap<TCDistributedActor<CVersionManager>, CVersionManagerState>::fs_GetKey(*this);
-			}
+			TCDistributedActor<CVersionManager> const &f_GetManager() const;
 
 			TCMap<CStr, TCMap<CVersionManager::CVersionIDAndPlatform, CVersionManagerVersion>> m_Versions;
 

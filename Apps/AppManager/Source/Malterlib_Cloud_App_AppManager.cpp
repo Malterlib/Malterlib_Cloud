@@ -8,6 +8,75 @@
 
 namespace NMib::NCloud::NAppManager
 {
+	CAppManagerActor::CApplication::CApplication(CStr const &_Name, CAppManagerActor *_pThis)
+		: m_Name(_Name)
+		, m_pThis(_pThis)
+	{
+	}
+
+	CStr const &CAppManagerActor::CVersionManagerApplication::f_GetApplicationName() const
+	{
+		return TCMap<CStr, CVersionManagerApplication>::fs_GetKey(*this);
+	}
+
+	TCDistributedActor<CVersionManager> const &CAppManagerActor::CVersionManagerState::f_GetManager() const
+	{
+		return TCMap<TCDistributedActor<CVersionManager>, CVersionManagerState>::fs_GetKey(*this);
+	}
+
+	TCDistributedActor<CCloudManager> const &CAppManagerActor::CCloudManagerState::f_GetManager() const
+	{
+		return TCMap<TCDistributedActor<CCloudManager>, CCloudManagerState>::fs_GetKey(*this);
+	}
+
+	CAppManagerActor::CRemoteApplicationKey::CRemoteApplicationKey(CAppManagerCoordinationInterface::CAppInfo const &_AppInfo)
+		: m_Group(_AppInfo.m_Group)
+		, m_VersionManagerApplication(_AppInfo.m_VersionManagerApplication)
+	{
+	}
+
+	CAppManagerActor::CRemoteApplicationKey::CRemoteApplicationKey(CApplicationSettings const &_Settings)
+		: m_Group(_Settings.m_UpdateGroup)
+		, m_VersionManagerApplication(_Settings.m_VersionManagerApplication)
+	{
+	}
+
+	CAppManagerActor::CRemoteApplicationWithTypeKey::CRemoteApplicationWithTypeKey(CAppManagerCoordinationInterface::CAppInfo const &_AppInfo, bool _bBypassCoordination)
+		: CRemoteApplicationKey(_AppInfo)
+		, m_UpdateType(_bBypassCoordination ? EDistributedAppUpdateType_Independent : _AppInfo.m_UpdateType)
+	{
+	}
+
+	CAppManagerActor::CRemoteApplicationWithTypeKey::CRemoteApplicationWithTypeKey(CApplication const &_Application, bool _bBypassCoordination)
+		: CRemoteApplicationKey(_Application.m_Settings)
+		, m_UpdateType(_Application.f_GetUpdateType(_bBypassCoordination))
+	{
+	}
+
+	auto CAppManagerActor::CRemoteApplicationWithTypeKey::f_WithoutType() const -> CRemoteApplicationKey const &
+	{
+		return *this;
+	}
+
+	CStr const &CAppManagerActor::CRemoteAppManager::f_GetHostID() const
+	{
+		return TCMap<CStr, CRemoteAppManager>::fs_GetKey(*this);
+	}
+
+	CExceptionPointer CAppManagerActor::CUpdateApplicationState::f_CheckAbort()
+	{
+		if (m_pApplication->m_bDeleted)
+			return DMibErrorInstance("Application has been deleted, aborting").f_ExceptionPointer();
+
+		if (m_bCancel)
+			return DMibErrorInstance("Update was cancelled").f_ExceptionPointer();
+
+		if (m_bCancelOnAppManagerStop)
+			return DMibErrorInstance("AppManager stopped").f_ExceptionPointer();
+
+		return nullptr;
+	}
+
 	CAppManagerActor::CAppManagerActor()
 		: CDistributedAppActor(CDistributedAppActor_Settings("AppManager").f_AuditCategory("Malterlib/Cloud/AppManager"))
 	{

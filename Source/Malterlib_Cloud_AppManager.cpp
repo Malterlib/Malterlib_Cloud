@@ -6,6 +6,44 @@
 
 namespace NMib::NCloud
 {
+	CAppManagerInterface::CVersionIDAndPlatform::CVersionIDAndPlatform(CVersionManager::CVersionIDAndPlatform const &_Other)
+		: CVersionManager::CVersionIDAndPlatform(_Other)
+	{
+	}
+
+	auto CAppManagerInterface::CVersionIDAndPlatform::operator = (CVersionManager::CVersionIDAndPlatform const &_Right) -> CVersionIDAndPlatform &
+	{
+		static_cast<CVersionManager::CVersionIDAndPlatform &>(*this) = _Right;
+		return *this;
+	}
+
+	CAppManagerInterface::CVersionID::CVersionID(CVersionManager::CVersionID const &_Other)
+		: CVersionManager::CVersionID(_Other)
+	{
+	}
+
+	auto CAppManagerInterface::CVersionID::operator = (CVersionManager::CVersionID const &_Right) -> CVersionID &
+	{
+		static_cast<CVersionManager::CVersionID &>(*this) = _Right;
+		return *this;
+	}
+
+	CAppManagerInterface::CVersionInformation::CVersionInformation(CVersionManager::CVersionInformation const &_Other)
+		: CVersionManager::CVersionInformation(_Other)
+	{
+	}
+
+	auto CAppManagerInterface::CVersionInformation::operator = (CVersionManager::CVersionInformation const &_Right) -> CVersionInformation &
+	{
+		static_cast<CVersionManager::CVersionInformation &>(*this) = _Right;
+		return *this;
+	}
+
+	NStr::CStr const &CAppManagerInterface::CApplicationInfo::f_GetName()
+	{
+		return NContainer::TCMap<NStr::CStr, CApplicationInfo>::fs_GetKey(*this);
+	}
+
 	CAppManagerInterface::CAppManagerInterface()
 	{
 		DMibPublishActorFunction(CAppManagerInterface::f_GetAvailableVersions);

@@ -9,6 +9,16 @@
 
 namespace NMib::NCloud::NPrivate
 {
+	CStr const &CBackupManagerClient_Instance::CPendingBackupFile::f_GetFileName() const
+	{
+		return TCMap<CStr, CPendingBackupFile>::fs_GetKey(*this);
+	}
+
+	CBackupManagerClient_ChecksumState &CBackupManagerClient_Instance::CAppendFileState::f_ChecksumState()
+	{
+		return *this;
+	}
+
 	CBackupManagerClient_Instance::CBackupManagerClient_Instance
 		(
 			TCDistributedActor<CBackupManager> const &_BackupManager

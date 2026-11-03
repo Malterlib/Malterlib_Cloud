@@ -42,6 +42,42 @@ namespace NMib::NCloud
 			<< f_OutgoingBytesPerSecond() / 1'000'000.0
 		;
 	}
+
+	template <typename tf_CStr>
+	void CBackupManagerClient::CNotification_BackupAborted::f_Format(tf_CStr &o_String) const
+	{
+		o_String += "Backup Aborted";
+	}
+
+	template <typename tf_CStr>
+	void CBackupManagerClient::CNotification_BackupError::f_Format(tf_CStr &o_String) const
+	{
+		o_String += typename tf_CStr::CFormat("Backup Error{}: {}") << (m_bFatal ? " (Fatal)" : "") << m_ErrorMessage;
+	}
+
+	template <typename tf_CStr>
+	void CBackupManagerClient::CNotification_FileFinished::f_Format(tf_CStr &o_String) const
+	{
+		o_String += typename tf_CStr::CFormat("File Finished: {}: {}") << m_FileName << m_TransferStats;
+	}
+
+	template <typename tf_CStr>
+	void CBackupManagerClient::CNotification_Quiescent::f_Format(tf_CStr &o_String) const
+	{
+		o_String += "Quiescent";
+	}
+
+	template <typename tf_CStr>
+	void CBackupManagerClient::CNotification_Unquiescent::f_Format(tf_CStr &o_String) const
+	{
+		o_String += "Unquiescent";
+	}
+
+	template <typename tf_CStr>
+	void CBackupManagerClient::CNotification_InitialFinished::f_Format(tf_CStr &o_String) const
+	{
+		o_String += typename tf_CStr::CFormat("Initial Finished: Added: {vs}   Removed: {vs}  Updated: {vs}") << m_AddedFiles << m_RemovedFiles << m_UpdatedFiles;
+	}
 }
 
 #ifndef DMibPNoShortCuts

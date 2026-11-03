@@ -36,12 +36,7 @@ namespace NMib::NCloud
 			struct CClientKey
 			{
 				template <typename tf_CStream>
-				void f_Stream(tf_CStream &_Stream)
-				{
-					_Stream % m_KeyID;
-					_Stream % m_Key;
-					_Stream % m_VerifiedOnServers;
-				}
+				void f_Stream(tf_CStream &_Stream);
 
 				NStr::CStr m_KeyID;
 				CSymmetricKey m_Key;
@@ -51,11 +46,7 @@ namespace NMib::NCloud
 			struct CClient
 			{
 				template <typename tf_CStream>
-				void f_Stream(tf_CStream &_Stream)
-				{
-					_Stream % m_HostID;
-					_Stream % m_Keys;
-				}
+				void f_Stream(tf_CStream &_Stream);
 
 				NStr::CStr m_HostID;
 				NConcurrency::TCAsyncGenerator<CClientKey> m_Keys;
@@ -64,22 +55,14 @@ namespace NMib::NCloud
 			struct CAvailableKeys
 			{
 				template <typename tf_CStream>
-				void f_Stream(tf_CStream &_Stream)
-				{
-					_Stream % m_KeySize;
-					_Stream % m_Keys;
-				}
+				void f_Stream(tf_CStream &_Stream);
 
 				uint32 m_KeySize;
 				NConcurrency::TCAsyncGenerator<CSymmetricKey> m_Keys;
 			};
 
 			template <typename tf_CStream>
-			void f_Stream(tf_CStream &_Stream)
-			{
-				_Stream % m_Clients;
-				_Stream % m_AvailableKeys;
-			}
+			void f_Stream(tf_CStream &_Stream);
 
 			NConcurrency::TCAsyncGenerator<CClient> m_Clients;
 			NConcurrency::TCAsyncGenerator<CAvailableKeys> m_AvailableKeys;
@@ -90,11 +73,7 @@ namespace NMib::NCloud
 			auto operator <=> (CHostKeyID const &_Right) const noexcept = default;
 
 			template <typename tf_CStream>
-			void f_Stream(tf_CStream &_Stream)
-			{
-				_Stream % m_HostID;
-				_Stream % m_KeyID;
-			}
+			void f_Stream(tf_CStream &_Stream);
 
 			NStr::CStr m_HostID;
 			NStr::CStr m_KeyID;
@@ -103,11 +82,7 @@ namespace NMib::NCloud
 		struct CUseAvailableKeyResult
 		{
 			template <typename tf_CStream>
-			void f_Stream(tf_CStream &_Stream)
-			{
-				_Stream % m_bCanUse;
-				_Stream % fg_Move(m_Subscription);
-			}
+			void f_Stream(tf_CStream &_Stream);
 
 			bool m_bCanUse = false;
 			// NOLINTNEXTLINE(malterlib-conceptual-prefix): a subscription handle like CActorSubscription, which the check misses because it is derived from it
@@ -150,3 +125,5 @@ namespace NMib::NCloud
 #ifndef DMibPNoShortCuts
 using namespace NMib::NCloud;
 #endif
+
+#include "Malterlib_Cloud_KeyManager.hpp"

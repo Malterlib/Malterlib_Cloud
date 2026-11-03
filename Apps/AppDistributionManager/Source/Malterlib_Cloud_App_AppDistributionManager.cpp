@@ -7,6 +7,21 @@
 
 namespace NMib::NCloud::NAppDistributionManager
 {
+	CStr const &CAppDistributionManagerActor::CDistribution::f_GetName() const
+	{
+		return TCMap<CStr, CDistribution>::fs_GetKey(*this);
+	}
+
+	CStr const &CAppDistributionManagerActor::CVersionManagerApplication::f_GetApplicationName() const
+	{
+		return TCMap<CStr, CVersionManagerApplication>::fs_GetKey(*this);
+	}
+
+	TCDistributedActor<CVersionManager> const &CAppDistributionManagerActor::CVersionManagerState::f_GetManager() const
+	{
+		return TCMap<TCDistributedActor<CVersionManager>, CVersionManagerState>::fs_GetKey(*this);
+	}
+
 	CAppDistributionManagerActor::CAppDistributionManagerActor()
 		: CDistributedAppActor(CDistributedAppActor_Settings("AppDistributionManager").f_AuditCategory("Malterlib/Cloud/AppDistributionManager"))
 	{

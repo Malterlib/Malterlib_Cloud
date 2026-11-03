@@ -99,10 +99,7 @@ namespace NMib::NCloud::NCloudManagerDatabase
 
 	struct CApplicationUpdateStateKey : public CApplicationKey
 	{
-		CApplicationUpdateStateKey()
-			: CApplicationKey{.m_Prefix = mc_Prefix}
-		{
-		}
+		CApplicationUpdateStateKey();
 
 		static CStr const mc_Prefix; // NOLINT(malterlib-variable-naming): defined constexpr in the .cpp, which the check doesn't see from here
 	};

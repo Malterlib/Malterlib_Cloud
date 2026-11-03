@@ -42,10 +42,7 @@ namespace NMib::NCloud::NBackupManager
 		struct CBackupInstanceManager;
 		struct CBackupInstanceManager
 		{
-			CBackupKey const &f_GetKey() const
-			{
-				return TCMap<CBackupKey, CBackupInstanceManager>::fs_GetKey(*this);
-			}
+			CBackupKey const &f_GetKey() const;
 
 			TCDistributedActor<CBackupInstance> m_BackupInstance;
 			TCLinkedList<TCPromise<void>> m_OnDestroyed;
@@ -61,10 +58,7 @@ namespace NMib::NCloud::NBackupManager
 			CBackupDownload();
 			~CBackupDownload();
 
-			CStr const &f_GetDownloadID() const
-			{
-				return TCMap<CStr, CBackupDownload>::fs_GetKey(*this);
-			}
+			CStr const &f_GetDownloadID() const;
 
 			TCUnsafeFuture<void> f_Destroy();
 

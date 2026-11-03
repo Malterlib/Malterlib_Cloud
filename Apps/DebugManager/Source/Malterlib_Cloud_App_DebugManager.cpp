@@ -12,6 +12,16 @@
 
 namespace NMib::NCloud::NDebugManager
 {
+	CStr const &CDebugManagerApp::CDownload::f_GetDownloadID() const
+	{
+		return TCMap<CStr, CDownload>::fs_GetKey(*this);
+	}
+
+	CStr const &CDebugManagerApp::CUpload::f_GetUploadID() const
+	{
+		return TCMap<CStr, CUpload>::fs_GetKey(*this);
+	}
+
 	CDebugManagerApp::CDebugManagerApp()
 		: CDistributedAppActor(CDistributedAppActor_Settings{"DebugManager"})
 	{

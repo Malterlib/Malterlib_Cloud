@@ -8,6 +8,11 @@
 
 namespace NMib::NCloud::NBackupManager
 {
+	CStr const &CBackupInstance::CInternal::CRSyncContext::f_GetSyncID() const
+	{
+		return TCMap<CStr, CRSyncContext>::fs_GetKey(*this);
+	}
+
 	void CBackupInstance::CInternal::f_RunRSyncProtocol(CRSyncContext &_Context, CIOByteVector &&_ServerPacket)
 	{
 		_Context.m_BytesTransferredIn += _ServerPacket.f_GetLen();

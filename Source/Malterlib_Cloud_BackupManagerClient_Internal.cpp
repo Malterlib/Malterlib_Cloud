@@ -6,6 +6,11 @@
 
 namespace NMib::NCloud
 {
+	CStr const &CBackupManagerClient::CInternal::CWatchedPath::f_GetPath() const
+	{
+		return TCMap<CStr, CWatchedPath>::fs_GetKey(*this);
+	}
+
 	CBackupManagerClient::CInternal::CInternal
 		(
 			CBackupManagerClient *_pThis

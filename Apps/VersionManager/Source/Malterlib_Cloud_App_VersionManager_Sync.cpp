@@ -19,6 +19,21 @@ namespace NMib::NCloud::NVersionManager
 {
 	using namespace NMib::NStr;
 
+	NStr::CStr const &CSyncSourceState::f_GetName() const
+	{
+		return NContainer::TCMap<NStr::CStr, CSyncSourceState>::fs_GetKey(*this);
+	}
+
+	NStr::CStr const &CSyncHostSubscription::f_GetHostID() const
+	{
+		return NContainer::TCMap<NStr::CStr, CSyncHostSubscription>::fs_GetKey(*this);
+	}
+
+	CSyncVersionState::CSyncVersionState(NStr::CStr const &_SequencerDescription)
+		: m_Sequencer(_SequencerDescription)
+	{
+	}
+
 	bool CVersionManagerDaemonActor::CServer::fsp_SyncMatchesFilter(CStr const &_Value, TCVector<CStr> const &_Filters)
 	{
 		if (_Filters.f_IsEmpty())

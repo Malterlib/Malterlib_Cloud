@@ -121,16 +121,10 @@ namespace NMib::NCloud
 		CAppManagerTestHelper(CStr const &_RootDirectory, EOption _Options, fp64 _Timeout);
 
 		template <typename tf_CHostID, typename tf_CPermissions>
-		static auto fs_Permissions(tf_CHostID &&_HostID, tf_CPermissions &&_Permissions)
-		{
-			return CDistributedActorTrustManagerInterface::CAddPermissions{{_HostID, ""}, _Permissions, mc_WaitForSubscriptions};
-		}
+		static auto fs_Permissions(tf_CHostID &&_HostID, tf_CPermissions &&_Permissions);
 
 		template <typename tf_CNamespace, typename tf_CHosts>
-		static auto fs_NamespaceHosts(tf_CNamespace &&_Namespace, tf_CHosts &&_Hosts)
-		{
-			return CDistributedActorTrustManagerInterface::CChangeNamespaceHosts{_Namespace, _Hosts, mc_WaitForSubscriptions};
-		}
+		static auto fs_NamespaceHosts(tf_CNamespace &&_Namespace, tf_CHosts &&_Hosts);
 
 		TCFuture<void> f_SetupTrust();
 		TCFuture<void> f_InstallTestApp(CStr _Name = "TestApp", CStr _Tag = "TestTag", CStr _Group = "TestGroup", CStr _VersionManagerApplication = "TestApp");
@@ -150,3 +144,5 @@ namespace NMib::NCloud
 		TCSharedPointer<CState> m_pState;
 	};
 }
+
+#include "Test_Malterlib_Cloud_AppManager.hpp"

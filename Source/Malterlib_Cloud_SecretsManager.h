@@ -107,7 +107,7 @@ namespace NMib::NCloud
 			CSecret &operator = (CSecret &&_Other) = default;
 
 			template <typename ...tfp_CParam>
-			CSecret(tfp_CParam && ...p_Params) // This is implemented inline as MSVC seems to be broken
+			CSecret(tfp_CParam && ...p_Params) // NOLINT(malterlib-header-declarations-only): Defined in the class because MSVC fails to match an out-of-class definition of it
 				: CSuper(fg_Forward<tfp_CParam>(p_Params)...)
 			{
 			}

@@ -12,6 +12,16 @@
 
 namespace NMib::NCloud::NBackupManager
 {
+	auto CBackupManagerServer::CBackupInstanceManager::f_GetKey() const -> CBackupKey const &
+	{
+		return TCMap<CBackupKey, CBackupInstanceManager>::fs_GetKey(*this);
+	}
+
+	CStr const &CBackupManagerServer::CBackupDownload::f_GetDownloadID() const
+	{
+		return TCMap<CStr, CBackupDownload>::fs_GetKey(*this);
+	}
+
 	CStr CBackupManagerServer::CBackupKey::f_GetDesc() const
 	{
 		return fg_Format("{}/{tst.}-{}", m_BackupName, m_BackupTime, m_BackupID);

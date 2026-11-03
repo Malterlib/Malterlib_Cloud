@@ -41,10 +41,7 @@ namespace NMib::NCloud::NDebugManager
 			CDownload();
 			~CDownload();
 
-			CStr const &f_GetDownloadID() const
-			{
-				return TCMap<CStr, CDownload>::fs_GetKey(*this);
-			}
+			CStr const &f_GetDownloadID() const;
 
 			TCActor<NCloud::CFileTransferSend> m_FileTransferSend;
 		};
@@ -54,10 +51,7 @@ namespace NMib::NCloud::NDebugManager
 			CUpload();
 			~CUpload();
 
-			CStr const &f_GetUploadID() const
-			{
-				return TCMap<CStr, CUpload>::fs_GetKey(*this);
-			}
+			CStr const &f_GetUploadID() const;
 
 			TCActor<NCloud::CFileTransferReceive> m_FileTransferReceive;
 		};

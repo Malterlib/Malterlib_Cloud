@@ -30,12 +30,8 @@ namespace NMib::NCloud
 
 				template <typename tf_CStream>
 				void f_Stream(tf_CStream &_Stream);
-
 				template <typename tf_CStr>
-				void f_Format(tf_CStr &o_Str) const
-				{
-					o_Str += typename tf_CStr::CFormat("Key: {}   Verified: {vs}") << m_Key << m_VerifiedOnServers;
-				}
+				void f_Format(tf_CStr &o_Str) const;
 
 				auto operator <=> (CClientKey const &_Right) const noexcept = default;
 
@@ -49,12 +45,8 @@ namespace NMib::NCloud
 
 				template <typename tf_CStream>
 				void f_Stream(tf_CStream &_Stream);
-
 				template <typename tf_CStr>
-				void f_Format(tf_CStr &o_Str) const
-				{
-					o_Str += typename tf_CStr::CFormat("{}") << m_Keys;
-				}
+				void f_Format(tf_CStr &o_Str) const;
 
 				auto operator <=> (CClientStore const &_Right) const noexcept = default;
 

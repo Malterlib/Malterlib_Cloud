@@ -36,10 +36,7 @@ namespace NMib::NCloud::NVersionManager
 	/// Runtime state for a single sync source
 	struct CSyncSourceState
 	{
-		NStr::CStr const &f_GetName() const
-		{
-			return NContainer::TCMap<NStr::CStr, CSyncSourceState>::fs_GetKey(*this);
-		}
+		NStr::CStr const &f_GetName() const;
 
 		CSyncSourceConfig m_Config;
 
@@ -52,10 +49,7 @@ namespace NMib::NCloud::NVersionManager
 	/// Subscription state for a single host ID (shared across all sync configs that reference it)
 	struct CSyncHostSubscription
 	{
-		NStr::CStr const &f_GetHostID() const
-		{
-			return NContainer::TCMap<NStr::CStr, CSyncHostSubscription>::fs_GetKey(*this);
-		}
+		NStr::CStr const &f_GetHostID() const;
 
 		NConcurrency::TCWeakDistributedActor<CVersionManager> m_Manager;
 		NConcurrency::CActorSubscription m_Subscription;
@@ -73,10 +67,7 @@ namespace NMib::NCloud::NVersionManager
 	/// State for tracking sync processing of a specific version
 	struct CSyncVersionState
 	{
-		CSyncVersionState(NStr::CStr const &_SequencerDescription)
-			: m_Sequencer(_SequencerDescription)
-		{
-		}
+		CSyncVersionState(NStr::CStr const &_SequencerDescription);
 
 		NConcurrency::CSequencer m_Sequencer;
 		// Origin ID of the notification chain currently being processed.

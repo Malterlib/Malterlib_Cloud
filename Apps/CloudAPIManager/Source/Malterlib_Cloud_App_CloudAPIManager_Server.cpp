@@ -13,6 +13,11 @@
 
 namespace NMib::NCloud::NCloudAPIManager
 {
+	CStr const &CCloudAPIManagerDaemonActor::CServer::CCloudContext::f_GetName() const
+	{
+		return TCMap<CStr, CCloudContext>::fs_GetKey(*this);
+	}
+
 	CCloudAPIManagerDaemonActor::CServer::CServer(CDistributedAppState &_AppState)
 		: mp_AppState(_AppState)
 		, mp_pCanDestroyTracker(fg_Construct())

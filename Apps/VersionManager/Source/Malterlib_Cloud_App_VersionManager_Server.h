@@ -25,10 +25,7 @@ namespace NMib::NCloud::NVersionManager
 			CVersionDownload();
 			~CVersionDownload();
 
-			CStr const &f_GetDownloadID() const
-			{
-				return TCMap<CStr, CVersionDownload>::fs_GetKey(*this);
-			}
+			CStr const &f_GetDownloadID() const;
 
 			TCActor<NCloud::CFileTransferSend> m_FileTransferSend;
 			CStr m_Desc;
@@ -39,10 +36,7 @@ namespace NMib::NCloud::NVersionManager
 			CVersionUpload();
 			~CVersionUpload();
 
-			CStr const &f_GetUploadID() const
-			{
-				return TCMap<CStr, CVersionUpload>::fs_GetKey(*this);
-			}
+			CStr const &f_GetUploadID() const;
 
 			TCActor<NCloud::CFileTransferReceive> m_FileTransferReceive;
 			CActorSubscription m_DownloadSubscription;
@@ -52,34 +46,20 @@ namespace NMib::NCloud::NVersionManager
 
 		struct CVersion
 		{
-			CVersionManager::CVersionIDAndPlatform const &f_GetIdentifier() const
-			{
-				return TCMap<CVersionManager::CVersionIDAndPlatform, CVersion>::fs_GetKey(*this);
-			}
+			CVersionManager::CVersionIDAndPlatform const &f_GetIdentifier() const;
 
 			CVersionManager::CVersionInformation m_VersionInfo;
 			TCAVLLink<> m_TimeLink;
 
 			struct CCompareTime
 			{
-				COrdering_Partial operator () (CVersion const &_Left, CVersion const &_Right) const
-				{
-					if (auto Result = _Left.m_VersionInfo.m_Time.f_IsValid() <=> _Right.m_VersionInfo.m_Time.f_IsValid(); Result != 0)
-						return Result;
-
-					return NStorage::fg_TupleReferences(_Left.m_VersionInfo.m_Time, _Left.f_GetIdentifier())
-						<=> NStorage::fg_TupleReferences(_Right.m_VersionInfo.m_Time, _Right.f_GetIdentifier())
-					;
-				}
+				COrdering_Partial operator () (CVersion const &_Left, CVersion const &_Right) const;
 			};
 		};
 
 		struct CApplication
 		{
-			CStr const &f_GetName() const
-			{
-				return TCMap<CStr, CApplication>::fs_GetKey(*this);
-			}
+			CStr const &f_GetName() const;
 
 			TCMap<CVersionManager::CVersionIDAndPlatform, CVersion> m_Versions;
 			TCAVLTree<&CVersion::m_TimeLink, CVersion::CCompareTime> m_VersionsByTime;
@@ -99,10 +79,7 @@ namespace NMib::NCloud::NVersionManager
 
 		struct CSubscription
 		{
-			CStr const &f_GetSubscriptionID() const
-			{
-				return TCMap<CStr, CSubscription>::fs_GetKey(*this);
-			}
+			CStr const &f_GetSubscriptionID() const;
 
 			uint32 m_nInitial = 0;
 			CCallingHostInfo m_CallingHostInfo;

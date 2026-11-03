@@ -54,10 +54,7 @@ namespace NMib::NCloud
 
 		struct CWatchedPath
 		{
-			CStr const &f_GetPath() const
-			{
-				return TCMap<CStr, CWatchedPath>::fs_GetKey(*this);
-			}
+			CStr const &f_GetPath() const;
 
 			CActorSubscription m_Subscription;
 			bool m_bRecursive = false;

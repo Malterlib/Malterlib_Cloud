@@ -47,10 +47,7 @@ namespace NMib::NCloud::NCloudAPIManager
 
 		struct CCloudContext
 		{
-			CStr const &f_GetName() const
-			{
-				return TCMap<CStr, CCloudContext>::fs_GetKey(*this);
-			}
+			CStr const &f_GetName() const;
 
 			COpenStackKeystoneInfo m_KeystoneInfo;
 			CStr m_SwiftStoragePolicy;

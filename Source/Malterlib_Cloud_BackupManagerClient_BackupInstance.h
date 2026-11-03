@@ -73,10 +73,7 @@ namespace NMib::NCloud::NPrivate
 
 		struct CPendingBackupFile
 		{
-			CStr const &f_GetFileName() const
-			{
-				return TCMap<CStr, CPendingBackupFile>::fs_GetKey(*this);
-			}
+			CStr const &f_GetFileName() const;
 
 			~CPendingBackupFile();
 
@@ -112,10 +109,7 @@ namespace NMib::NCloud::NPrivate
 
 		struct CAppendFileState : public CBackupManagerClient_ChecksumState
 		{
-			CBackupManagerClient_ChecksumState &f_ChecksumState()
-			{
-				return *this;
-			}
+			CBackupManagerClient_ChecksumState &f_ChecksumState();
 
 			bool m_bDirty = true;
 		};
