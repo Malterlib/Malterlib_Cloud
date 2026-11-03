@@ -15,7 +15,7 @@ namespace NMib::NCloud::NSecretsManager
 	using CEncryptedStream = TCBinaryStream_Encrypted<NStorage::TCUniquePointer<NStream::CBinaryStream>>;
 
 	CSecretsManagerDaemonActor::CServer::CDownload::CDownload() = default;
-	CSecretsManagerDaemonActor::CServer::CDownload::CDownload(CDownload &&) = default;
+	CSecretsManagerDaemonActor::CServer::CDownload::CDownload(CDownload &&_Other) = default;
 
 	CSecretsManagerDaemonActor::CServer::CDownload::~CDownload()
 	{
@@ -47,7 +47,7 @@ namespace NMib::NCloud::NSecretsManager
 	}
 
 	CSecretsManagerDaemonActor::CServer::CUpload::CUpload() = default;
-	CSecretsManagerDaemonActor::CServer::CUpload::CUpload(CUpload &&) = default;
+	CSecretsManagerDaemonActor::CServer::CUpload::CUpload(CUpload &&_Other) = default;
 
 	CSecretsManagerDaemonActor::CServer::CUpload::~CUpload()
 	{
@@ -370,7 +370,7 @@ namespace NMib::NCloud::NSecretsManager
 				{
 					if (pSecretProperties->m_Secret != SavedSecret)
 					{
-						(*pCleanupFile)->f_Destroy() > [=](TCAsyncResult<void> &&)
+						(*pCleanupFile)->f_Destroy() > [=](TCAsyncResult<void> &&_DestroyResult)
 							{
 								// For the problem with two competing simultaneous uploads we chose to let the one that completes first win.
 								// Another alternative would have been to lock the secret during an upload and disallow other operations during the upload,
@@ -421,7 +421,7 @@ namespace NMib::NCloud::NSecretsManager
 					}
 					else
 					{
-						(*pCleanupFile)->f_Destroy() > [=](TCAsyncResult<void> &&)
+						(*pCleanupFile)->f_Destroy() > [=](TCAsyncResult<void> &&_DestroyResult)
 							{
 								CStr Error = "{} files in the manifest? This was unexpected"_f << Result.m_Manifest.m_Files.f_GetLen();
 								CheckResultPromise.f_SetException(Auditor.f_Exception(Error));
@@ -432,7 +432,7 @@ namespace NMib::NCloud::NSecretsManager
 				else
 				{
 					// The secret was removed while the file was transferred. Ooops.
-					(*pCleanupFile)->f_Destroy() > [=](TCAsyncResult<void> &&)
+					(*pCleanupFile)->f_Destroy() > [=](TCAsyncResult<void> &&_DestroyResult)
 						{
 							CheckResultPromise.f_SetException(Auditor.f_Exception("Secret '{}' removed while the secret file was uploaded"_f << _ID));
 						}

@@ -76,20 +76,20 @@ namespace NMib::NCloud
 		{
 		}
 
-		template <typename t_CResult>
+		template <typename tf_CResult>
 		auto f_Upload
 			(
-				NConcurrency::TCActorFunctor<TCFuture<t_CResult> (NConcurrency::TCAsyncGeneratorWithID<CDebugManager::CDownloadFile> _FilesGenerator)> _fDoUpload
+				NConcurrency::TCActorFunctor<TCFuture<tf_CResult> (NConcurrency::TCAsyncGeneratorWithID<CDebugManager::CDownloadFile> _FilesGenerator)> _fDoUpload
 				, CStr _Source
 				, int32 _CompressionLevel
 			)
 			-> TCUnsafeFuture<CDebugManagerHelper::CUploadResult>
 		;
 
-		template <typename t_CResult>
+		template <typename tf_CResult>
 		auto f_Download
 			(
-				NConcurrency::TCActorFunctor<TCFuture<t_CResult> (NConcurrency::CActorSubscription _Subscription)> _fDoDownload
+				NConcurrency::TCActorFunctor<TCFuture<tf_CResult> (NConcurrency::CActorSubscription _Subscription)> _fDoDownload
 				, CStr _DestinationDirectory
 				, CFileTransferReceive::EReceiveFlag _ReceiveFlags
 				, uint64 _QueueSize
@@ -111,10 +111,10 @@ namespace NMib::NCloud
 	}
 
 	CDebugManagerHelper::~CDebugManagerHelper() = default;
-	CDebugManagerHelper::CDebugManagerHelper(CDebugManagerHelper const &) = default;
-	CDebugManagerHelper::CDebugManagerHelper(CDebugManagerHelper &&) = default;
-	CDebugManagerHelper &CDebugManagerHelper::operator = (CDebugManagerHelper const &) = default;
-	CDebugManagerHelper &CDebugManagerHelper::operator = (CDebugManagerHelper &&) = default;
+	CDebugManagerHelper::CDebugManagerHelper(CDebugManagerHelper const &_Other) = default;
+	CDebugManagerHelper::CDebugManagerHelper(CDebugManagerHelper &&_Other) = default;
+	CDebugManagerHelper &CDebugManagerHelper::operator = (CDebugManagerHelper const &_Other) = default;
+	CDebugManagerHelper &CDebugManagerHelper::operator = (CDebugManagerHelper &&_Other) = default;
 
 	TCFuture<void> CDebugManagerHelper::f_AbortAll() const
 	{
@@ -136,10 +136,10 @@ namespace NMib::NCloud
 		return fg_Move(Promise.m_Future);
 	}
 
-	template <typename t_CResult>
+	template <typename tf_CResult>
 	auto CDebugManagerHelperInternal::f_Upload
 		(
-			NConcurrency::TCActorFunctor<TCFuture<t_CResult> (NConcurrency::TCAsyncGeneratorWithID<CDebugManager::CDownloadFile> _FilesGenerator)> _fDoUpload
+			NConcurrency::TCActorFunctor<TCFuture<tf_CResult> (NConcurrency::TCAsyncGeneratorWithID<CDebugManager::CDownloadFile> _FilesGenerator)> _fDoUpload
 			, CStr _Source
 			, int32 _CompressionLevel
 		)
@@ -221,10 +221,10 @@ namespace NMib::NCloud
 		co_return fg_Move(ReturnResult);
 	}
 
-	template <typename t_CResult>
+	template <typename tf_CResult>
 	auto CDebugManagerHelperInternal::f_Download
 		(
-			NConcurrency::TCActorFunctor<TCFuture<t_CResult> (NConcurrency::CActorSubscription _Subscription)> _fDoDownload
+			NConcurrency::TCActorFunctor<TCFuture<tf_CResult> (NConcurrency::CActorSubscription _Subscription)> _fDoDownload
 			, CStr _DestinationDirectory
 			, CFileTransferReceive::EReceiveFlag _ReceiveFlags
 			, uint64 _QueueSize

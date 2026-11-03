@@ -41,7 +41,7 @@ namespace NMib::NCloud::NSecretsManager
 		struct CDownload
 		{
 			CDownload();
-			CDownload(CDownload &&);
+			CDownload(CDownload &&_Other);
 			~CDownload();
 			TCFuture<void> f_Destroy();
 
@@ -53,7 +53,7 @@ namespace NMib::NCloud::NSecretsManager
 		struct CUpload
 		{
 			CUpload();
-			CUpload(CUpload &&);
+			CUpload(CUpload &&_Other);
 			~CUpload();
 			TCFuture<void> f_Destroy();
 

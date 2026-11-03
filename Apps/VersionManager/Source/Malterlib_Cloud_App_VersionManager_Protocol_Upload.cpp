@@ -73,7 +73,7 @@ namespace NMib::NCloud::NVersionManager
 		{
 		}
 
-		COptionalFuture(COptionalFuture &&) = default;
+		COptionalFuture(COptionalFuture &&_Other) = default;
 
 		~COptionalFuture()
 		{

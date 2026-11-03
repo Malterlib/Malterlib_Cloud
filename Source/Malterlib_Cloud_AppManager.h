@@ -70,10 +70,10 @@ namespace NMib::NCloud
 		struct CVersionIDAndPlatform : public CVersionManager::CVersionIDAndPlatform
 		{
 			CVersionIDAndPlatform() = default;
-			CVersionIDAndPlatform(CVersionIDAndPlatform const &) = default;
-			CVersionIDAndPlatform(CVersionIDAndPlatform &&) = default;
-			CVersionIDAndPlatform &operator = (CVersionIDAndPlatform const &) = default;
-			CVersionIDAndPlatform &operator = (CVersionIDAndPlatform &&) = default;
+			CVersionIDAndPlatform(CVersionIDAndPlatform const &_Other) = default;
+			CVersionIDAndPlatform(CVersionIDAndPlatform &&_Other) = default;
+			CVersionIDAndPlatform &operator = (CVersionIDAndPlatform const &_Other) = default;
+			CVersionIDAndPlatform &operator = (CVersionIDAndPlatform &&_Other) = default;
 
 			CVersionIDAndPlatform(CVersionManager::CVersionIDAndPlatform const &_Other)
 				: CVersionManager::CVersionIDAndPlatform(_Other)
@@ -93,10 +93,10 @@ namespace NMib::NCloud
 		struct CVersionID : public CVersionManager::CVersionID
 		{
 			CVersionID() = default;
-			CVersionID(CVersionID const &) = default;
-			CVersionID(CVersionID &&) = default;
-			CVersionID &operator = (CVersionID const &) = default;
-			CVersionID &operator = (CVersionID &&) = default;
+			CVersionID(CVersionID const &_Other) = default;
+			CVersionID(CVersionID &&_Other) = default;
+			CVersionID &operator = (CVersionID const &_Other) = default;
+			CVersionID &operator = (CVersionID &&_Other) = default;
 
 			CVersionID(CVersionManager::CVersionID const &_Other)
 				: CVersionManager::CVersionID(_Other)
@@ -116,10 +116,10 @@ namespace NMib::NCloud
 		struct CVersionInformation : public CVersionManager::CVersionInformation
 		{
 			CVersionInformation() = default;
-			CVersionInformation(CVersionInformation const &) = default;
-			CVersionInformation(CVersionInformation &&) = default;
-			CVersionInformation &operator = (CVersionInformation const &) = default;
-			CVersionInformation &operator = (CVersionInformation &&) = default;
+			CVersionInformation(CVersionInformation const &_Other) = default;
+			CVersionInformation(CVersionInformation &&_Other) = default;
+			CVersionInformation &operator = (CVersionInformation const &_Other) = default;
+			CVersionInformation &operator = (CVersionInformation &&_Other) = default;
 
 			CVersionInformation(CVersionManager::CVersionInformation const &_Other)
 				: CVersionManager::CVersionInformation(_Other)

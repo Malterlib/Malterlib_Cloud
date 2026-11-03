@@ -90,8 +90,8 @@ namespace NMib::NCloud
 		struct CManifestChange_Add : public CManifestChange_Change
 		{
 			CManifestChange_Add() = default;
-			CManifestChange_Add(CManifestChange_Add &&) = default;
-			CManifestChange_Add(CManifestChange_Add const &) = default;
+			CManifestChange_Add(CManifestChange_Add &&_Other) = default;
+			CManifestChange_Add(CManifestChange_Add const &_Other) = default;
 
 			CManifestChange_Add(NFile::CDirectoryManifestFile &&_ManifestFile);
 		};
@@ -105,8 +105,8 @@ namespace NMib::NCloud
 		struct CManifestChange_Rename : public CManifestChange_Change
 		{
 			CManifestChange_Rename() = default;
-			CManifestChange_Rename(CManifestChange_Rename &&) = default;
-			CManifestChange_Rename(CManifestChange_Rename const &) = default;
+			CManifestChange_Rename(CManifestChange_Rename &&_Other) = default;
+			CManifestChange_Rename(CManifestChange_Rename const &_Other) = default;
 
 			CManifestChange_Rename(NFile::CDirectoryManifestFile &&_ManifestFile, NStr::CStr const &_FromFileName);
 

@@ -101,10 +101,10 @@ namespace NMib::NCloud
 			;
 
 			CSecret() = default;
-			CSecret(CSecret const &) = default;
-			CSecret(CSecret &&) = default;
-			CSecret &operator = (CSecret const &) = default;
-			CSecret &operator = (CSecret &&) = default;
+			CSecret(CSecret const &_Other) = default;
+			CSecret(CSecret &&_Other) = default;
+			CSecret &operator = (CSecret const &_Other) = default;
+			CSecret &operator = (CSecret &&_Other) = default;
 
 			template <typename ...tfp_CParam>
 			CSecret(tfp_CParam && ...p_Params) // This is implemented inline as MSVC seems to be broken

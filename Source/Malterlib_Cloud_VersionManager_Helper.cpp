@@ -113,10 +113,10 @@ namespace NMib::NCloud
 	}
 
 	CVersionManagerHelper::~CVersionManagerHelper() = default;
-	CVersionManagerHelper::CVersionManagerHelper(CVersionManagerHelper const &) = default;
-	CVersionManagerHelper::CVersionManagerHelper(CVersionManagerHelper &&) = default;
-	CVersionManagerHelper &CVersionManagerHelper::operator = (CVersionManagerHelper const &) = default;
-	CVersionManagerHelper &CVersionManagerHelper::operator = (CVersionManagerHelper &&) = default;
+	CVersionManagerHelper::CVersionManagerHelper(CVersionManagerHelper const &_Other) = default;
+	CVersionManagerHelper::CVersionManagerHelper(CVersionManagerHelper &&_Other) = default;
+	CVersionManagerHelper &CVersionManagerHelper::operator = (CVersionManagerHelper const &_Other) = default;
+	CVersionManagerHelper &CVersionManagerHelper::operator = (CVersionManagerHelper &&_Other) = default;
 
 	TCFuture<void> CVersionManagerHelper::f_AbortAll() const
 	{

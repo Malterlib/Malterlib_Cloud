@@ -91,37 +91,37 @@ namespace
 		DMibStreamImplementProtected(TCBinaryStreamFileDelayed);
 	};
 
-	template <typename tf_CKey, typename tf_CValue, typename ...tf_CParams>
+	template <typename tf_CKey, typename tf_CValue, typename ...tfp_CParams>
 	void fg_CreateMapHelper(TCMap<tf_CKey, tf_CValue> &_Return)
 	{
 	}
 
-	template <typename tf_CKey, typename tf_CValue, typename ...tf_CParams>
-	void fg_CreateMapHelper(TCMap<tf_CKey, tf_CValue> &_Return, tf_CKey &&_First, tf_CParams && ...p_Params)
+	template <typename tf_CKey, typename tf_CValue, typename ...tfp_CParams>
+	void fg_CreateMapHelper(TCMap<tf_CKey, tf_CValue> &_Return, tf_CKey &&_First, tfp_CParams && ...p_Params)
 	{
 		_Return[fg_Forward<tf_CKey>(_First)];
-		fg_CreateMapHelper<tf_CKey, tf_CValue>(_Return, fg_Forward<tf_CParams>(p_Params)...);
+		fg_CreateMapHelper<tf_CKey, tf_CValue>(_Return, fg_Forward<tfp_CParams>(p_Params)...);
 	}
 
-	template <typename tf_CKey, typename tf_CValue, typename ...tf_CParams>
-	TCMap<NTraits::TCRemoveReferenceAndQualifiers<tf_CKey>, NTraits::TCRemoveReferenceAndQualifiers<tf_CValue>> fg_CreateMap(tf_CKey &&_First, tf_CParams && ...p_Params)
+	template <typename tf_CKey, typename tf_CValue, typename ...tfp_CParams>
+	TCMap<NTraits::TCRemoveReferenceAndQualifiers<tf_CKey>, NTraits::TCRemoveReferenceAndQualifiers<tf_CValue>> fg_CreateMap(tf_CKey &&_First, tfp_CParams && ...p_Params)
 	{
 		TCMap<NTraits::TCRemoveReferenceAndQualifiers<tf_CKey>, NTraits::TCRemoveReferenceAndQualifiers<tf_CValue>> Return;
 		fg_CreateMapHelper<NTraits::TCRemoveReferenceAndQualifiers<tf_CKey>, NTraits::TCRemoveReferenceAndQualifiers<tf_CValue>>
 			(
 				Return
 				, fg_Forward<tf_CKey>(_First)
-				, fg_Forward<tf_CParams>(p_Params)...
+				, fg_Forward<tfp_CParams>(p_Params)...
 			)
 		;
 		return Return;
 	}
 
-	template <typename tf_CKey, typename tf_CValue, typename ...tf_CParams>
-	TCMap<tf_CKey, tf_CValue> fg_CreateMap(tf_CParams && ...p_Params)
+	template <typename tf_CKey, typename tf_CValue, typename ...tfp_CParams>
+	TCMap<tf_CKey, tf_CValue> fg_CreateMap(tfp_CParams && ...p_Params)
 	{
 		TCMap<tf_CKey, tf_CValue> Return;
-		fg_CreateMapHelper<tf_CKey, tf_CValue>(Return, fg_Forward<tf_CParams>(p_Params)...);
+		fg_CreateMapHelper<tf_CKey, tf_CValue>(Return, fg_Forward<tfp_CParams>(p_Params)...);
 		return Return;
 	}
 };
@@ -2182,7 +2182,7 @@ private:
 					auto Subscription = fg_Move(SecretsManagerLaunches[0].m_Subscription);
 					Subscription->f_Destroy().f_OnResultSet
 						(
-							[=](auto &&)
+							[=](auto &&_DestroyResult)
 							{
 								pDestroyFinished->f_Exchange(true);
 								pDestroyFinishedEvent->f_SetSignaled();

@@ -108,7 +108,7 @@ namespace NMib::NCloud::NDebugManager
 	struct COptionalFuture
 	{
 		COptionalFuture(TCFuture<void> &&_Future);
-		COptionalFuture(COptionalFuture &&);
+		COptionalFuture(COptionalFuture &&_Other);
 		~COptionalFuture();
 
 		TCFuture<void> m_Future;

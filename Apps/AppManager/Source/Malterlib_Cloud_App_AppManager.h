@@ -537,8 +537,8 @@ namespace NMib::NCloud::NAppManager
 		struct CUpdateApplicationState
 		{
 			CUpdateApplicationState() = default;
-			CUpdateApplicationState(CUpdateApplicationState const &) = delete;
-			CUpdateApplicationState(CUpdateApplicationState &&) = delete;
+			CUpdateApplicationState(CUpdateApplicationState const &_Other) = delete;
+			CUpdateApplicationState(CUpdateApplicationState &&_Other) = delete;
 
 			CExceptionPointer f_CheckAbort()
 			{

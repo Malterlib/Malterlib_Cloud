@@ -323,10 +323,10 @@ namespace NMib::NCloud
 		CVersionManagerHelper(NStr::CStr const &_RootDirectory, uint64 _QueueSize = NFile::gc_IdealNetworkQueueSize, fp64 _Timeout = 30.0);
 		~CVersionManagerHelper();
 
-		CVersionManagerHelper(CVersionManagerHelper const &);
-		CVersionManagerHelper(CVersionManagerHelper &&);
-		CVersionManagerHelper &operator = (CVersionManagerHelper const &);
-		CVersionManagerHelper &operator = (CVersionManagerHelper &&);
+		CVersionManagerHelper(CVersionManagerHelper const &_Other);
+		CVersionManagerHelper(CVersionManagerHelper &&_Other);
+		CVersionManagerHelper &operator = (CVersionManagerHelper const &_Other);
+		CVersionManagerHelper &operator = (CVersionManagerHelper &&_Other);
 
 		struct CUploadResult
 		{

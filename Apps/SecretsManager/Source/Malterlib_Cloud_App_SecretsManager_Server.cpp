@@ -409,7 +409,7 @@ namespace NMib::NCloud::NSecretsManager
 					{
 						// This is used to test shutdown. We wait here while the test checks that the file has been deleted
 						// and that the future from the secrets manager destruction has not resloved set yet
-						mp_DelayDeletes.f_Insert().f_Future() > [=, this, pCanDestroyTracker = pCanDestroyTracker, RemovePromise = fg_Move(RemovePromise)](auto &&) mutable
+						mp_DelayDeletes.f_Insert().f_Future() > [=, this, pCanDestroyTracker = pCanDestroyTracker, RemovePromise = fg_Move(RemovePromise)](auto &&_DelayResult) mutable
 							{
 								fp_RemoveFile(_FileName, _Auditor) > fg_Move(RemovePromise) / [pCanDestroyTracker, RemovePromise]()
 									{

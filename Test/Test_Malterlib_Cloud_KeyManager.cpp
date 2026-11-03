@@ -54,8 +54,8 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 
 	struct CTestState : public CAllowUnsafeThis
 	{
-		CTestState(CTestState const &) = delete;
-		CTestState(CTestState &&) = delete;
+		CTestState(CTestState const &_Other) = delete;
+		CTestState(CTestState &&_Other) = delete;
 
 		CTestState(CStr const &_RootDirectory)
 			: m_RootDirectory(_RootDirectory)

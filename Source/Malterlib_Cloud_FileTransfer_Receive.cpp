@@ -260,8 +260,8 @@ namespace NMib::NCloud
 			using CResumeFileInfoParams::CResumeFileInfoParams;
 
 			CResumeFileInfo() = default;
-			CResumeFileInfo &operator = (CResumeFileInfo &&) = default;
-			CResumeFileInfo(CResumeFileInfo &&) = default;
+			CResumeFileInfo &operator = (CResumeFileInfo &&_Other) = default;
+			CResumeFileInfo(CResumeFileInfo &&_Other) = default;
 			CResumeFileInfo(CResumeFileInfoParams &&_Other)
 				: CResumeFileInfoParams(fg_Move(_Other))
 			{

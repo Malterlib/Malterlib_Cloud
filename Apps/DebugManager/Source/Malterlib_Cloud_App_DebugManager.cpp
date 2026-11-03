@@ -83,7 +83,7 @@ namespace NMib::NCloud::NDebugManager
 	{
 	}
 
-	COptionalFuture::COptionalFuture(COptionalFuture &&) = default;
+	COptionalFuture::COptionalFuture(COptionalFuture &&_Other) = default;
 
 	COptionalFuture::~COptionalFuture()
 	{

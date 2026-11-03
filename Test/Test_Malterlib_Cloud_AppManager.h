@@ -71,8 +71,8 @@ namespace NMib::NCloud
 			CState(CStr const &_RootDirectory, EOption _Options, fp64 _Timeout);
 			~CState();
 
-			CState(CState &&) = delete;
-			CState(CState const &) = delete;
+			CState(CState &&_Other) = delete;
+			CState(CState const &_Other) = delete;
 
 			CStr m_ProgramDirectory = CFile::fs_GetProgramDirectory();
 			CStr m_RootDirectory;

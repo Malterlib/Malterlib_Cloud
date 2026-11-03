@@ -15,7 +15,7 @@ namespace NMib::NCloud
 			, NConcurrency::TCActor<NConcurrency::CActorDistributionManager> _DistributionManager
 			, CSecretsManager::CSecretID _ID
 			, NFile::CDirectorySyncSend::CConfig _Config
-			, NStorage::NReference::TCReference<NConcurrency::CActorSubscription> o_Subscription
+			, NStorage::NReference::TCReference<NConcurrency::CActorSubscription> o_Subscription // NOLINT(malterlib-parameter-naming): it can be written through
 		)
 		-> NConcurrency::TCFuture<NFile::CDirectorySyncSend::CSyncResult>
 	;

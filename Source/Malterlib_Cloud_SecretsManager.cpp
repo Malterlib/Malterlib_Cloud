@@ -296,7 +296,7 @@ namespace NMib::NCloud
 		struct CSecretEqualsVisitor
 		{
 			template <typename tf_CTypeLeft, typename tf_CTypeRight>
-			bool operator () (tf_CTypeLeft const &, tf_CTypeRight const &)
+			bool operator () (tf_CTypeLeft const &_Left, tf_CTypeRight const &_Right)
 			{
 				return false;
 			}

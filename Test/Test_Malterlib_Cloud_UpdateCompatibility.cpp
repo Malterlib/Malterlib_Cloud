@@ -60,37 +60,37 @@ static constexpr ch8 const *gc_AccessDeniedErrorMessage
 
 namespace
 {
-	template <typename tf_CKey, typename tf_CValue, typename ...tf_CParams>
+	template <typename tf_CKey, typename tf_CValue, typename ...tfp_CParams>
 	void fg_CreateMapHelper(TCMap<tf_CKey, tf_CValue> &_Return)
 	{
 	}
 
-	template <typename tf_CKey, typename tf_CValue, typename ...tf_CParams>
-	void fg_CreateMapHelper(TCMap<tf_CKey, tf_CValue> &_Return, tf_CKey &&_First, tf_CParams && ...p_Params)
+	template <typename tf_CKey, typename tf_CValue, typename ...tfp_CParams>
+	void fg_CreateMapHelper(TCMap<tf_CKey, tf_CValue> &_Return, tf_CKey &&_First, tfp_CParams && ...p_Params)
 	{
 		_Return[fg_Forward<tf_CKey>(_First)];
-		fg_CreateMapHelper<tf_CKey, tf_CValue>(_Return, fg_Forward<tf_CParams>(p_Params)...);
+		fg_CreateMapHelper<tf_CKey, tf_CValue>(_Return, fg_Forward<tfp_CParams>(p_Params)...);
 	}
 
-	template <typename tf_CKey, typename tf_CValue, typename ...tf_CParams>
-	TCMap<NTraits::TCRemoveReferenceAndQualifiers<tf_CKey>, NTraits::TCRemoveReferenceAndQualifiers<tf_CValue>> fg_CreateMap(tf_CKey &&_First, tf_CParams && ...p_Params)
+	template <typename tf_CKey, typename tf_CValue, typename ...tfp_CParams>
+	TCMap<NTraits::TCRemoveReferenceAndQualifiers<tf_CKey>, NTraits::TCRemoveReferenceAndQualifiers<tf_CValue>> fg_CreateMap(tf_CKey &&_First, tfp_CParams && ...p_Params)
 	{
 		TCMap<NTraits::TCRemoveReferenceAndQualifiers<tf_CKey>, NTraits::TCRemoveReferenceAndQualifiers<tf_CValue>> Return;
 		fg_CreateMapHelper<NTraits::TCRemoveReferenceAndQualifiers<tf_CKey>, NTraits::TCRemoveReferenceAndQualifiers<tf_CValue>>
 			(
 				Return
 				, fg_Forward<tf_CKey>(_First)
-				, fg_Forward<tf_CParams>(p_Params)...
+				, fg_Forward<tfp_CParams>(p_Params)...
 			)
 		;
 		return Return;
 	}
 
-	template <typename tf_CKey, typename tf_CValue, typename ...tf_CParams>
-	TCMap<tf_CKey, tf_CValue> fg_CreateMap(tf_CParams && ...p_Params)
+	template <typename tf_CKey, typename tf_CValue, typename ...tfp_CParams>
+	TCMap<tf_CKey, tf_CValue> fg_CreateMap(tfp_CParams && ...p_Params)
 	{
 		TCMap<tf_CKey, tf_CValue> Return;
-		fg_CreateMapHelper<tf_CKey, tf_CValue>(Return, fg_Forward<tf_CParams>(p_Params)...);
+		fg_CreateMapHelper<tf_CKey, tf_CValue>(Return, fg_Forward<tfp_CParams>(p_Params)...);
 		return Return;
 	}
 }
@@ -1727,7 +1727,7 @@ private:
 				;
 				SimpleLaunch.m_bWholeLineOutput = false;
 
-				SimpleLaunch.m_Params.m_fOnStateChange = [LaunchFinished, pResult](CProcessLaunchStateChangeVariant const &_State, fp64)
+				SimpleLaunch.m_Params.m_fOnStateChange = [LaunchFinished, pResult](CProcessLaunchStateChangeVariant const &_State, fp64 _TimeSinceStart)
 					{
 						if (_State.f_GetTypeID() == EProcessLaunchState_Exited)
 						{

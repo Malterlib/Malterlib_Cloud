@@ -26,10 +26,10 @@ namespace NMib::NCloud
 		CDebugManagerHelper(NStr::CStr const &_RootDirectory, uint64 _QueueSize = NFile::gc_IdealNetworkQueueSize, fp64 _Timeout = 30.0);
 		~CDebugManagerHelper();
 
-		CDebugManagerHelper(CDebugManagerHelper const &);
-		CDebugManagerHelper(CDebugManagerHelper &&);
-		CDebugManagerHelper &operator = (CDebugManagerHelper const &);
-		CDebugManagerHelper &operator = (CDebugManagerHelper &&);
+		CDebugManagerHelper(CDebugManagerHelper const &_Other);
+		CDebugManagerHelper(CDebugManagerHelper &&_Other);
+		CDebugManagerHelper &operator = (CDebugManagerHelper const &_Other);
+		CDebugManagerHelper &operator = (CDebugManagerHelper &&_Other);
 
 		NConcurrency::TCFuture<void> f_AbortAll() const;
 

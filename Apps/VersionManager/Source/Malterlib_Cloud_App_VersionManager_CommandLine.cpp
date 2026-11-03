@@ -28,7 +28,7 @@ namespace NMib::NCloud::NVersionManager
 					"Names"_o= _o["--refresh-versions"]
 					, "Description"_o= "Rescan disk and refresh version database. Removes entries for versions no longer on disk, adds new versions, and updates changed metadata."
 				}
-				, [this](CEJsonSorted const, TCSharedPointer<CCommandLineControl> _pCommandLine) -> TCFuture<uint32>
+				, [this](CEJsonSorted const _Params, TCSharedPointer<CCommandLineControl> _pCommandLine) -> TCFuture<uint32>
 				{
 					using namespace NStr;
 					auto Result = co_await mp_pServer(&CServer::f_RefreshDatabaseFromDisk);
