@@ -60,18 +60,18 @@ namespace NMib::NCloud::NAppManager
 
 					co_await fg_ContinueRunningOnActor(WriteTransaction.f_Checkout());
 
-					auto WriteCursor = WriteTransaction.m_Transaction.f_WriteCursor();
+					auto iWriteCursor = WriteTransaction.m_Transaction.f_WriteCursor();
 
 					CRootInfoKey Key;
 
 					CRootInfoValue Value;
-					if (WriteCursor.f_FindEqual(Key))
-						Value = WriteCursor.f_Value<CRootInfoValue>();
+					if (iWriteCursor.f_FindEqual(Key))
+						Value = iWriteCursor.f_Value<CRootInfoValue>();
 
 					if (!Value.m_UniqueKey)
 						Value.m_UniqueKey = fg_RandomID();
 
-					WriteCursor.f_Upsert(Key, Value);
+					iWriteCursor.f_Upsert(Key, Value);
 
 					CInitResult Result;
 
@@ -79,9 +79,9 @@ namespace NMib::NCloud::NAppManager
 					Result.m_LastUpdateSequence = Value.m_LastUpdateSequenceAtCleanup;
 
 					{
-						auto ReadCursor = WriteTransaction.m_Transaction.f_ReadCursor(CUpdateNotificationKey::mc_Prefix);
-						if (ReadCursor.f_Last())
-							Result.m_LastUpdateSequence = fg_Max(Result.m_LastUpdateSequence, ReadCursor.f_Key<CUpdateNotificationKey>().m_UniqueSequence);
+						auto iUpdateNotification = WriteTransaction.m_Transaction.f_ReadCursor(CUpdateNotificationKey::mc_Prefix);
+						if (iUpdateNotification.f_Last())
+							Result.m_LastUpdateSequence = fg_Max(Result.m_LastUpdateSequence, iUpdateNotification.f_Key<CUpdateNotificationKey>().m_UniqueSequence);
 					}
 
 					if (!InitResult.f_IsSet())

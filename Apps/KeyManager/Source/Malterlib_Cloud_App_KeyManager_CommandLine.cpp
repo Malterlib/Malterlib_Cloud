@@ -389,7 +389,7 @@ namespace NMib::NCloud::NKeyManager
 		co_return {};
 	}
 
-	static constexpr ch8 const *gc_Salt = "MiBKeyMa";
+	static constexpr ch8 const *gc_pSalt = "MiBKeyMa";
 
 	TCFuture<uint32> CKeyManagerDaemonActor::f_ProvidePassword(NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
@@ -418,7 +418,7 @@ namespace NMib::NCloud::NKeyManager
 								{
 									auto CheckDestroyOnResume = co_await fp_CheckStoppedOrDestroyedOnResume();
 
-									CSecureByteVector Salt{(uint8 const *)gc_Salt, 8};
+									CSecureByteVector Salt{(uint8 const *)gc_pSalt, 8};
 									TCActor<CKeyManagerServerDatabase_EncryptedFile> DatabaseActor = fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>
 										(
 											mp_State.m_RootDirectory + "/KeyDatabase.encrypted"
@@ -500,7 +500,7 @@ namespace NMib::NCloud::NKeyManager
 						co_return DErrorInstance("A database has not yet been decrypted");
 
 					{
-						CSecureByteVector Salt{(uint8 const *)gc_Salt, 8};
+						CSecureByteVector Salt{(uint8 const *)gc_pSalt, 8};
 						TCActor<CKeyManagerServerDatabase_EncryptedFile> DatabaseActor = fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>
 							(
 								mp_State.m_RootDirectory + "/KeyDatabase.encrypted"
@@ -522,7 +522,7 @@ namespace NMib::NCloud::NKeyManager
 						}
 					}
 
-					CSecureByteVector Salt{(uint8 const *)gc_Salt, 8};
+					CSecureByteVector Salt{(uint8 const *)gc_pSalt, 8};
 					co_await mp_DatabaseActor(&CKeyManagerServerDatabase_EncryptedFile::f_ChangePassword, NewPassword, Salt);
 
 					if (!mp_ServerActor)

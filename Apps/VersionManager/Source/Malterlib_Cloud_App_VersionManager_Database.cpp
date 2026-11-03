@@ -76,10 +76,10 @@ namespace NMib::NCloud::NVersionManager
 				{
 					CLoadResult Result;
 
-					for (auto ReadCursor = _ReadTransaction.m_Transaction.f_ReadCursor(CVersionDatabaseKey::mc_Prefix); ReadCursor; ++ReadCursor)
+					for (auto iVersion = _ReadTransaction.m_Transaction.f_ReadCursor(CVersionDatabaseKey::mc_Prefix); iVersion; ++iVersion)
 					{
-						auto Key = ReadCursor.f_Key<CVersionDatabaseKey>();
-						auto Value = ReadCursor.f_Value<CVersionDatabaseValue>();
+						auto Key = iVersion.f_Key<CVersionDatabaseKey>();
+						auto Value = iVersion.f_Value<CVersionDatabaseValue>();
 
 						Result.m_Versions[Key.m_Application][Key.m_VersionIDAndPlatform] = Value.m_VersionInfo;
 						Result.m_KnownTags += Value.m_VersionInfo.m_Tags;
@@ -140,8 +140,8 @@ namespace NMib::NCloud::NVersionManager
 			(
 				g_Dispatch(Checkout) / [WriteTransaction = fg_Move(WriteTransaction), Key = fg_Move(Key), Value = fg_Move(Value)]() mutable -> CDatabaseActor::CTransactionWrite
 				{
-					auto Cursor = WriteTransaction.m_Transaction.f_WriteCursor();
-					Cursor.f_Upsert(Key, Value);
+					auto iCursor = WriteTransaction.m_Transaction.f_WriteCursor();
+					iCursor.f_Upsert(Key, Value);
 					return fg_Move(WriteTransaction);
 				}
 			)
@@ -169,9 +169,9 @@ namespace NMib::NCloud::NVersionManager
 			(
 				g_Dispatch(Checkout) / [WriteTransaction = fg_Move(WriteTransaction), Key = fg_Move(Key)]() mutable -> CDatabaseActor::CTransactionWrite
 				{
-					auto Cursor = WriteTransaction.m_Transaction.f_WriteCursor();
-					if (Cursor.f_FindEqual(Key))
-						Cursor.f_Delete();
+					auto iCursor = WriteTransaction.m_Transaction.f_WriteCursor();
+					if (iCursor.f_FindEqual(Key))
+						iCursor.f_Delete();
 					return fg_Move(WriteTransaction);
 				}
 			)
@@ -319,10 +319,10 @@ namespace NMib::NCloud::NVersionManager
 
 					// === Read database from write transaction ===
 					TCMap<CStr, TCMap<CVersionManager::CVersionIDAndPlatform, CVersionManager::CVersionInformation>> DatabaseVersions;
-					for (auto ReadCursor = Result.m_WriteTransaction.m_Transaction.f_ReadCursor(CVersionDatabaseKey::mc_Prefix); ReadCursor; ++ReadCursor)
+					for (auto iVersion = Result.m_WriteTransaction.m_Transaction.f_ReadCursor(CVersionDatabaseKey::mc_Prefix); iVersion; ++iVersion)
 					{
-						auto Key = ReadCursor.f_Key<CVersionDatabaseKey>();
-						auto Value = ReadCursor.f_Value<CVersionDatabaseValue>();
+						auto Key = iVersion.f_Key<CVersionDatabaseKey>();
+						auto Value = iVersion.f_Value<CVersionDatabaseValue>();
 						DatabaseVersions[Key.m_Application][Key.m_VersionIDAndPlatform] = Value.m_VersionInfo;
 					}
 
@@ -374,7 +374,7 @@ namespace NMib::NCloud::NVersionManager
 					// === Apply database changes ===
 					if (!ToUpsert.f_IsEmpty() || !ToRemove.f_IsEmpty())
 					{
-						auto Cursor = Result.m_WriteTransaction.m_Transaction.f_WriteCursor();
+						auto iCursor = Result.m_WriteTransaction.m_Transaction.f_WriteCursor();
 						for (auto &[AppName, VersionID, VersionInfo] : ToUpsert)
 						{
 							CVersionDatabaseKey Key;
@@ -382,7 +382,7 @@ namespace NMib::NCloud::NVersionManager
 							Key.m_VersionIDAndPlatform = VersionID;
 							CVersionDatabaseValue Value;
 							Value.m_VersionInfo = VersionInfo;
-							Cursor.f_Upsert(Key, Value);
+							iCursor.f_Upsert(Key, Value);
 						}
 
 						for (auto &[AppName, VersionID] : ToRemove)
@@ -390,8 +390,8 @@ namespace NMib::NCloud::NVersionManager
 							CVersionDatabaseKey Key;
 							Key.m_Application = AppName;
 							Key.m_VersionIDAndPlatform = VersionID;
-							if (Cursor.f_FindEqual(Key))
-								Cursor.f_Delete();
+							if (iCursor.f_FindEqual(Key))
+								iCursor.f_Delete();
 						}
 					}
 

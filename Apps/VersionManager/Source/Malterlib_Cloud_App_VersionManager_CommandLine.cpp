@@ -31,7 +31,7 @@ namespace NMib::NCloud::NVersionManager
 				, [this](CEJsonSorted const _Params, TCSharedPointer<CCommandLineControl> _pCommandLine) -> TCFuture<uint32>
 				{
 					using namespace NStr;
-					auto Result = co_await mp_pServer(&CServer::f_RefreshDatabaseFromDisk);
+					auto Result = co_await mp_Server(&CServer::f_RefreshDatabaseFromDisk);
 					co_await _pCommandLine->f_StdOut("Refreshed versions: {} added, {} updated, {} removed\n"_f << Result.m_nAdded << Result.m_nUpdated << Result.m_nRemoved);
 					co_return 0;
 				}

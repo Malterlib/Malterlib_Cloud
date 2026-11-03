@@ -105,8 +105,8 @@ namespace NMib::NCloud::NAppManager
 			)
 		;
 
-		for (auto &fOnRegisterDistributedApp : Application.m_OnRegisterDistributedApp)
-			fOnRegisterDistributedApp.f_SetResult();
+		for (auto &OnRegisterDistributedApp : Application.m_OnRegisterDistributedApp)
+			OnRegisterDistributedApp.f_SetResult();
 		Application.m_OnRegisterDistributedApp.f_Clear();
 
 		co_return g_ActorSubscription / [pApplication, AssignSequence = ++Application.m_AppInterfaceAssignSequence, HostInfo = CallingHostInfo.f_GetHostInfo()]() -> TCFuture<void>

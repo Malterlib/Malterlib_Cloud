@@ -224,6 +224,7 @@ namespace NMib::NCloud
 			void f_Stream(tf_CStream &_Stream);
 
 			CBackupKey m_BackupKey;
+			// NOLINTNEXTLINE(malterlib-conceptual-prefix): a subscription handle like CActorSubscription, which the check misses because it is derived from it
 			NConcurrency::TCActorSubscriptionWithID<> m_Subscription;
 			EInitBackupFlag m_Flags = EInitBackupFlag_None;
 		};
@@ -237,6 +238,7 @@ namespace NMib::NCloud
 
 			NStr::CStr m_BackupSource;
 			NTime::CTime m_Time;
+			// NOLINTNEXTLINE(malterlib-conceptual-prefix): a subscription handle like CActorSubscription, which the check misses because it is derived from it
 			NConcurrency::TCActorSubscriptionWithID<> m_Subscription;
 		};
 

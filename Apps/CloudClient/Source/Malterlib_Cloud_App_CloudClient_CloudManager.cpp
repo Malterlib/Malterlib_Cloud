@@ -428,8 +428,8 @@ namespace NMib::NCloud::NCloudClient
 				(CEJsonSorted const _Params, TCSharedPointer<CCommandLineControl> _pCommandLine, CDistributedAppSensorReader_SensorFilter _Filter, ESensorOutputFlag _Flags, CStr _TableType)
 				-> TCFuture<uint32>
 				{
-					auto SensorReaders = co_await fp_CommandLine_CloudManager_GetSensorReaders(_Params["Host"].f_String());
-					co_return co_await f_CommandLine_SensorListOutput(_pCommandLine, fp_CommandLine_CloudManager_GetAggregatedSensors(SensorReaders, _Filter), _Flags, _TableType);
+					auto pSensorReaders = co_await fp_CommandLine_CloudManager_GetSensorReaders(_Params["Host"].f_String());
+					co_return co_await f_CommandLine_SensorListOutput(_pCommandLine, fp_CommandLine_CloudManager_GetAggregatedSensors(pSensorReaders, _Filter), _Flags, _TableType);
 				}
 				, g_ActorFunctor / [this]
 				(
@@ -441,9 +441,9 @@ namespace NMib::NCloud::NCloudClient
 				)
 				-> TCFuture<uint32>
 				{
-					auto SensorReaders = co_await fp_CommandLine_CloudManager_GetSensorReaders(_Params["Host"].f_String());
-					auto SensorsGenerator = fp_CommandLine_CloudManager_GetAggregatedSensors(SensorReaders, _Filter.m_SensorFilter);
-					auto ReadingsGenerator = fp_CommandLine_CloudManager_GetAggregatedSensorStatus(SensorReaders, _Filter);
+					auto pSensorReaders = co_await fp_CommandLine_CloudManager_GetSensorReaders(_Params["Host"].f_String());
+					auto SensorsGenerator = fp_CommandLine_CloudManager_GetAggregatedSensors(pSensorReaders, _Filter.m_SensorFilter);
+					auto ReadingsGenerator = fp_CommandLine_CloudManager_GetAggregatedSensorStatus(pSensorReaders, _Filter);
 
 					CDistributedAppSensorReader_SensorReadingFilter Filter;
 					Filter.m_Flags = CDistributedAppSensorReader_SensorReadingFilter::ESensorReadingsFlag_None;
@@ -471,9 +471,9 @@ namespace NMib::NCloud::NCloudClient
 				)
 				-> TCFuture<uint32>
 				{
-					auto SensorReaders = co_await fp_CommandLine_CloudManager_GetSensorReaders(_Params["Host"].f_String());
-					auto SensorsGenerator = fp_CommandLine_CloudManager_GetAggregatedSensors(SensorReaders, _Filter.m_SensorFilter);
-					auto ReadingsGenerator = fp_CommandLine_CloudManager_GetAggregatedSensorReadings(SensorReaders, _Filter);
+					auto pSensorReaders = co_await fp_CommandLine_CloudManager_GetSensorReaders(_Params["Host"].f_String());
+					auto SensorsGenerator = fp_CommandLine_CloudManager_GetAggregatedSensors(pSensorReaders, _Filter.m_SensorFilter);
+					auto ReadingsGenerator = fp_CommandLine_CloudManager_GetAggregatedSensorReadings(pSensorReaders, _Filter);
 
 					co_return co_await f_CommandLine_SensorReadingsOutput(_pCommandLine, fg_Move(ReadingsGenerator), fg_Move(SensorsGenerator), _MaxEntries, _Flags, _TableType, _Filter);
 				}
@@ -496,8 +496,8 @@ namespace NMib::NCloud::NCloudClient
 				)
 				-> TCFuture<uint32>
 				{
-					auto LogReaders = co_await fp_CommandLine_CloudManager_GetLogReaders(_Params["Host"].f_String());
-					co_return co_await f_CommandLine_LogListOutput(_pCommandLine, fp_CommandLine_CloudManager_GetAggregatedLogs(LogReaders, _Filter), _Flags, _Verbosity, _TableType);
+					auto pLogReaders = co_await fp_CommandLine_CloudManager_GetLogReaders(_Params["Host"].f_String());
+					co_return co_await f_CommandLine_LogListOutput(_pCommandLine, fp_CommandLine_CloudManager_GetAggregatedLogs(pLogReaders, _Filter), _Flags, _Verbosity, _TableType);
 				}
 				, g_ActorFunctor / [this]
 				(
@@ -511,9 +511,9 @@ namespace NMib::NCloud::NCloudClient
 				)
 				-> TCFuture<uint32>
 				{
-					auto LogReaders = co_await fp_CommandLine_CloudManager_GetLogReaders(_Params["Host"].f_String());
-					auto LogsGenerator = fp_CommandLine_CloudManager_GetAggregatedLogs(LogReaders, _Filter.m_LogFilter);
-					auto EntriesGenerator = fp_CommandLine_CloudManager_GetAggregatedLogEntries(LogReaders, _Filter);
+					auto pLogReaders = co_await fp_CommandLine_CloudManager_GetLogReaders(_Params["Host"].f_String());
+					auto LogsGenerator = fp_CommandLine_CloudManager_GetAggregatedLogs(pLogReaders, _Filter.m_LogFilter);
+					auto EntriesGenerator = fp_CommandLine_CloudManager_GetAggregatedLogEntries(pLogReaders, _Filter);
 
 					co_return co_await f_CommandLine_LogEntriesOutput(_pCommandLine, fg_Move(EntriesGenerator), fg_Move(LogsGenerator), _MaxEntries, _Flags, _Verbosity, _TableType, _Filter);
 				}

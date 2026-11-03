@@ -7,7 +7,7 @@
 namespace NMib::NCloud::NAppManager
 {
 #ifndef DPlatformFamily_Windows
-	static constexpr ch8 const gc_pLimitsSetupScript[] =
+	static constexpr ch8 const gc_LimitsSetupScript[] =
 		{
 #	embed "Malterlib_Cloud_App_AppManager_Limits_Setup.sh"
 			, '\0'
@@ -60,7 +60,7 @@ namespace NMib::NCloud::NAppManager
 		Environment["MaxMapCount"] = CStr::fs_ToStr(nMaxMapCount);
 		Environment["PlatformFamily"] = DMibStringize(DPlatformFamily);
 
-		co_await (fp_RunBashScript(gc_pLimitsSetupScript, "SetupLimits", fg_Move(Environment), nullptr, 2) % "Failed to setup limits");
+		co_await (fp_RunBashScript(gc_LimitsSetupScript, "SetupLimits", fg_Move(Environment), nullptr, 2) % "Failed to setup limits");
 
 		co_return {};
 #endif

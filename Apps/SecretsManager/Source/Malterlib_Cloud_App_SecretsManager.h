@@ -26,6 +26,6 @@ namespace NMib::NCloud::NSecretsManager
 		TCFuture<CEJsonSorted> fp_Test_Command(CStr _Command, CEJsonSorted const _Params) override;
 #endif
 
-		TCActor<CServerController> mp_pServerController;
+		TCActor<CServerController> mp_ServerController;
 	};
 }

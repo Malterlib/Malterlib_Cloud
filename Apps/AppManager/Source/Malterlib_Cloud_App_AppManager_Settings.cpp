@@ -483,9 +483,9 @@ namespace NMib::NCloud::NAppManager
 			m_RunAsGroup = *_Settings.m_RunAsGroup;
 			o_ChangedSettings |= EApplicationSetting_RunAsGroup;
 		}
-		if (_Settings.m_bRunAsUserHasShell)
+		if (_Settings.m_RunAsUserHasShell)
 		{
-			m_bRunAsUserHasShell = *_Settings.m_bRunAsUserHasShell;
+			m_bRunAsUserHasShell = *_Settings.m_RunAsUserHasShell;
 			o_ChangedSettings |= EApplicationSetting_RunAsUserHasShell;
 		}
 
@@ -514,20 +514,20 @@ namespace NMib::NCloud::NAppManager
 			m_Backup_NewBackupInterval = *_Settings.m_Backup_NewBackupInterval;
 			o_ChangedSettings |= EApplicationSetting_BackupNewBackupInterval;
 		}
-		if (_Settings.m_bBackupEnabled)
+		if (_Settings.m_BackupEnabled)
 		{
-			m_bBackupEnabled = *_Settings.m_bBackupEnabled;
+			m_bBackupEnabled = *_Settings.m_BackupEnabled;
 			o_ChangedSettings |= EApplicationSetting_BackupEnabled;
 		}
 
-		if (_Settings.m_bDistributedApp)
+		if (_Settings.m_DistributedApp)
 		{
-			m_bDistributedApp = *_Settings.m_bDistributedApp;
+			m_bDistributedApp = *_Settings.m_DistributedApp;
 			o_ChangedSettings |= EApplicationSetting_DistributedApp;
 		}
-		if (_Settings.m_bAutoUpdate)
+		if (_Settings.m_AutoUpdate)
 		{
-			m_bAutoUpdate = *_Settings.m_bAutoUpdate;
+			m_bAutoUpdate = *_Settings.m_AutoUpdate;
 			o_ChangedSettings |= EApplicationSetting_AutoUpdate;
 		}
 		if (_Settings.m_UpdateTags)
@@ -560,9 +560,9 @@ namespace NMib::NCloud::NAppManager
 			m_UpdateScripts.m_OnError = *_Settings.m_UpdateScriptOnError;
 			o_ChangedSettings |= EApplicationSetting_UpdateScript_OnError;
 		}
-		if (_Settings.m_bSelfUpdateSource)
+		if (_Settings.m_SelfUpdateSource)
 		{
-			m_bSelfUpdateSource = *_Settings.m_bSelfUpdateSource;
+			m_bSelfUpdateSource = *_Settings.m_SelfUpdateSource;
 			o_ChangedSettings |= EApplicationSetting_SelfUpdateSource;
 		}
 		if (_Settings.m_UpdateGroup)
@@ -575,14 +575,14 @@ namespace NMib::NCloud::NAppManager
 			m_Dependencies = *_Settings.m_Dependencies;
 			o_ChangedSettings |= EApplicationSetting_Dependencies;
 		}
-		if (_Settings.m_bStopOnDependencyFailure)
+		if (_Settings.m_StopOnDependencyFailure)
 		{
-			m_bStopOnDependencyFailure = *_Settings.m_bStopOnDependencyFailure;
+			m_bStopOnDependencyFailure = *_Settings.m_StopOnDependencyFailure;
 			o_ChangedSettings |= EApplicationSetting_StopOnDependencyFailure;
 		}
-		if (_Settings.m_bLaunchInProcess)
+		if (_Settings.m_LaunchInProcess)
 		{
-			m_bLaunchInProcess = *_Settings.m_bLaunchInProcess;
+			m_bLaunchInProcess = *_Settings.m_LaunchInProcess;
 			o_ChangedSettings |= EApplicationSetting_LaunchInProcess;
 		}
 	}

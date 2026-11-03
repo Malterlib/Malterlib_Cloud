@@ -28,6 +28,7 @@ namespace NMib::NCloud
 			void f_Stream(tf_CStream &_Stream);
 
 			NConcurrency::TCAsyncGenerator<NContainer::CIOByteVector> m_DataGenerator;
+			// NOLINTNEXTLINE(malterlib-conceptual-prefix): a subscription handle like CActorSubscription, which the check misses because it is derived from it
 			NConcurrency::TCActorSubscriptionWithID<> m_Subscription;
 			uint64 m_StartPosition;
 		};

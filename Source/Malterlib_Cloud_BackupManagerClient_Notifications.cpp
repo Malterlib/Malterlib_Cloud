@@ -74,8 +74,8 @@ namespace NMib::NCloud
 			{
 				Internal.m_bInitialFinished = true;
 
-				for (auto &Subscription : Internal.m_OnInitialFinishedSubscriptions)
-					Subscription().f_DiscardResult();
+				for (auto &fOnInitialFinished : Internal.m_OnInitialFinishedSubscriptions)
+					fOnInitialFinished().f_DiscardResult();
 			}
 		}
 		else if (Notification.m_Notification.f_GetTypeID() == ENotification_Quiescent)

@@ -69,9 +69,9 @@ namespace NMib::NCloud::NAppManager
 		CRootInfoKey RootKey;
 		CRootInfoValue RootValue;
 		{
-			auto WriteCursor = _WriteTransaction.m_Transaction.f_WriteCursor();
-			if (WriteCursor.f_FindEqual(RootKey))
-				RootValue = WriteCursor.f_Value<CRootInfoValue>();
+			auto iWriteCursor = _WriteTransaction.m_Transaction.f_WriteCursor();
+			if (iWriteCursor.f_FindEqual(RootKey))
+				RootValue = iWriteCursor.f_Value<CRootInfoValue>();
 		}
 
 		RootValue.m_LastUpdateSequenceAtCleanup = mp_LastUpdateSequence;
@@ -104,8 +104,8 @@ namespace NMib::NCloud::NAppManager
 		}
 
 		{
-			auto WriteCursor = _WriteTransaction.m_Transaction.f_WriteCursor();
-			WriteCursor.f_Upsert(RootKey, RootValue);
+			auto iWriteCursor = _WriteTransaction.m_Transaction.f_WriteCursor();
+			iWriteCursor.f_Upsert(RootKey, RootValue);
 		}
 
 		if (StartTime != NTime::CTime::fs_EndOfTime())

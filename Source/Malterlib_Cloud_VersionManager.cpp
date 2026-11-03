@@ -291,10 +291,10 @@ namespace NMib::NCloud
 		else
 		{
 			if constexpr (tf_CStream::mc_Direction == NStream::EStreamDirection_Consume)
-				m_fStartTransferDeprecated = fg_Construct();
+				m_StartTransferDeprecated = fg_Construct();
 
 			if (_Stream.f_GetVersion() >= EProtocolVersion_RefactorToActorFunctorsUploadDownload)
-				_Stream % fg_Move(*m_fStartTransferDeprecated);
+				_Stream % fg_Move(*m_StartTransferDeprecated);
 			else
 			{
 				if constexpr (tf_CStream::mc_Direction == NStream::EStreamDirection_Consume)
@@ -304,14 +304,14 @@ namespace NMib::NCloud
 					_Stream.f_GetStream() >> DispatchActor;
 					_Stream.f_GetStream() >> fStartTransfer;
 
-					m_fStartTransferDeprecated = {fg_Move(DispatchActor), fg_Move(fStartTransfer)};
+					m_StartTransferDeprecated = {fg_Move(DispatchActor), fg_Move(fStartTransfer)};
 				}
 				else
 				{
-					_Stream.f_GetStream() << fg_Move(m_fStartTransferDeprecated->f_GetActor());
-					_Stream.f_GetStream() << fg_Move(m_fStartTransferDeprecated->f_GetFunctor());
+					_Stream.f_GetStream() << fg_Move(m_StartTransferDeprecated->f_GetActor());
+					_Stream.f_GetStream() << fg_Move(m_StartTransferDeprecated->f_GetFunctor());
 
-					m_fStartTransferDeprecated->f_Clear();
+					m_StartTransferDeprecated->f_Clear();
 				}
 			}
 		}

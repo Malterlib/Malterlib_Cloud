@@ -9,7 +9,7 @@
 
 static fp64 gs_Timeout = 120.0 * NMib::NTest::gc_TimeoutMultiplier;
 
-static constexpr ch8 const gc_pFailingPreUpdateScript[] =
+static constexpr ch8 const gc_FailingPreUpdateScript[] =
 	{
 #embed "Test_Malterlib_Cloud_AppManager_General_FailingPreUpdate.sh"
 		, '\0'
@@ -321,6 +321,7 @@ struct CAppManager_General_Tests : public NMib::NTest::CTest
 								}
 							}
 						)
+						// NOLINTNEXTLINE(malterlib-conceptual-prefix): a subscription handle like CActorSubscription, which the check misses because it is derived from it
 						> fg_Move(Promise.m_Promise) / [pUpdateNotificationsState, Promise = fg_Move(Promise.m_Promise)](NConcurrency::TCActorSubscriptionWithID<> &&_Subscription)
 						{
 							pUpdateNotificationsState->m_Subscriptions.f_Insert(fg_Move(_Subscription));
@@ -459,7 +460,7 @@ struct CAppManager_General_Tests : public NMib::NTest::CTest
 				UpdateNotificationState.f_Clear();
 				DMibTestMark;
 				CStr ScriptPath = RootDirectory / "FailingPreUpdate.sh";
-				CFile::fs_WriteStringToFile(ScriptPath, gc_pFailingPreUpdateScript, false);
+				CFile::fs_WriteStringToFile(ScriptPath, gc_FailingPreUpdateScript, false);
 
 				co_await fSetPreUpdateScriptApp0("TestApp", ScriptPath);
 				DMibTestMark;

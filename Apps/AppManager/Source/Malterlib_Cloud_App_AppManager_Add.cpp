@@ -262,7 +262,7 @@ namespace NMib::NCloud::NAppManager
 			pApplication->m_pParentApplication->m_Children.f_Insert(*pApplication);
 		}
 
-		auto pCleanup = g_OnScopeExitActor / [pApplication]
+		auto Cleanup = g_OnScopeExitActor / [pApplication]
 			{
 				pApplication->f_Delete();
 			}
@@ -618,7 +618,7 @@ namespace NMib::NCloud::NAppManager
 		pApplication->m_Files = fg_Move(Files);
 
 		mp_Applications[pApplication->m_Name] = pApplication;
-		pCleanup->f_Clear();
+		Cleanup->f_Clear();
 
 		auto InProgressScope = pApplication->f_SetInProgress("Add Application");
 		auto DestroyInProgress = co_await fg_AsyncDestroy(fg_Move(InProgressScope));

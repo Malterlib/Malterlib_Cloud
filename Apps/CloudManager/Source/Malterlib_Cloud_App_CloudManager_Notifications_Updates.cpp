@@ -186,15 +186,15 @@ namespace NMib::NCloud::NCloudManager
 
 						co_await fg_ContinueRunningOnActor(WriteTransaction.f_Checkout());
 
-						auto WriteCursor = WriteTransaction.m_Transaction.f_WriteCursor();
+						auto iWriteCursor = WriteTransaction.m_Transaction.f_WriteCursor();
 
 						CApplicationUpdateStateKey Key;
 						Key.m_AppManagerHostID = _AppManagerID;
 						Key.m_Application = Notification.m_Application;
 
 						CApplicationUpdateStateValue Value;
-						if (WriteCursor.f_FindEqual(Key))
-							Value = WriteCursor.f_Value<CApplicationUpdateStateValue>();
+						if (iWriteCursor.f_FindEqual(Key))
+							Value = iWriteCursor.f_Value<CApplicationUpdateStateValue>();
 
 						if (Value.m_LastUpdateID != Notification.m_UpdateID)
 						{
@@ -211,12 +211,12 @@ namespace NMib::NCloud::NCloudManager
 						auto &OutStage = Value.m_Stages[Notification.m_Stage];
 						OutStage.m_Time = Notification.m_UpdateTime;
 
-						WriteCursor.f_Upsert(Key, Value);
+						iWriteCursor.f_Upsert(Key, Value);
 
 						StateValuePromise.f_SetResult(Value);
 
 						if (AppManagerWrite)
-							WriteCursor.f_Upsert(fg_Get<0>(*AppManagerWrite), fg_Get<1>(*AppManagerWrite));
+							iWriteCursor.f_Upsert(fg_Get<0>(*AppManagerWrite), fg_Get<1>(*AppManagerWrite));
 
 						co_return fg_Move(WriteTransaction);
 					}
@@ -309,7 +309,7 @@ namespace NMib::NCloud::NCloudManager
 
 		auto &AppManagerInfo = pAppManager->m_Data.m_Info;
 
-		SlackAttachment.m_bFieldsMarkdown = true;
+		SlackAttachment.m_FieldsMarkdown = true;
 		SlackAttachment.m_Fields.f_Insert
 			(
 				{
@@ -370,7 +370,7 @@ namespace NMib::NCloud::NCloudManager
 				<< CSlackActor::CMessage::fs_EscapeString(Notification.m_Application)
 				<< CSlackActor::CMessage::fs_EscapeString(AppManagerInfo.m_HostName)
 			;
-			LongRunningMessage.m_bReplyBroadcast = true;
+			LongRunningMessage.m_ReplyBroadcast = true;
 
 			auto &LongRunningSlackAttachment = LongRunningMessage.m_Attachments.f_Insert();
 			LongRunningSlackAttachment.m_Title = SlackAttachment.m_Title;
@@ -394,25 +394,25 @@ namespace NMib::NCloud::NCloudManager
 
 						co_await fg_ContinueRunningOnActor(WriteTransaction.f_Checkout());
 
-						auto WriteCursor = WriteTransaction.m_Transaction.f_WriteCursor();
+						auto iWriteCursor = WriteTransaction.m_Transaction.f_WriteCursor();
 
 						CApplicationUpdateStateKey Key;
 						Key.m_AppManagerHostID = _AppManagerID;
 						Key.m_Application = Notification.m_Application;
 
 						CApplicationUpdateStateValue Value;
-						if (WriteCursor.f_FindEqual(Key))
-							Value = WriteCursor.f_Value<CApplicationUpdateStateValue>();
+						if (iWriteCursor.f_FindEqual(Key))
+							Value = iWriteCursor.f_Value<CApplicationUpdateStateValue>();
 
 						if (Value.m_LastUpdateID == Notification.m_UpdateID)
 						{
 							if (Value.m_LastNotification.f_IsDone())
-								WriteCursor.f_Delete();
+								iWriteCursor.f_Delete();
 							else
 							{
 								Value.m_SlackTimestamps = fg_Move(SlackTimestamps);
 								Value.m_bDeferred = false;
-								WriteCursor.f_Upsert(Key, Value);
+								iWriteCursor.f_Upsert(Key, Value);
 							}
 						}
 

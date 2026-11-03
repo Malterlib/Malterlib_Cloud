@@ -272,8 +272,8 @@ namespace NMib::NCloud
 
 	auto CSecretsManager::CSecretProperties::f_GetImmutable() const -> bool const &
 	{
-		static bool s_Immutable = false;
-		return m_Immutable.f_Get(s_Immutable);
+		static bool s_bImmutable = false;
+		return m_Immutable.f_Get(s_bImmutable);
 	}
 
 	bool CSecretsManager::CSecretProperties::operator == (CSecretsManager::CSecretProperties const &_Right) const noexcept

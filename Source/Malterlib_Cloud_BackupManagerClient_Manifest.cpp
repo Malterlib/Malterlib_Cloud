@@ -67,7 +67,7 @@ namespace NMib::NCloud
 
 							CUpdateManifestResult Result;
 							Result.m_bExists = true;
-							Result.m_Appended = true;
+							Result.m_bAppended = true;
 							Result.m_bChecksumValid = true;
 							Result.m_ManifestFile = AppendState.m_ManifestFile;
 							Result.m_FileID = AppendState.m_FileID;

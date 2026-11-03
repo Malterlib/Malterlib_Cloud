@@ -88,12 +88,12 @@ namespace NMib::NCloud::NCloudManager
 						{
 							TCSet<CStr> ToClearAppManagers;
 
-							for (auto AppManagers = _ReadTransaction.m_Transaction.f_ReadCursor(CAppManagerKey::mc_Prefix); AppManagers; ++AppManagers)
+							for (auto iAppManager = _ReadTransaction.m_Transaction.f_ReadCursor(CAppManagerKey::mc_Prefix); iAppManager; ++iAppManager)
 							{
-								auto Key = AppManagers.f_Key<CAppManagerKey>();
+								auto Key = iAppManager.f_Key<CAppManagerKey>();
 								if (SeenAppManagers.f_Exists(Key.m_HostID))
 									continue;
-								auto Data = AppManagers.template f_Value<CAppManagerValue>();
+								auto Data = iAppManager.template f_Value<CAppManagerValue>();
 								if (Data.m_bActive)
 									ToClearAppManagers[Key.m_HostID];
 							}
@@ -131,23 +131,23 @@ namespace NMib::NCloud::NCloudManager
 							co_await fg_ContinueRunningOnActor(WriteTransaction.f_Checkout());
 
 							{
-								auto Cursor = WriteTransaction.m_Transaction.f_WriteCursor();
+								auto iCursor = WriteTransaction.m_Transaction.f_WriteCursor();
 
 								for (auto &AppManagerData : AppManagerWrites.f_Entries())
-									Cursor.f_Upsert(AppManagerData.f_Key(), AppManagerData.f_Value());
+									iCursor.f_Upsert(AppManagerData.f_Key(), AppManagerData.f_Value());
 
 								for (auto &ToClear : ToClearAppManagers)
 								{
-									if (!Cursor.f_FindEqual(CAppManagerKey{.m_HostID = ToClear}))
+									if (!iCursor.f_FindEqual(CAppManagerKey{.m_HostID = ToClear}))
 										continue;
 
-									auto Data = Cursor.f_Value<CAppManagerValue>();
+									auto Data = iCursor.f_Value<CAppManagerValue>();
 									if (Data.m_bActive)
 									{
 										Data.m_bActive = false;
 										Data.m_LastConnectionErrorTime = CTime::fs_NowUTC();
 										Data.m_LastConnectionError = "Missing";
-										Cursor.f_SetValue(Data);
+										iCursor.f_SetValue(Data);
 									}
 								}
 							}

@@ -357,8 +357,8 @@ namespace NMib::NCloud::NCloudManager
 						pAttachment = &AlertAttachments.f_Insert();
 						auto &Attachment = *pAttachment;
 
-						Attachment.m_bFieldsMarkdown = true;
-						Attachment.m_bTextMarkdown = true;
+						Attachment.m_FieldsMarkdown = true;
+						Attachment.m_TextMarkdown = true;
 
 						Attachment.m_Text = "{}\n\n"_f << CNotifications::fs_ReformatHostForSlack(pLogInfo->m_HostName);
 
@@ -429,7 +429,7 @@ namespace NMib::NCloud::NCloudManager
 					auto fAddInfoField = [&](CStr const &_Name, auto &&_Value, bool _bShort = true)
 						{
 							auto &Field = SlackAttachment.m_Fields.f_Insert();
-							Field.m_bShort = _bShort;
+							Field.m_Short = _bShort;
 							Field.m_Title = fEscape(_Name);
 							Field.m_Value = _Value;
 						}
@@ -452,7 +452,7 @@ namespace NMib::NCloud::NCloudManager
 		{
 			CSlackActor::CMessage Message;
 			Message.m_Text = "*Log entries*";
-			Message.m_bMarkdown = true;
+			Message.m_Markdown = true;
 			Message.m_Attachments = fg_Move(AlertAttachments);
 
 			CNotifications::fs_LimitMessage(Message, "logs from applications exists");

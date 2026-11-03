@@ -393,8 +393,8 @@ namespace NMib::NCloud::NCloudManager
 
 				auto &SlackAttachment = Attachments.f_Insert();
 
-				SlackAttachment.m_bFieldsMarkdown = true;
-				SlackAttachment.m_bTextMarkdown = true;
+				SlackAttachment.m_FieldsMarkdown = true;
+				SlackAttachment.m_TextMarkdown = true;
 
 				SlackAttachment.m_Text = "{}\n\n*{}*"_f << CNotifications::fs_ReformatHostForSlack(SensorInfo.m_HostName) << fEscape(SensorInfo.m_Name);
 
@@ -441,7 +441,7 @@ namespace NMib::NCloud::NCloudManager
 					{
 						auto &Field = SlackAttachment.m_Fields.f_Insert();
 						Field.m_Value = "*{}*\n```{}```"_f << CDistributedAppSensorReporter::fs_StatusSeverityToString(_Status.m_Severity) << fEscape(_Status.m_Message);
-						Field.m_bShort = _bShort;
+						Field.m_Short = _bShort;
 					}
 				;
 
@@ -466,7 +466,7 @@ namespace NMib::NCloud::NCloudManager
 								FixType = "Resolved";
 
 							Field.m_Value = "*{0}*\n```{0} after {1}```"_f << FixType << fg_SecondsDurationToHumanReadable(Sensor.m_State.m_TimeInProblemState);
-							Field.m_bShort = true;
+							Field.m_Short = true;
 						}
 					}
 				;
@@ -487,7 +487,7 @@ namespace NMib::NCloud::NCloudManager
 		{
 			CSlackActor::CMessage Message;
 			Message.m_Text = "*Resolved sensor problems*";
-			Message.m_bMarkdown = true;
+			Message.m_Markdown = true;
 			Message.m_Attachments = fg_Move(FixedAttachments);
 
 			CNotifications::fs_LimitMessage(Message, "sensor problems were resolved");
@@ -506,7 +506,7 @@ namespace NMib::NCloud::NCloudManager
 		{
 			CSlackActor::CMessage Message;
 			Message.m_Text = "*Temporary sensor problems*\nThe following sensors were temporarily in an error state:";
-			Message.m_bMarkdown = true;
+			Message.m_Markdown = true;
 
 			for (auto &Names : TemporaryProblems)
 			{
@@ -531,10 +531,10 @@ namespace NMib::NCloud::NCloudManager
 		{
 			CSlackActor::CMessage Message;
 			Message.m_Text = "*Sensor problems*";
-			Message.m_bMarkdown = true;
+			Message.m_Markdown = true;
 			Message.m_Attachments = fg_Move(ProblemAttachments);
 			if (bProblemsFixed)
-				Message.m_bReplyBroadcast = true;
+				Message.m_ReplyBroadcast = true;
 
 			CNotifications::fs_LimitMessage(Message, "sensors are in a problem state");
 
@@ -555,7 +555,7 @@ namespace NMib::NCloud::NCloudManager
 		{
 			CSlackActor::CMessage AllResolvedMessage;
 			AllResolvedMessage.m_Text = "*All sensor problems have now been resolved*";
-			AllResolvedMessage.m_bReplyBroadcast = true;
+			AllResolvedMessage.m_ReplyBroadcast = true;
 
 			mp_LastSentProblemMessage.m_Attachments.f_Clear();
 			mp_ProblemNotificationFlags = CNotifications::EType_None;

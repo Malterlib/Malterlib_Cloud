@@ -186,7 +186,7 @@ namespace NMib::NCloud::NVersionManager
 			)
 		;
 
-		auto pCleanup = g_OnScopeExitActor / [pThis, UploadID, Desc = pUpload->m_Desc, Auditor]
+		auto Cleanup = g_OnScopeExitActor / [pThis, UploadID, Desc = pUpload->m_Desc, Auditor]
 			{
 				if (pThis->mp_VersionUploads.f_Remove(UploadID))
 					Auditor.f_Error(fg_Format("'{}' Aborted upload of version", Desc));
@@ -318,11 +318,11 @@ namespace NMib::NCloud::NVersionManager
 
 			FinishedFuture = pThis->self.f_Invoke(fg_Move(fFinishUpload), fg_Move(ReceiveFilesFuture));
 
-			pCleanup->f_Clear();
+			Cleanup->f_Clear();
 		}
 		else
 		{
-			if (!pParams->m_fStartTransferDeprecated)
+			if (!pParams->m_StartTransferDeprecated)
 				co_return Auditor.f_Exception("Internal error: start transfer missing");
 
 			auto FileTransferContext = co_await pUpload->m_FileTransferReceive(&CFileTransferReceive::f_ReceiveFilesDeprecated, pParams->m_QueueSize, ReceiveFlags).f_Wrap();
@@ -339,7 +339,7 @@ namespace NMib::NCloud::NVersionManager
 			CVersionManager::CStartUploadTransferDeprecated StartTransfer;
 			StartTransfer.m_TransferContextDeprecated = fg_Move(*FileTransferContext);
 
-			auto Result = co_await (*pParams->m_fStartTransferDeprecated)(fg_Move(StartTransfer)).f_Wrap();
+			auto Result = co_await (*pParams->m_StartTransferDeprecated)(fg_Move(StartTransfer)).f_Wrap();
 			if (!Result)
 			{
 				CStr Error = Auditor.f_Error({"Failed to start transfer. See Version Manager log.", fg_Format("'{}': {}", Desc, Result.f_GetExceptionStr())});
@@ -350,7 +350,7 @@ namespace NMib::NCloud::NVersionManager
 
 			FinishedFuture = pThis->self.f_Invoke(fg_Move(fFinishUpload), pUpload->m_FileTransferReceive(&CFileTransferReceive::f_GetResultDeprecated).f_Call());
 
-			pCleanup->f_Clear();
+			Cleanup->f_Clear();
 		}
 
 		CVersionManager::CStartUploadVersion::CResult StartUploadResult;

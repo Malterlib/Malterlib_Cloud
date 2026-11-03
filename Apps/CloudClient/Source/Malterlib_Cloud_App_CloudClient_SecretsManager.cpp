@@ -1099,12 +1099,12 @@ namespace NMib::NCloud::NCloudClient
 		}
 
 		CSecretsManager::CSecret Secret;
-		bool SecretWasSet = false;
+		bool bSecretWasSet = false;
 
 		if (auto pValue = _Params.f_GetMember("Secret"))
 		{
 			++nSetProperties;
-			SecretWasSet = true;
+			bSecretWasSet = true;
 			CStdInReaderPromptParams PasswordPrompt;
 			PasswordPrompt.m_bPassword = true;
 			if (*pValue == "string")
@@ -1139,7 +1139,7 @@ namespace NMib::NCloud::NCloudClient
 		if (nSetProperties == 0)
 			co_return DMibErrorInstance("No properties specified. Specify at least one property to change");
 
-		if (SecretWasSet)
+		if (bSecretWasSet)
 			Properties.f_SetSecret(fg_Move(Secret));
 
 		co_await fp_SecretsManager_SubscribeToServers().f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for secrets managers");

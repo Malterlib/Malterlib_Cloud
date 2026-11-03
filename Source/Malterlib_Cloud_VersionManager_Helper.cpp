@@ -179,7 +179,7 @@ namespace NMib::NCloud
 			NConcurrency::TCPromiseFuturePair<CFileTransferResult> Promise;
 			TransferResultFuture = fg_Move(Promise.m_Future);
 
-			StartUpload.m_fStartTransferDeprecated = g_ActorFunctor / [pState, Promise = fg_Move(Promise.m_Promise)]
+			StartUpload.m_StartTransferDeprecated = g_ActorFunctor / [pState, Promise = fg_Move(Promise.m_Promise)]
 				(CVersionManager::CStartUploadTransferDeprecated _Params) mutable -> TCFuture<CVersionManager::CStartUploadTransferDeprecated::CResult>
 				{
 					CVersionManager::CStartUploadTransferDeprecated::CResult Result;
@@ -215,7 +215,7 @@ namespace NMib::NCloud
 		CStr StateID = fg_FastRandomID(Internal.m_States);
 		Internal.m_States[StateID] = pState;
 
-		auto pStateCleanup = g_OnScopeExitActor / [StateID, pInternal = mp_pInternal]
+		auto StateCleanup = g_OnScopeExitActor / [StateID, pInternal = mp_pInternal]
 			{
 				auto &Internal = *pInternal;
 				Internal.m_States.f_Remove(StateID);
@@ -285,7 +285,7 @@ namespace NMib::NCloud
 		CStr StateID = fg_FastRandomID(Internal.m_States);
 		Internal.m_States[StateID] = pState;
 
-		auto pStateCleanup = g_OnScopeExitActor / [StateID, pInternal = mp_pInternal]
+		auto StateCleanup = g_OnScopeExitActor / [StateID, pInternal = mp_pInternal]
 			{
 				auto &Internal = *pInternal;
 				Internal.m_States.f_Remove(StateID);
@@ -420,7 +420,7 @@ namespace NMib::NCloud
 				CStr StateID = fg_FastRandomID(Internal.m_States);
 				Internal.m_States[StateID] = pState;
 
-				auto pStateCleanup = g_OnScopeExitActor / [StateID, pInternal]
+				auto StateCleanup = g_OnScopeExitActor / [StateID, pInternal]
 					{
 						auto &Internal = *pInternal;
 						Internal.m_States.f_Remove(StateID);
@@ -510,7 +510,7 @@ namespace NMib::NCloud
 		CStr StateID = fg_FastRandomID(Internal.m_States);
 		Internal.m_States[StateID] = pState;
 
-		auto pStateCleanup = g_OnScopeExitActor / [StateID, pInternal = mp_pInternal]
+		auto StateCleanup = g_OnScopeExitActor / [StateID, pInternal = mp_pInternal]
 			{
 				auto &Internal = *pInternal;
 				Internal.m_States.f_Remove(StateID);

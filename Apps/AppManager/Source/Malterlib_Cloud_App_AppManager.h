@@ -557,10 +557,10 @@ namespace NMib::NCloud::NAppManager
 			template <typename tf_CType>
 			bool f_CheckAbort(TCPromise<tf_CType> const &o_Error)
 			{
-				if (auto Error = f_CheckAbort())
+				if (auto pError = f_CheckAbort())
 				{
 					if (!o_Error.f_IsSet())
-						o_Error.f_SetException(Error);
+						o_Error.f_SetException(pError);
 					return true;
 				}
 				return false;

@@ -146,7 +146,7 @@ namespace NMib::NCloud::NAppManager
 			return true;
 
 		++mp_PendingAutoLaunches;
-		auto pCleanupAutoLaunches = g_OnScopeExitActor / [this]
+		auto CleanupAutoLaunches = g_OnScopeExitActor / [this]
 			{
 				if (--mp_PendingAutoLaunches == 0)
 					fp_UpdateApplicationDependencies();
@@ -154,7 +154,7 @@ namespace NMib::NCloud::NAppManager
 		;
 
 		auto InProgressScope = Application.f_SetInProgress("AutoStartApp");
-		fp_LaunchApp(_pApplication, true) > [this, InProgressScope = fg_Move(InProgressScope), _pApplication, pCleanupAutoLaunches](TCAsyncResult<CAppLaunchResult> &&_Result)
+		fp_LaunchApp(_pApplication, true) > [this, InProgressScope = fg_Move(InProgressScope), _pApplication, CleanupAutoLaunches](TCAsyncResult<CAppLaunchResult> &&_Result)
 			{
 				if (_Result)
 					return;

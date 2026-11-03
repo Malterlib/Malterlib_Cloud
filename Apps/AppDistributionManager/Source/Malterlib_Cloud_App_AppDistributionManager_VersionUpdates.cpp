@@ -178,7 +178,7 @@ namespace NMib::NCloud::NAppDistributionManager
 
 		auto const DownloadID = fg_RandomID(mp_Downloads);
 		auto &DownloadState = mp_Downloads[DownloadID];
-		auto pCleanup = g_OnScopeExitActor / [this, DownloadID]
+		auto Cleanup = g_OnScopeExitActor / [this, DownloadID]
 			{
 				mp_Downloads.f_Remove(DownloadID);
 			}

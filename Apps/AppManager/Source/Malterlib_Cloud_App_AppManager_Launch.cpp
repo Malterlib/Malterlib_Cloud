@@ -86,11 +86,11 @@ namespace NMib::NCloud::NAppManager
 		_pApplication->m_bDistributedStartupFinished = false;
 		struct CState
 		{
-			COnScopeExitShared m_pCleanup;
+			COnScopeExitShared m_Cleanup;
 		};
 
 		TCSharedPointer<CState> pState = fg_Construct();
-		pState->m_pCleanup = fg_OnScopeExitShared
+		pState->m_Cleanup = fg_OnScopeExitShared
 			(
 				[_pApplication]
 				{
@@ -282,11 +282,11 @@ namespace NMib::NCloud::NAppManager
 			if (_pApplication->m_bLaunching)
 				_pApplication->m_bDistributedStartupFinished = true;
 
-			pState->m_pCleanup.f_Clear();
+			pState->m_Cleanup.f_Clear();
 			if (StartResult)
 			{
-				for (auto &fOnStartedDistributedApp : _pApplication->m_OnStartedDistributedApp)
-					fOnStartedDistributedApp.f_SetResult();
+				for (auto &OnStartedDistributedApp : _pApplication->m_OnStartedDistributedApp)
+					OnStartedDistributedApp.f_SetResult();
 				_pApplication->m_OnStartedDistributedApp.f_Clear();
 
 				fp_AppLaunchStateChanged(_pApplication, "Launched", CAppManagerInterface::EStatusSeverity_None);
@@ -371,11 +371,11 @@ namespace NMib::NCloud::NAppManager
 													if (_pApplication->m_bLaunching)
 														_pApplication->m_bDistributedStartupFinished = true;
 
-													pState->m_pCleanup.f_Clear();
+													pState->m_Cleanup.f_Clear();
 													if (_Result)
 													{
-														for (auto &fOnStartedDistributedApp : _pApplication->m_OnStartedDistributedApp)
-															fOnStartedDistributedApp.f_SetResult();
+														for (auto &OnStartedDistributedApp : _pApplication->m_OnStartedDistributedApp)
+															OnStartedDistributedApp.f_SetResult();
 														_pApplication->m_OnStartedDistributedApp.f_Clear();
 
 														fp_AppLaunchStateChanged(_pApplication, "Launched", CAppManagerInterface::EStatusSeverity_None);
@@ -410,7 +410,7 @@ namespace NMib::NCloud::NAppManager
 									;
 									return;
 								}
-								pState->m_pCleanup.f_Clear();
+								pState->m_Cleanup.f_Clear();
 								fp_AppLaunchStateChanged(_pApplication, "Launched", CAppManagerInterface::EStatusSeverity_None);
 								if (!LaunchPromise.f_IsSet())
 									LaunchPromise.f_SetResult(CAppLaunchResult{});
@@ -423,7 +423,7 @@ namespace NMib::NCloud::NAppManager
 									fp_ScheduleRelaunchApp(_pApplication);
 
 								fp_AppLaunchStateChanged(_pApplication, fg_Format("Failed launch: {}", LaunchError), CAppManagerInterface::EStatusSeverity_Error);
-								pState->m_pCleanup.f_Clear();
+								pState->m_Cleanup.f_Clear();
 								if (!LaunchPromise.f_IsSet())
 									LaunchPromise.f_SetException(DMibErrorInstance(LaunchError));
 							}
@@ -478,7 +478,7 @@ namespace NMib::NCloud::NAppManager
 									;
 								}
 
-								pState->m_pCleanup.f_Clear();
+								pState->m_Cleanup.f_Clear();
 
 								for (auto &Promise : _pApplication->m_OnRegisterDistributedApp)
 									Promise.f_SetException(DMibErrorInstance("Application exited"));
@@ -579,7 +579,7 @@ namespace NMib::NCloud::NAppManager
 						if (!LaunchPromise.f_IsSet())
 							LaunchPromise.f_SetResult(CAppLaunchResult{_Error});
 
-						pState->m_pCleanup.f_Clear();
+						pState->m_Cleanup.f_Clear();
 
 						co_return {};
 					}
@@ -599,7 +599,7 @@ namespace NMib::NCloud::NAppManager
 
 			if (!LaunchSubscription)
 			{
-				pState->m_pCleanup.f_Clear();
+				pState->m_Cleanup.f_Clear();
 				DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to launch app '{}': {}", _pApplication->m_Name, LaunchSubscription.f_GetExceptionStr());
 				fp_ScheduleRelaunchApp(_pApplication);
 				co_return LaunchSubscription.f_GetException();

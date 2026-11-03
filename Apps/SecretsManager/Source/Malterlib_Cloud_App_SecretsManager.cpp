@@ -20,18 +20,18 @@ namespace NMib::NCloud::NSecretsManager
 
 	TCFuture<void> CSecretsManagerDaemonActor::fp_StartApp(CEJsonSorted const _Params)
 	{
-		mp_pServerController = fg_ConstructActor<CServerController>(fg_Construct(self), self, mp_State);
-		co_await mp_pServerController(&CServerController::f_Init);
+		mp_ServerController = fg_ConstructActor<CServerController>(fg_Construct(self), self, mp_State);
+		co_await mp_ServerController(&CServerController::f_Init);
 		co_return {};
 	}
 
 	TCFuture<void> CSecretsManagerDaemonActor::fp_StopApp()
 	{
-		if (mp_pServerController)
+		if (mp_ServerController)
 		{
 			DMibLogWithCategory(Mib/Cloud/SecretsManager, Info, "Shutting down server");
 
-			auto Result = co_await fg_TempCopy(mp_pServerController).f_Destroy().f_Wrap();
+			auto Result = co_await fg_TempCopy(mp_ServerController).f_Destroy().f_Wrap();
 			if (!Result)
 				DMibLogWithCategory(Mib/Cloud/SecretsManager, Error, "Failed to shut down server: {}", Result.f_GetExceptionStr());
 		}
@@ -43,10 +43,10 @@ namespace NMib::NCloud::NSecretsManager
 	TCFuture<CEJsonSorted> CSecretsManagerDaemonActor::fp_Test_Command(CStr _Command, CEJsonSorted const _Params)
 	{
 		// This function is used to provoke some special cases during testing
-		if (!mp_pServerController)
+		if (!mp_ServerController)
 			co_return DMibErrorInstance("No server controller");
 
-		co_return co_await mp_pServerController.f_CallActor(&CServerController::f_Test_Command)(fg_Move(_Command), fg_Move(fg_RemoveQualifiers(_Params)));
+		co_return co_await mp_ServerController.f_CallActor(&CServerController::f_Test_Command)(fg_Move(_Command), fg_Move(fg_RemoveQualifiers(_Params)));
 	}
 #endif
 }

@@ -22,7 +22,7 @@ namespace NMib::NCloud::NAppManager
 		DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Starting pending self update reporting");
 
 		mp_bPendingSelfUpdateInProgress = true;
-		auto pCleanupAutoUpdate = g_OnScopeExitActor / [this]
+		auto CleanupAutoUpdate = g_OnScopeExitActor / [this]
 			{
 				mp_bPendingSelfUpdateInProgress = false;
 				fp_AutoUpdate_Update();
@@ -47,7 +47,7 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 
-		fg_Move(mp_InitialStartupResultFuture) > [this, pUpdateState, pCleanupAutoUpdate](TCAsyncResult<void> &&_Result)
+		fg_Move(mp_InitialStartupResultFuture) > [this, pUpdateState, CleanupAutoUpdate](TCAsyncResult<void> &&_Result)
 			{
 				if (!_Result)
 				{

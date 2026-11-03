@@ -41,7 +41,7 @@ namespace NMib::NCloud
 			{
 				auto &Internal = *m_pThis->mp_pInternal;
 
-				auto AppAuditor = Internal.m_AuditorFactory(fg_GetCallingHostInfo(), {});
+				auto AppAuditor = Internal.m_fAuditorFactory(fg_GetCallingHostInfo(), {});
 
 				TCSet<CNetworkTunnelName> Tunnels;
 
@@ -83,7 +83,7 @@ namespace NMib::NCloud
 
 				auto CallingHostInfo = fg_GetCallingHostInfo();
 
-				auto AppAuditor = Internal.m_AuditorFactory(CallingHostInfo, {});
+				auto AppAuditor = Internal.m_fAuditorFactory(CallingHostInfo, {});
 
 				auto SubscriptionID = fg_RandomID(Internal.m_ChangeSubscriptions);
 
@@ -151,7 +151,7 @@ namespace NMib::NCloud
 			{
 				auto &Internal = *m_pThis->mp_pInternal;
 
-				auto AppAuditor = Internal.m_AuditorFactory(fg_GetCallingHostInfo(), {});
+				auto AppAuditor = Internal.m_fAuditorFactory(fg_GetCallingHostInfo(), {});
 
 				TCVector<CStr> Permissions = {"{}/ConnectAll"_f << Internal.m_PermissionPrefix, "{}/{}/Connect"_f << Internal.m_PermissionPrefix << _OpenConnection.m_Name};
 
@@ -265,14 +265,14 @@ namespace NMib::NCloud
 				CNetworkTunnelsServer *_pThis
 				, TCActor<CActorDistributionManager> const &_DistributionManager
 				, TCActor<CDistributedActorTrustManager> const &_TrustManager
-				, TCFunctionMovable<CDistributedAppAuditor (CCallingHostInfo const &_CallingHostInfo, NStr::CStr const &_Category)> &&_AuditorFactory
+				, TCFunctionMovable<CDistributedAppAuditor (CCallingHostInfo const &_CallingHostInfo, NStr::CStr const &_Category)> &&_fAuditorFactory
 				, CStr const &_LogCategory
 				, CStr const &_PermissionPrefix
 			)
 			: m_pThis(_pThis)
 			, m_DistributionManager(_DistributionManager)
 			, m_TrustManager(_TrustManager)
-			, m_AuditorFactory(fg_Move(_AuditorFactory))
+			, m_fAuditorFactory(fg_Move(_fAuditorFactory))
 			, m_LogCategory(_LogCategory)
 			, m_PermissionPrefix(_PermissionPrefix)
 		{
@@ -288,7 +288,7 @@ namespace NMib::NCloud
 		CStr m_LogCategory;
 		CStr m_PermissionPrefix;
 
-		TCFunctionMovable<CDistributedAppAuditor (CCallingHostInfo const &_CallingHostInfo, NStr::CStr const &_Category)> m_AuditorFactory;
+		TCFunctionMovable<CDistributedAppAuditor (CCallingHostInfo const &_CallingHostInfo, NStr::CStr const &_Category)> m_fAuditorFactory;
 		TCDistributedActorInstance<CNetworkTunnelImplementation> m_NetworkTunnelInstance;
 		CTrustedPermissionSubscription m_Permissions;
 
@@ -304,11 +304,11 @@ namespace NMib::NCloud
 		(
 			TCActor<CActorDistributionManager> const &_DistributionManager
 			, TCActor<CDistributedActorTrustManager> const &_TrustManager
-			, TCFunctionMovable<CDistributedAppAuditor (CCallingHostInfo const &_CallingHostInfo, NStr::CStr const &_Category)> &&_AuditorFactory
+			, TCFunctionMovable<CDistributedAppAuditor (CCallingHostInfo const &_CallingHostInfo, NStr::CStr const &_Category)> &&_fAuditorFactory
 			, CStr const &_LogCategory
 			, CStr const &_PermissionPrefix
 		)
-		: mp_pInternal(fg_Construct(this, _DistributionManager, _TrustManager, fg_Move(_AuditorFactory), _LogCategory, _PermissionPrefix))
+		: mp_pInternal(fg_Construct(this, _DistributionManager, _TrustManager, fg_Move(_fAuditorFactory), _LogCategory, _PermissionPrefix))
 	{
 	}
 

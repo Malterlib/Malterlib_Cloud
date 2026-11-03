@@ -194,14 +194,14 @@ namespace NMib::NCloud::NCloudManager
 				(
 					[](CDatabaseActor::CTransactionRead &&_ReadTransaction)
 					{
-						auto ReadCursor = _ReadTransaction.m_Transaction.f_ReadCursor();
+						auto iReadCursor = _ReadTransaction.m_Transaction.f_ReadCursor();
 
 						CCloudManagerGlobalStateKey Key;
 
 						CCloudManagerGlobalStateValue GlobalState;
 
-						if (ReadCursor.f_FindEqual(Key))
-							GlobalState = ReadCursor.f_Value<CCloudManagerGlobalStateValue>();
+						if (iReadCursor.f_FindEqual(Key))
+							GlobalState = iReadCursor.f_Value<CCloudManagerGlobalStateValue>();
 
 						return GlobalState;
 					}
@@ -221,9 +221,9 @@ namespace NMib::NCloud::NCloudManager
 
 		co_await fg_ContinueRunningOnActor(WriteTransaction.f_Checkout());
 
-		auto Cursor = WriteTransaction.m_Transaction.f_WriteCursor();
+		auto iCursor = WriteTransaction.m_Transaction.f_WriteCursor();
 
-		Cursor.f_Upsert(CCloudManagerGlobalStateKey(), State);
+		iCursor.f_Upsert(CCloudManagerGlobalStateKey(), State);
 
 		co_return fg_Move(WriteTransaction);
 	}
@@ -290,8 +290,8 @@ namespace NMib::NCloud::NCloudManager
 					co_await fg_ContinueRunningOnActor(WriteTransaction.f_Checkout());
 
 					{
-						auto Cursor = WriteTransaction.m_Transaction.f_WriteCursor();
-						Cursor.f_Upsert(Key, Data);
+						auto iCursor = WriteTransaction.m_Transaction.f_WriteCursor();
+						iCursor.f_Upsert(Key, Data);
 					}
 
 					co_return fg_Move(WriteTransaction);
@@ -330,9 +330,9 @@ namespace NMib::NCloud::NCloudManager
 					co_await fg_ContinueRunningOnActor(WriteTransaction.f_Checkout());
 
 					bool bFoundAppManager = false;
-					for (auto AppManagerCursor = WriteTransaction.m_Transaction.f_WriteCursor(CAppManagerKey::mc_Prefix, _HostID); AppManagerCursor;)
+					for (auto iAppManager = WriteTransaction.m_Transaction.f_WriteCursor(CAppManagerKey::mc_Prefix, _HostID); iAppManager;)
 					{
-						AppManagerCursor.f_Delete();
+						iAppManager.f_Delete();
 						bFoundAppManager = true;
 					}
 
@@ -341,16 +341,16 @@ namespace NMib::NCloud::NCloudManager
 
 					(*pRemovedHostIDs)[_HostID];
 
-					for (auto ApplicationCursor = WriteTransaction.m_Transaction.f_WriteCursor(CApplicationKey::mc_Prefix, _HostID); ApplicationCursor;)
+					for (auto iApplication = WriteTransaction.m_Transaction.f_WriteCursor(CApplicationKey::mc_Prefix, _HostID); iApplication;)
 					{
-						auto Application = ApplicationCursor.f_Value<CApplicationValue>();
+						auto Application = iApplication.f_Value<CApplicationValue>();
 						if (Application.m_ApplicationInfo.m_HostID)
 							(*pRemovedHostIDs)[Application.m_ApplicationInfo.m_HostID];
-						ApplicationCursor.f_Delete();
+						iApplication.f_Delete();
 					}
 
-					for (auto ApplicationCursor = WriteTransaction.m_Transaction.f_WriteCursor(CApplicationUpdateStateKey::mc_Prefix, _HostID); ApplicationCursor;)
-						ApplicationCursor.f_Delete();
+					for (auto iUpdateState = WriteTransaction.m_Transaction.f_WriteCursor(CApplicationUpdateStateKey::mc_Prefix, _HostID); iUpdateState;)
+						iUpdateState.f_Delete();
 
 					co_return fg_Move(WriteTransaction);
 				}

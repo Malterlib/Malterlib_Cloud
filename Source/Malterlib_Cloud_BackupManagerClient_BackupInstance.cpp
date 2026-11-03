@@ -47,10 +47,10 @@ namespace NMib::NCloud::NPrivate
 	CBackupManagerClient_Instance::CPendingBackupFile::~CPendingBackupFile()
 	{
 		auto pRunningState = m_pRunningState.f_Lock();
-		if (pRunningState && pRunningState->m_pOnScopeExit)
+		if (pRunningState && pRunningState->m_OnScopeExit)
 		{
 			DMibCloudBackupManagerDebugOut("Destructor clear on scope: {}\n", f_GetFileName());
-			pRunningState->m_pOnScopeExit.f_Clear();
+			pRunningState->m_OnScopeExit.f_Clear();
 		}
 	}
 
@@ -98,7 +98,7 @@ namespace NMib::NCloud::NPrivate
 		if (auto pAppendState = mp_AppendFileState.f_FindEqual(_pRunningState->m_FileName))
 			pAppendState->m_bDirty = true;
 
-		_pRunningState->m_pOnScopeExit.f_Clear();
+		_pRunningState->m_OnScopeExit.f_Clear();
 
 		mp_BackupManagerClient(&CBackupManagerClient::fp_HashMismatch, _PendingFile.m_ManifestFile.m_OriginalPath).f_DiscardResult();
 	}
@@ -109,7 +109,7 @@ namespace NMib::NCloud::NPrivate
 		if (auto pAppendState = mp_AppendFileState.f_FindEqual(_pRunningState->m_FileName))
 			pAppendState->m_bDirty = true;
 
-		_pRunningState->m_pOnScopeExit.f_Clear();
+		_pRunningState->m_OnScopeExit.f_Clear();
 
 		mp_BackupManagerClient(&CBackupManagerClient::fp_HashMismatch, _pRunningState->m_ManifestFile.m_OriginalPath).f_DiscardResult();
 	}
@@ -152,7 +152,7 @@ namespace NMib::NCloud::NPrivate
 						if (!pPendingFile)
 						{
 							DMibCloudBackupManagerDebugOut("Missing pending file: {}\n", FileName);
-							pRunningState->m_pOnScopeExit.f_Clear();
+							pRunningState->m_OnScopeExit.f_Clear();
 							co_return {};
 						}
 
@@ -214,7 +214,7 @@ namespace NMib::NCloud::NPrivate
 						}
 
 						DMibCloudBackupManagerDebugOut("RSync done clear on scope exit: {}\n", FileName);
-						pRunningState->m_pOnScopeExit.f_Clear();
+						pRunningState->m_OnScopeExit.f_Clear();
 						if (!DestroyResult)
 							co_return DestroyResult.f_GetException();
 
@@ -265,7 +265,7 @@ namespace NMib::NCloud::NPrivate
 				{
 					DMibCloudBackupManagerDebugOut("RSync start failed: {}\n", FileName);
 					fp_ReportBackupError(fg_Format("Failed to start rsync: {}", _Subscription.f_GetExceptionStr()), false);
-					pRunningState->m_pOnScopeExit.f_Clear();
+					pRunningState->m_OnScopeExit.f_Clear();
 					return;
 				}
 
@@ -426,7 +426,7 @@ namespace NMib::NCloud::NPrivate
 			fp_ReportRetry(_pRunningState);
 			fp_ReportBackupError(fg_Format("Failed to start append sync for '{}': {}", RunningState.m_FileName, _Exception), false);
 			DMibCloudBackupManagerDebugOut("Append sync failed: {}\n", FileName);
-			pRunningState->m_pOnScopeExit.f_Clear();
+			pRunningState->m_OnScopeExit.f_Clear();
 			return;
 		}
 
@@ -436,7 +436,7 @@ namespace NMib::NCloud::NPrivate
 				{
 					fp_ReportBackupError(fg_Format("Failed to append sync for '{}': {}", pRunningState->m_FileName, _Result.f_GetExceptionStr()), false);
 					DMibCloudBackupManagerDebugOut("Append sync failed 2: {}\n", FileName);
-					pRunningState->m_pOnScopeExit.f_Clear();
+					pRunningState->m_OnScopeExit.f_Clear();
 					return;
 				}
 				auto *pPendingFile = mp_PendingFiles.f_FindEqual(FileName);
@@ -448,7 +448,7 @@ namespace NMib::NCloud::NPrivate
 				}
 				else
 					DMibCloudBackupManagerDebugOut("Append sync not finished: {}\n", FileName);
-				pRunningState->m_pOnScopeExit.f_Clear();
+				pRunningState->m_OnScopeExit.f_Clear();
 			}
 		;
 	}
@@ -479,7 +479,7 @@ namespace NMib::NCloud::NPrivate
 			RunningState.m_ManifestFile = PendingFile.m_ManifestFile;
 
 			++mp_nRunningSyncs;
-			RunningState.m_pOnScopeExit = g_OnScopeExitActor / [this, FileName, SyncSequence]
+			RunningState.m_OnScopeExit = g_OnScopeExitActor / [this, FileName, SyncSequence]
 				{
 					--mp_nRunningSyncs;
 
@@ -787,12 +787,12 @@ namespace NMib::NCloud::NPrivate
 
 									fp_SequenceMultipleSyncs
 										(
-											[=, this, ManifestFile = *pManifestFile](NMib::COnScopeExitShared &&_pScope) mutable
+											[=, this, ManifestFile = *pManifestFile](NMib::COnScopeExitShared &&_Scope) mutable
 											{
 												auto &PendingFile = mp_PendingFiles[FileName];
 												mp_PendingFilesQueue.f_Insert(PendingFile);
 												PendingFile.m_ManifestFile = ManifestFile;
-												PendingFile.m_pSequenceSyncsScope = _pScope;
+												PendingFile.m_SequenceSyncsScope = _Scope;
 												fp_ProcessBackupQueue();
 											}
 											, FilesToSequenceWrite
@@ -884,7 +884,7 @@ namespace NMib::NCloud::NPrivate
 		fp_SequenceMultipleSyncs
 			(
 				[=, this, ChangePromise = _ManifestChange.m_Promise, ManifestChange = _ManifestChange.m_ManifestChange, bDirty = _ManifestChange.m_bDirty]
-				(NMib::COnScopeExitShared &&_pScope) mutable
+				(NMib::COnScopeExitShared &&_Scope) mutable
 				{
 #ifdef DMibCloudBackupManagerDebug
 					switch (ManifestChange.f_GetTypeID())
@@ -981,7 +981,7 @@ namespace NMib::NCloud::NPrivate
 
 							auto Mapping = mp_PendingFiles(_FileName);
 							auto &PendingFile = *Mapping;
-							PendingFile.m_pSequenceSyncsScope = _pScope;
+							PendingFile.m_SequenceSyncsScope = _Scope;
 							PendingFile.m_ManifestFile = ManifestFile;
 
 							DMibCheck(Mapping.f_WasCreated());
@@ -1009,7 +1009,7 @@ namespace NMib::NCloud::NPrivate
 							(TCAsyncResult<void> &&_Result) mutable
 							{
 								(void)Cleanup;
-								(void)_pScope;
+								(void)_Scope;
 
 								if (!_Result)
 								{

@@ -124,10 +124,10 @@ namespace NMib::NCloud::NCloudManager
 
 					co_await fg_ContinueRunningOnActor(WriteTransaction.f_Checkout());
 
-					auto WriteCursor = WriteTransaction.m_Transaction.f_WriteCursor();
+					auto iWriteCursor = WriteTransaction.m_Transaction.f_WriteCursor();
 
 					CAppManagerKey Key{.m_HostID = _AppManagerID};
-					WriteCursor.f_Upsert(Key, AppManagerData);
+					iWriteCursor.f_Upsert(Key, AppManagerData);
 
 					co_return fg_Move(WriteTransaction);
 				}
@@ -175,43 +175,43 @@ namespace NMib::NCloud::NCloudManager
 
 					if (Params.m_bInitial)
 					{
-						for (auto ApplicationCursor = WriteTransaction.m_Transaction.f_WriteCursor(CApplicationKey::mc_Prefix, _AppManagerID); ApplicationCursor;)
+						for (auto iApplication = WriteTransaction.m_Transaction.f_WriteCursor(CApplicationKey::mc_Prefix, _AppManagerID); iApplication;)
 						{
 							if (Params.m_bFiltered || Params.m_bAccessDenied)
 							{
 								CApplicationValue Value;
-								Value = ApplicationCursor.f_Value<CApplicationValue>();
+								Value = iApplication.f_Value<CApplicationValue>();
 
 								Value.m_ApplicationInfo.m_Status = "Indeterminate status, fix permissions in app manager";
 								Value.m_ApplicationInfo.m_StatusSeverity = CAppManagerInterface::EStatusSeverity_Error;
 
-								ApplicationCursor.f_SetValue(Value);
-								++ApplicationCursor;
+								iApplication.f_SetValue(Value);
+								++iApplication;
 							}
 							else
 							{
-								auto Value = ApplicationCursor.f_Value<CApplicationValue>();
+								auto Value = iApplication.f_Value<CApplicationValue>();
 								if (Value.m_ApplicationInfo.m_HostID)
 									pHostChanges->m_RemovedHosts[Value.m_ApplicationInfo.m_HostID];
-								ApplicationCursor.f_Delete();
+								iApplication.f_Delete();
 							}
 						}
 					}
 
-					auto WriteCursor = WriteTransaction.m_Transaction.f_WriteCursor();
+					auto iWriteCursor = WriteTransaction.m_Transaction.f_WriteCursor();
 					for (auto &Change : Params.m_Changes)
 					{
 						CApplicationKey Key{.m_AppManagerHostID = _AppManagerID, .m_Application = Change.m_Application};
 						if (Change.m_Change.f_IsOfType<CAppManagerInterface::CApplicationChange_Remove>())
 						{
-							if (WriteCursor.f_FindEqual(Key))
-								WriteCursor.f_Delete();
+							if (iWriteCursor.f_FindEqual(Key))
+								iWriteCursor.f_Delete();
 							continue;
 						}
 
 						CApplicationValue Value;
-						if (WriteCursor.f_FindEqual(Key))
-							Value = WriteCursor.f_Value<CApplicationValue>();
+						if (iWriteCursor.f_FindEqual(Key))
+							Value = iWriteCursor.f_Value<CApplicationValue>();
 
 						if (Change.m_Change.f_IsOfType<CAppManagerInterface::CApplicationChange_AddOrChangeInfo>())
 							Value.m_ApplicationInfo = Change.m_Change.f_GetAsType<CAppManagerInterface::CApplicationChange_AddOrChangeInfo>().m_Info;
@@ -230,7 +230,7 @@ namespace NMib::NCloud::NCloudManager
 							pHostChanges->m_SeenHostsSensor[Value.m_ApplicationInfo.m_HostID].m_TimeSeen = Now;
 						}
 
-						WriteCursor.f_Upsert(Key, Value);
+						iWriteCursor.f_Upsert(Key, Value);
 					}
 
 					co_return fg_Move(WriteTransaction);
@@ -515,9 +515,9 @@ namespace NMib::NCloud::NCloudManager
 					{
 						TCMap<CStr, CDistributedAppSensorStoreLocal::CSeenHost> AppManagerSeenHosts;
 
-						for (auto ApplicationCursor = _ReadTransaction.m_Transaction.f_ReadCursor(CApplicationKey::mc_Prefix, AppManagerID); ApplicationCursor; ++ApplicationCursor)
+						for (auto iApplication = _ReadTransaction.m_Transaction.f_ReadCursor(CApplicationKey::mc_Prefix, AppManagerID); iApplication; ++iApplication)
 						{
-							auto Application = ApplicationCursor.f_Value<CApplicationValue>();
+							auto Application = iApplication.f_Value<CApplicationValue>();
 							if (Application.m_ApplicationInfo.m_HostID)
 								AppManagerSeenHosts[Application.m_ApplicationInfo.m_HostID].m_PauseReportingFor = _SecondsToPause;
 						}
@@ -566,10 +566,10 @@ namespace NMib::NCloud::NCloudManager
 					{
 						TCMap<CStr, CAppManagerDynamicInfo> Return;
 
-						for (auto AppManagers = _ReadTransaction.m_Transaction.f_ReadCursor(CAppManagerKey::mc_Prefix); AppManagers; ++AppManagers)
+						for (auto iAppManager = _ReadTransaction.m_Transaction.f_ReadCursor(CAppManagerKey::mc_Prefix); iAppManager; ++iAppManager)
 						{
-							auto Key = AppManagers.f_Key<CAppManagerKey>();
-							auto Value = AppManagers.f_Value<CAppManagerValue>();
+							auto Key = iAppManager.f_Key<CAppManagerKey>();
+							auto Value = iAppManager.f_Value<CAppManagerValue>();
 
 							auto &OutAppManager = Return[Key.m_HostID];
 							OutAppManager = Value.m_Info;
@@ -615,10 +615,10 @@ namespace NMib::NCloud::NCloudManager
 					{
 						TCMap<CApplicationKey, CApplicationInfo> Return;
 
-						for (auto Applications = _ReadTransaction.m_Transaction.f_ReadCursor(NCloudManagerDatabase::CApplicationKey::mc_Prefix); Applications; ++Applications)
+						for (auto iApplication = _ReadTransaction.m_Transaction.f_ReadCursor(NCloudManagerDatabase::CApplicationKey::mc_Prefix); iApplication; ++iApplication)
 						{
-							auto Key = Applications.f_Key<NCloudManagerDatabase::CApplicationKey>();
-							auto Value = Applications.f_Value<CApplicationValue>();
+							auto Key = iApplication.f_Key<NCloudManagerDatabase::CApplicationKey>();
+							auto Value = iApplication.f_Value<CApplicationValue>();
 
 							CApplicationKey ApplicationKey{Key.m_AppManagerHostID, Key.m_Application};
 
@@ -820,10 +820,10 @@ namespace NMib::NCloud::NCloudManager
 					{
 						CCloudManager::CExpectedVersions InitialExpectedVersions;
 
-						for (auto Applications = _ReadTransaction.m_Transaction.f_ReadCursor(CExpectedOsVersionKey::mc_Prefix, OsName); Applications; ++Applications)
+						for (auto iExpectedOsVersion = _ReadTransaction.m_Transaction.f_ReadCursor(CExpectedOsVersionKey::mc_Prefix, OsName); iExpectedOsVersion; ++iExpectedOsVersion)
 						{
-							auto Key = Applications.f_Key<CExpectedOsVersionKey>();
-							auto Value = Applications.f_Value<CExpectedOsVersionValue>();
+							auto Key = iExpectedOsVersion.f_Key<CExpectedOsVersionKey>();
+							auto Value = iExpectedOsVersion.f_Value<CExpectedOsVersionValue>();
 
 							InitialExpectedVersions.m_Versions[fg_Move(Key.m_CurrentVersion)] = fg_Move(Value.m_ExpectedVersionRange);
 						}
@@ -870,10 +870,10 @@ namespace NMib::NCloud::NCloudManager
 					{
 						TCMap<CStr, CExpectedVersions> Return;
 
-						for (auto Applications = _ReadTransaction.m_Transaction.f_ReadCursor(CExpectedOsVersionKey::mc_Prefix); Applications; ++Applications)
+						for (auto iExpectedOsVersion = _ReadTransaction.m_Transaction.f_ReadCursor(CExpectedOsVersionKey::mc_Prefix); iExpectedOsVersion; ++iExpectedOsVersion)
 						{
-							auto Key = Applications.f_Key<CExpectedOsVersionKey>();
-							auto Value = Applications.f_Value<CExpectedOsVersionValue>();
+							auto Key = iExpectedOsVersion.f_Key<CExpectedOsVersionKey>();
+							auto Value = iExpectedOsVersion.f_Value<CExpectedOsVersionValue>();
 
 							Return[Key.m_OsName].m_Versions[Key.m_CurrentVersion] = fg_Move(Value.m_ExpectedVersionRange);
 						}

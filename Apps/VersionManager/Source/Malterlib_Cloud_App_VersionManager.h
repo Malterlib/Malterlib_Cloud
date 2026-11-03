@@ -22,6 +22,6 @@ namespace NMib::NCloud::NVersionManager
 		TCFuture<void> fp_StopApp() override;
 		void fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine) override;
 
-		TCActor<CServer> mp_pServer;
+		TCActor<CServer> mp_Server;
 	};
 }

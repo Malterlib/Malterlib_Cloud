@@ -22,7 +22,7 @@ namespace NMib::NCloud
 
 		DMibCloudBackupManagerDebugOut("Retry subscribe\n");
 
-		auto pActive = f_MarkInstancesActive();
+		auto Active = f_MarkInstancesActive();
 
 		if (m_bRunningRetrySubscribe)
 		{
@@ -579,12 +579,12 @@ namespace NMib::NCloud
 
 		umint Sequence = m_FileNotificationSequence++;
 
-		auto pActive = f_MarkInstancesActive();
+		auto Active = f_MarkInstancesActive();
 
 		f_UpdateManifest(RelativePath, OriginalPath, bDirtyHint) + f_UpdateManifest(RelativePathFrom, OriginalPathFrom, bDirtyHint) > [=, this]
 			(TCAsyncResult<CUpdateManifestResult> &&_Change, TCAsyncResult<CUpdateManifestResult> &&_ChangeFrom)
 			{
-				(void)pActive;
+				(void)Active;
 				DMibCheck(Sequence > m_LastSeenNotificationSequence);
 				m_LastSeenNotificationSequence = Sequence;
 

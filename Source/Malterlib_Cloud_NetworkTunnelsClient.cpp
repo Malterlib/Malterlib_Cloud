@@ -176,8 +176,8 @@ namespace NMib::NCloud
 			}
 			Internal.m_Connections.f_Clear();
 
-			for (auto &Tunnel : Internal.m_Tunnels)
-				Tunnel->f_Destroy() > Results;
+			for (auto &pTunnel : Internal.m_Tunnels)
+				pTunnel->f_Destroy() > Results;
 			Internal.m_Tunnels.f_Clear();
 
 			if (Internal.m_AddressResolver)
@@ -620,6 +620,7 @@ namespace NMib::NCloud
 					;
 
 					m_NetworkTunnelsState[_Tunnels];
+					// NOLINTNEXTLINE(malterlib-conceptual-prefix): a subscription handle like CActorSubscription, which the check misses because it is derived from it
 					auto ChangesSubscription = co_await _Tunnels.f_CallActor(&ICNetworkTunnels::f_SubscribeTunnels)(fg_Move(Subscribe));
 
 					// The actor can have been removed while subscribing

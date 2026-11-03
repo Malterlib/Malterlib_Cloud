@@ -35,7 +35,7 @@ namespace NMib::NCloud
 		_Stream % m_RunAsUser;
 		_Stream % m_RunAsGroup;
 		if (_Stream.f_GetVersion() >= EProtocolVersion_AddRunAsUserHasShell)
-			_Stream % m_bRunAsUserHasShell;
+			_Stream % m_RunAsUserHasShell;
 
 		_Stream % m_Backup_IncludeWildcards;
 		_Stream % m_Backup_ExcludeWildcards;
@@ -47,11 +47,11 @@ namespace NMib::NCloud
 		_Stream % m_UpdateBranches;
 
 		if (_Stream.f_GetVersion() >= EProtocolVersion_AddAutoUpdateAndExtendAppInfo)
-			_Stream % m_bAutoUpdate;
+			_Stream % m_AutoUpdate;
 		else if constexpr (tf_CStream::mc_bConsume)
 		{
 			if (m_UpdateTags)
-				m_bAutoUpdate = !(*m_UpdateTags).f_IsEmpty();
+				m_AutoUpdate = !(*m_UpdateTags).f_IsEmpty();
 		}
 
 		_Stream % m_UpdateScriptPreUpdate;
@@ -61,12 +61,12 @@ namespace NMib::NCloud
 		_Stream % m_UpdateGroup;
 		_Stream % m_Dependencies;
 
-		_Stream % m_bSelfUpdateSource;
-		_Stream % m_bDistributedApp;
-		_Stream % m_bStopOnDependencyFailure;
-		_Stream % m_bBackupEnabled;
+		_Stream % m_SelfUpdateSource;
+		_Stream % m_DistributedApp;
+		_Stream % m_StopOnDependencyFailure;
+		_Stream % m_BackupEnabled;
 		if (_Stream.f_GetVersion() >= EProtocolVersion_AddLaunchInProcess)
-			_Stream % m_bLaunchInProcess;
+			_Stream % m_LaunchInProcess;
 	}
 
 	template <typename tf_CStream>

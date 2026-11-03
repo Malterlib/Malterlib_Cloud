@@ -27,6 +27,7 @@ namespace NMib::NCloud::NSecretsManager
 			TCFuture<CSecretProperties> f_GetSecretProperties(CSecretID _ID) override;
 			TCFuture<CSecret> f_GetSecret(CSecretID _ID) override;
 			TCFuture<CSecret> f_GetSecretBySemanticID(CGetSecretBySemanticID _Options) override;
+			// NOLINTNEXTLINE(malterlib-conceptual-prefix): a subscription handle like CActorSubscription, which the check misses because it is derived from it
 			TCFuture<TCDistributedActorInterfaceWithID<CDirectorySyncClient>> f_DownloadFile(CSecretID _ID, TCActorSubscriptionWithID<> _Subscription) override;
 			TCFuture<void> f_ModifyTags(CSecretID _ID, TCSet<CStrSecure> _TagsToRemove, TCSet<CStrSecure> _TagsToAdd) override;
 			TCFuture<void> f_SetMetadata(CSetMetadata _Metadata) override;
@@ -46,6 +47,7 @@ namespace NMib::NCloud::NSecretsManager
 			TCFuture<void> f_Destroy();
 
 			TCDistributedActor<CDirectorySyncSend> m_DirectorySyncSend;
+			// NOLINTNEXTLINE(malterlib-conceptual-prefix): a subscription handle like CActorSubscription, which the check misses because it is derived from it
 			TCActorSubscriptionWithID<> m_Subscription;
 			CActorSubscription m_FileSubscription;
 		};
@@ -105,7 +107,7 @@ namespace NMib::NCloud::NSecretsManager
 
 		static void fsp_AddPermissionQueryIndexedByPermission
 			(
-				char const *_ReadWrite
+				char const *_pReadWrite
 				, CStr const &_SemanticID
 				, TCSet<CStrSecure> const &_Tags
 				, TCMap<CStr, TCVector<CPermissionQuery>> &o_Permissions
@@ -114,7 +116,7 @@ namespace NMib::NCloud::NSecretsManager
 		static void fsp_AddPermissionQueryIndexedBySecretID
 			(
 				CSecretsManager::CSecretID const &_ID
-				, char const *_ReadWrite
+				, char const *_pReadWrite
 				, CStr const &_SemanticID
 				, TCSet<CStrSecure> const &_Tags
 				, TCMap<CStr, TCVector<CPermissionQuery>> &o_Permissions

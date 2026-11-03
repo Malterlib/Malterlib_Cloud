@@ -129,6 +129,7 @@ namespace NMib::NCloud
 			_Stream % fg_Move(m_AppManagerCloudManagerInterface);
 		else
 		{
+			// NOLINTNEXTLINE(malterlib-conceptual-prefix): a subscription handle like CActorSubscription, which the check misses because it is derived from it
 			NConcurrency::TCActorSubscriptionWithID<> Subscription;
 			if constexpr (tf_CStream::mc_bFeed)
 				Subscription = fg_Move(m_AppManagerCloudManagerInterface.f_GetSubscription());

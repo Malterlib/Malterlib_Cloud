@@ -392,10 +392,10 @@ namespace NMib::NCloud
 				CAppManagerInterface::CApplicationAdd Add;
 				CAppManagerInterface::CApplicationSettings Settings;
 				Settings.m_VersionManagerApplication = _VersionManagerApplication;
-				Settings.m_bAutoUpdate = true;
+				Settings.m_AutoUpdate = true;
 				Settings.m_UpdateTags = TCSet<CStr>{_Tag};
 				Settings.m_UpdateGroup = _Group;
-				Settings.m_bLaunchInProcess = (State.m_Options & EOption_LaunchTestAppInApp) != EOption_None;
+				Settings.m_LaunchInProcess = (State.m_Options & EOption_LaunchTestAppInApp) != EOption_None;
 				Add.m_Version = State.m_PackageInfo.m_VersionID;
 
 				AppManager.m_Interface.f_CallActor(&CAppManagerInterface::f_Add)(_Name, Add, Settings) > AddAppResults;

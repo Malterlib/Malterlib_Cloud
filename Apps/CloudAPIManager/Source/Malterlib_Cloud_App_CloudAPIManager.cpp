@@ -23,16 +23,16 @@ namespace NMib::NCloud::NCloudAPIManager
 
 	TCFuture<void> CCloudAPIManagerDaemonActor::fp_StartApp(NEncoding::CEJsonSorted const _Params)
 	{
-		mp_pServer = fg_ConstructActor<CServer>(fg_Construct(self), mp_State);
+		mp_Server = fg_ConstructActor<CServer>(fg_Construct(self), mp_State);
 		co_return {};
 	}
 
 	TCFuture<void> CCloudAPIManagerDaemonActor::fp_StopApp()
 	{
-		if (mp_pServer)
+		if (mp_Server)
 		{
 			DMibLogWithCategory(Mib/Cloud/CloudAPIManager/Daemon, Info, "Shutting down");
-			co_await (fg_Move(mp_pServer).f_Destroy() % "Failed to shut down server");
+			co_await (fg_Move(mp_Server).f_Destroy() % "Failed to shut down server");
 		}
 
 		co_return {};

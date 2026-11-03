@@ -70,7 +70,7 @@ namespace NMib::NCloud
 		if (NewConfig.m_IncludeWildcards.f_IsEmpty())
 			co_return {};
 
-		auto pActive = Internal.f_MarkInstancesActive();
+		auto Active = Internal.f_MarkInstancesActive();
 
 		auto pThis = m_pThis;
 

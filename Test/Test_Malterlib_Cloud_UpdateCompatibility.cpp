@@ -54,7 +54,7 @@ using namespace NMib::NTime;
 static fp64 gs_Timeout = 2_minutes * gc_TimeoutMultiplier;
 static uint32 gs_CompressionLevel = 4;
 
-static constexpr ch8 const *gc_AccessDeniedErrorMessage
+static constexpr ch8 const *gc_pAccessDeniedErrorMessage
 	= "Failed to download application from version manager: Failed to download the application from any manager: Failed to start download on remote server: Access denied"
 ;
 
@@ -894,10 +894,10 @@ private:
 				fWaitVersionsAvailable(_AppManager, "AppManager");
 				CAppManagerInterface::CApplicationAdd Add;
 				CAppManagerInterface::CApplicationSettings ApplicationSettings;
-				ApplicationSettings.m_bAutoUpdate = true;
+				ApplicationSettings.m_AutoUpdate = true;
 				ApplicationSettings.m_UpdateTags = TCSet<CStr>{_Tag};
 				ApplicationSettings.m_UpdateBranches = TCSet<CStr>{"*"};
-				ApplicationSettings.m_bSelfUpdateSource = true;
+				ApplicationSettings.m_SelfUpdateSource = true;
 				ApplicationSettings.m_VersionManagerApplication = "AppManager";
 				ApplicationSettings.m_ExecutableParameters = TCVector<CStr>{};
 
@@ -918,7 +918,7 @@ private:
 				fWaitVersionsAvailable(_AppManager, "AppManager");
 				CAppManagerInterface::CApplicationAdd Add;
 				CAppManagerInterface::CApplicationSettings ApplicationSettings;
-				ApplicationSettings.m_bAutoUpdate = true;
+				ApplicationSettings.m_AutoUpdate = true;
 				ApplicationSettings.m_UpdateTags = TCSet<CStr>{_Tag};
 				ApplicationSettings.m_UpdateBranches = TCSet<CStr>{"*"};
 				ApplicationSettings.m_VersionManagerApplication = _Application;
@@ -2097,7 +2097,7 @@ private:
 		// Test that download fails without permission
 		DMibLogWithCategory(Test, Info, "Testing download without permission (should fail)...");
 		CStr ErrorNoPerms = fApplicationAddWithAuth(AppManager_AppManager, "TestApp_SingleAuth_NoPerms", UserInfoNoPerms.m_UserID, UserInfoNoPerms.m_Password);
-		DMibExpect(ErrorNoPerms, ==, gc_AccessDeniedErrorMessage)("User without permission should be denied even with correct password");
+		DMibExpect(ErrorNoPerms, ==, gc_pAccessDeniedErrorMessage)("User without permission should be denied even with correct password");
 		DMibLogWithCategory(Test, Info, "Single auth failure test succeeded");
 
 		// Test Scenario C: New -> New with parallel downloads (both support multi-auth)
@@ -2172,14 +2172,14 @@ private:
 							if (bShouldSucceed)
 								ExpectedErrors.f_Insert({""});
 							else
-								ExpectedErrors.f_Insert({gc_AccessDeniedErrorMessage});
+								ExpectedErrors.f_Insert({gc_pAccessDeniedErrorMessage});
 						}
 						else
 						{
 							if (bShouldSucceed)
 								ExpectedErrors.f_Insert({"Authentication already enabled", ""});
 							else
-								ExpectedErrors.f_Insert({"Authentication already enabled", gc_AccessDeniedErrorMessage});
+								ExpectedErrors.f_Insert({"Authentication already enabled", gc_pAccessDeniedErrorMessage});
 						}
 					}
 
@@ -2284,10 +2284,10 @@ public:
 					Packages[AppName].f_Insert(PackagePath);
 			}
 
-			for (auto &AppName : {"KeyManager", "AppManager", "VersionManager"})
+			for (auto &pAppName : {"KeyManager", "AppManager", "VersionManager"})
 			{
-				CStr AppArchive = "Latest/{}.tar.zst"_f << AppName;
-				Packages[AppName].f_Insert(AppArchive);
+				CStr AppArchive = "Latest/{}.tar.zst"_f << pAppName;
+				Packages[pAppName].f_Insert(AppArchive);
 			}
 
 			auto &AppManagers = Packages["AppManager"];

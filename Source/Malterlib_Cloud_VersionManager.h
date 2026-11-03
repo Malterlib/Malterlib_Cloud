@@ -142,6 +142,7 @@ namespace NMib::NCloud
 			void f_Stream(tf_CStream &_Stream);
 
 			NConcurrency::TCAsyncGenerator<NContainer::CIOByteVector> m_DataGenerator;
+			// NOLINTNEXTLINE(malterlib-conceptual-prefix): a subscription handle like CActorSubscription, which the check misses because it is derived from it
 			NConcurrency::TCActorSubscriptionWithID<> m_Subscription;
 			uint64 m_StartPosition;
 		};
@@ -203,7 +204,7 @@ namespace NMib::NCloud
 			uint64 m_QueueSize = NFile::gc_IdealNetworkQueueSize;
 			EFlag m_Flags = EFlag_None;
 			NStorage::TCOptional<NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<CStartUploadTransferDeprecated::CResult> (CStartUploadTransferDeprecated _Params)>>
-				m_fStartTransferDeprecated
+				m_StartTransferDeprecated
 			;
 			NStorage::TCOptional<NConcurrency::TCAsyncGeneratorWithID<CDownloadFile>> m_FilesGenerator;
 		};
@@ -265,6 +266,7 @@ namespace NMib::NCloud
 				template <typename tf_CStream>
 				void f_Stream(tf_CStream &_Stream);
 
+				// NOLINTNEXTLINE(malterlib-conceptual-prefix): a subscription handle like CActorSubscription, which the check misses because it is derived from it
 				NConcurrency::TCActorSubscriptionWithID<> m_Subscription;
 			};
 

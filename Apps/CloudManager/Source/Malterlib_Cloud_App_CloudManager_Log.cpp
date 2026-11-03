@@ -123,7 +123,7 @@ namespace NMib::NCloud::NCloudManager
 		)
 		-> TCFuture<TCActorSubscriptionWithID<>>
 	{
-		TCActorSubscriptionWithID<> Subscription;
+		TCActorSubscriptionWithID<> Subscription; // NOLINT(malterlib-conceptual-prefix): a subscription handle like CActorSubscription, which the check misses because it is derived from it
 		{
 			auto pThis = m_pThis;
 			auto OnResume = co_await pThis->f_CheckDestroyedOnResume();
@@ -145,7 +145,7 @@ namespace NMib::NCloud::NCloudManager
 
 	auto CCloudManagerServer::CDistributedAppLogReaderImplementation::f_SubscribeLogEntries(CSubscribeLogEntries _Params) -> TCFuture<TCActorSubscriptionWithID<>>
 	{
-		TCActorSubscriptionWithID<> Subscription;
+		TCActorSubscriptionWithID<> Subscription; // NOLINT(malterlib-conceptual-prefix): a subscription handle like CActorSubscription, which the check misses because it is derived from it
 		{
 			auto pThis = m_pThis;
 			auto OnResume = co_await pThis->f_CheckDestroyedOnResume();

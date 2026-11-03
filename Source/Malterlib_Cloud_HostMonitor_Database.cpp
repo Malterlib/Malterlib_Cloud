@@ -24,13 +24,13 @@ namespace NMib::NCloud
 			(
 				[](CDatabaseActor::CTransactionRead &&_ReadTransaction)
 				{
-					auto ReadCursor = _ReadTransaction.m_Transaction.f_ReadCursor();
+					auto iReadCursor = _ReadTransaction.m_Transaction.f_ReadCursor();
 
 					CPatchStateKey Key;
 					CPatchStateValue PatchDatabaseState;
 
-					if (ReadCursor.f_FindEqual(Key))
-						PatchDatabaseState = ReadCursor.f_Value<CPatchStateValue>();
+					if (iReadCursor.f_FindEqual(Key))
+						PatchDatabaseState = iReadCursor.f_Value<CPatchStateValue>();
 
 					return PatchDatabaseState;
 				}

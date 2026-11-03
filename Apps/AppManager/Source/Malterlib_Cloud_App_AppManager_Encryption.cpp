@@ -6,7 +6,7 @@
 namespace NMib::NCloud::NAppManager
 {
 #ifdef DPlatformFamily_Linux
-	static constexpr ch8 const gc_pSetupEncryptionScript[] =
+	static constexpr ch8 const gc_SetupEncryptionScript[] =
 		{
 #	embed "Malterlib_Cloud_App_AppManager_Encryption_Common.sh"
 			,
@@ -14,7 +14,7 @@ namespace NMib::NCloud::NAppManager
 			, '\0'
 		}
 	;
-	static constexpr ch8 const gc_pOpenEncryptionScript[] =
+	static constexpr ch8 const gc_OpenEncryptionScript[] =
 		{
 #	embed "Malterlib_Cloud_App_AppManager_Encryption_Common.sh"
 			,
@@ -22,7 +22,7 @@ namespace NMib::NCloud::NAppManager
 			, '\0'
 		}
 	;
-	static constexpr ch8 const gc_pCloseEncryptionScript[] =
+	static constexpr ch8 const gc_CloseEncryptionScript[] =
 		{
 #	embed "Malterlib_Cloud_App_AppManager_Encryption_Common.sh"
 			,
@@ -110,15 +110,15 @@ namespace NMib::NCloud::NAppManager
 		switch (_Operation)
 		{
 		case EEncryptOperation_Setup:
-			pScript = gc_pSetupEncryptionScript;
+			pScript = gc_SetupEncryptionScript;
 			pDesc = "SetupEncryption";
 			break;
 		case EEncryptOperation_Open:
-			pScript = gc_pOpenEncryptionScript;
+			pScript = gc_OpenEncryptionScript;
 			pDesc = "OpenEncryption";
 			break;
 		case EEncryptOperation_Close:
-			pScript = gc_pCloseEncryptionScript;
+			pScript = gc_CloseEncryptionScript;
 			pDesc = "CloseEncryption";
 			break;
 		default: DNeverGetHere; break;

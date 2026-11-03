@@ -148,7 +148,7 @@ namespace NMib::NCloud
 			NStorage::TCOptional<NContainer::TCVector<NStr::CStr>> m_ExecutableParameters;
 			NStorage::TCOptional<NStr::CStr> m_RunAsUser;
 			NStorage::TCOptional<NStr::CStr> m_RunAsGroup;
-			NStorage::TCOptional<bool> m_bRunAsUserHasShell;
+			NStorage::TCOptional<bool> m_RunAsUserHasShell;
 
 			NStorage::TCOptional<NContainer::TCMap<NStr::CStr, NFile::CDirectoryManifestConfig::CDestination>> m_Backup_IncludeWildcards;
 			NStorage::TCOptional<NContainer::TCSet<NStr::CStr>> m_Backup_ExcludeWildcards;
@@ -156,7 +156,7 @@ namespace NMib::NCloud
 			NStorage::TCOptional<NContainer::TCMap<NStr::CStr, NFile::EDirectoryManifestSyncFlag>> m_Backup_RemoveSyncFlagsWildcards;
 			NStorage::TCOptional<NTime::CTimeSpan> m_Backup_NewBackupInterval;
 
-			NStorage::TCOptional<bool> m_bAutoUpdate;
+			NStorage::TCOptional<bool> m_AutoUpdate;
 			NStorage::TCOptional<NContainer::TCSet<NStr::CStr>> m_UpdateTags;
 			NStorage::TCOptional<NContainer::TCSet<NStr::CStr>> m_UpdateBranches; // Are wild cards
 			NStorage::TCOptional<NStr::CStr> m_UpdateScriptPreUpdate;
@@ -165,11 +165,11 @@ namespace NMib::NCloud
 			NStorage::TCOptional<NStr::CStr> m_UpdateScriptOnError;
 			NStorage::TCOptional<NContainer::TCSet<NStr::CStr>> m_Dependencies;
 
-			NStorage::TCOptional<bool> m_bDistributedApp;
-			NStorage::TCOptional<bool> m_bSelfUpdateSource;
-			NStorage::TCOptional<bool> m_bStopOnDependencyFailure;
-			NStorage::TCOptional<bool> m_bBackupEnabled;
-			NStorage::TCOptional<bool> m_bLaunchInProcess;
+			NStorage::TCOptional<bool> m_DistributedApp;
+			NStorage::TCOptional<bool> m_SelfUpdateSource;
+			NStorage::TCOptional<bool> m_StopOnDependencyFailure;
+			NStorage::TCOptional<bool> m_BackupEnabled;
+			NStorage::TCOptional<bool> m_LaunchInProcess;
 		};
 
 		struct CApplicationInfo

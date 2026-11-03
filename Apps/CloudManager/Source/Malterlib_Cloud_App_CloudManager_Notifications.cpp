@@ -113,7 +113,7 @@ namespace NMib::NCloud::NCloudManager
 			TCAsyncResult<CStr> Result;
 			if (auto *pTimestamp = _Timestamps.f_FindEqual(ChannelID))
 			{
-				if (Message.m_bReplyBroadcast && *Message.m_bReplyBroadcast)
+				if (Message.m_ReplyBroadcast && *Message.m_ReplyBroadcast)
 				{
 					Message.m_ThreadTimestamp = *pTimestamp;
 					Result = co_await mp_SlackActor(&CSlackActor::f_PostMessage, Channel.m_Token, Message).f_Wrap();
@@ -123,8 +123,8 @@ namespace NMib::NCloud::NCloudManager
 			}
 			else
 			{
-				if (Message.m_bReplyBroadcast)
-					Message.m_bReplyBroadcast.f_Clear();
+				if (Message.m_ReplyBroadcast)
+					Message.m_ReplyBroadcast.f_Clear();
 
 				Result = co_await mp_SlackActor(&CSlackActor::f_PostMessage, Channel.m_Token, Message).f_Wrap();
 			}
@@ -143,7 +143,7 @@ namespace NMib::NCloud::NCloudManager
 		CSlackActor::CMessage Message;
 
 		auto &SlackAttachment = Message.m_Attachments.f_Insert();
-		SlackAttachment.m_bFieldsMarkdown = true;
+		SlackAttachment.m_FieldsMarkdown = true;
 		if (_Error)
 		{
 			SlackAttachment.m_Text = "Cloud Manager started with error:\n```{}```"_f << CSlackActor::CMessage::fs_EscapeString(_Error);

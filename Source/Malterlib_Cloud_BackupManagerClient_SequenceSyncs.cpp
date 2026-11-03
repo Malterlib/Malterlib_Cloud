@@ -64,13 +64,13 @@ namespace NMib::NCloud::NPrivate
 		{
 			umint m_nWaiting = 0;
 			TCVector<COnScopeExitShared> m_CleanupScopes;
-			TCFunctionMovable<void (COnScopeExitShared &&_pCleanup)> m_fToRun;
+			TCFunctionMovable<void (COnScopeExitShared &&_Cleanup)> m_fToRun;
 		};
 	}
 
 	void CBackupManagerClient_Instance::fp_SequenceMultipleSyncs
 		(
-			TCFunctionMovable<void (COnScopeExitShared &&_pCleanup)> &&_fToRun
+			TCFunctionMovable<void (COnScopeExitShared &&_Cleanup)> &&_fToRun
 			, TCVector<CStr> const &_WriteFiles
 			, TCVector<CStr> const &_ReadFiles
 		)
@@ -95,9 +95,9 @@ namespace NMib::NCloud::NPrivate
 		pState->m_nWaiting = _WriteFiles.f_GetLen() + _ReadFiles.f_GetLen();
 		pState->m_fToRun = fg_Move(_fToRun);
 
-		auto fSyncRun = [pState](COnScopeExitShared &&_pCleanup)
+		auto fSyncRun = [pState](COnScopeExitShared &&_Cleanup)
 			{
-				pState->m_CleanupScopes.f_Insert(fg_Move(_pCleanup));
+				pState->m_CleanupScopes.f_Insert(fg_Move(_Cleanup));
 				if (--pState->m_nWaiting == 0)
 				{
 					pState->m_fToRun
@@ -119,13 +119,13 @@ namespace NMib::NCloud::NPrivate
 			fp_SequenceReadSyncs(File, fSyncRun);
 	}
 
-	void CBackupManagerClient_Instance::fp_SequenceWriteSyncs(CStr const &_FileName, TCFunctionMovable<void (COnScopeExitShared &&_pCleanup)> &&_fToRun)
+	void CBackupManagerClient_Instance::fp_SequenceWriteSyncs(CStr const &_FileName, TCFunctionMovable<void (COnScopeExitShared &&_Cleanup)> &&_fToRun)
 	{
 		mp_SequencedSyncs[_FileName].m_WriteWaiting.f_Insert(fg_Move(_fToRun));
 		fp_RunSequencedSyncs(_FileName);
 	}
 
-	void CBackupManagerClient_Instance::fp_SequenceReadSyncs(CStr const &_FileName, TCFunctionMovable<void (COnScopeExitShared &&_pCleanup)> &&_fToRun)
+	void CBackupManagerClient_Instance::fp_SequenceReadSyncs(CStr const &_FileName, TCFunctionMovable<void (COnScopeExitShared &&_Cleanup)> &&_fToRun)
 	{
 		mp_SequencedSyncs[_FileName].m_ReadWaiting.f_Insert(fg_Move(_fToRun));
 		fp_RunSequencedSyncs(_FileName);

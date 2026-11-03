@@ -80,7 +80,7 @@ namespace NMib::NCloud
 			bool m_bRemoved = false;
 			bool m_bAdded = false;
 			bool m_bIDChanged = false;
-			bool m_Appended = false;
+			bool m_bAppended = false;
 			bool m_bChecksumValid = false;
 			CBackupManagerClient_ChecksumState m_ChecksumState;
 		};

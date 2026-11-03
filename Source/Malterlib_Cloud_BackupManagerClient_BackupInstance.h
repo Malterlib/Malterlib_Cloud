@@ -56,7 +56,7 @@ namespace NMib::NCloud::NPrivate
 			TCBinaryStreamFile<> m_File;
 			TCBinaryStreamSubStream<> m_LimitedFile;
 			TCUniquePointer<CRSyncServer> m_pRSyncServer;
-			COnScopeExitShared m_pOnScopeExit;
+			COnScopeExitShared m_OnScopeExit;
 			TCSharedPointer<CCanDestroyTracker> m_pCanDestroyTracker;
 			CDirectoryManifestFile m_ManifestFile;
 			uint32 m_PendingQueue = 0;
@@ -92,7 +92,7 @@ namespace NMib::NCloud::NPrivate
 
 			CDirectoryManifestFile m_ManifestFile;
 
-			COnScopeExitShared m_pSequenceSyncsScope;
+			COnScopeExitShared m_SequenceSyncsScope;
 
 			bool m_bFinished = false;
 		};
@@ -125,8 +125,8 @@ namespace NMib::NCloud::NPrivate
 			umint m_nReading = 0;
 			umint m_nWriting = 0;
 
-			TCLinkedList<TCFunctionMovable<void (COnScopeExitShared &&_pCleanup)>> m_ReadWaiting;
-			TCLinkedList<TCFunctionMovable<void (COnScopeExitShared &&_pCleanup)>> m_WriteWaiting;
+			TCLinkedList<TCFunctionMovable<void (COnScopeExitShared &&_Cleanup)>> m_ReadWaiting;
+			TCLinkedList<TCFunctionMovable<void (COnScopeExitShared &&_Cleanup)>> m_WriteWaiting;
 		};
 
 		struct CPendingManifestChange
@@ -165,9 +165,9 @@ namespace NMib::NCloud::NPrivate
 		void fp_ReportHashMismatch(TCSharedPointerSupportWeak<CRunningSyncState> const &_pRunningState, CPendingBackupFile &_PendingFile);
 		void fp_ReportRetry(TCSharedPointerSupportWeak<CRunningSyncState> const &_pRunningState);
 
-		void fp_SequenceWriteSyncs(CStr const &_FileName, TCFunctionMovable<void (COnScopeExitShared &&_pCleanup)> &&_fToRun);
-		void fp_SequenceReadSyncs(CStr const &_FileName, TCFunctionMovable<void (COnScopeExitShared &&_pCleanup)> &&_fToRun);
-		void fp_SequenceMultipleSyncs(TCFunctionMovable<void (COnScopeExitShared &&_pCleanup)> &&_fToRun, TCVector<CStr> const &_WriteFiles, TCVector<CStr> const &_ReadFiles);
+		void fp_SequenceWriteSyncs(CStr const &_FileName, TCFunctionMovable<void (COnScopeExitShared &&_Cleanup)> &&_fToRun);
+		void fp_SequenceReadSyncs(CStr const &_FileName, TCFunctionMovable<void (COnScopeExitShared &&_Cleanup)> &&_fToRun);
+		void fp_SequenceMultipleSyncs(TCFunctionMovable<void (COnScopeExitShared &&_Cleanup)> &&_fToRun, TCVector<CStr> const &_WriteFiles, TCVector<CStr> const &_ReadFiles);
 		void fp_RunSequencedSyncs(CStr const &_FileName);
 
 		TCSharedPointer<CCanDestroyTracker> mp_pCanDestroyTracker = fg_Construct();

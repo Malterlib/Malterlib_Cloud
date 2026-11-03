@@ -117,17 +117,17 @@ namespace NMib::NCloud::NSecretsManager
 
 		Permissions["SecretsManager/Read/*/NoTag"];
 		Permissions["SecretsManager/Write/*/NoTag"];
-		for (auto const &pTag : mp_Tags)
+		for (auto const &Tag : mp_Tags)
 		{
-			Permissions[fg_Format("SecretsManager/Read/*/Tag/{}", mp_Tags.fs_GetKey(pTag))];
-			Permissions[fg_Format("SecretsManager/Write/*/Tag/{}", mp_Tags.fs_GetKey(pTag))];
+			Permissions[fg_Format("SecretsManager/Read/*/Tag/{}", mp_Tags.fs_GetKey(Tag))];
+			Permissions[fg_Format("SecretsManager/Write/*/Tag/{}", mp_Tags.fs_GetKey(Tag))];
 		}
 		Permissions["SecretsManager/Read/NoSemanticID/*"];
 		Permissions["SecretsManager/Write/NoSemanticID/*"];
-		for (auto const &pSemanticID : mp_SemanticIDs)
+		for (auto const &SemanticID : mp_SemanticIDs)
 		{
-			Permissions[fg_Format("SecretsManager/Read/SemanticID/{}/*", mp_SemanticIDs.fs_GetKey(pSemanticID))];
-			Permissions[fg_Format("SecretsManager/Write/SemanticID/{}/*", mp_SemanticIDs.fs_GetKey(pSemanticID))];
+			Permissions[fg_Format("SecretsManager/Read/SemanticID/{}/*", mp_SemanticIDs.fs_GetKey(SemanticID))];
+			Permissions[fg_Format("SecretsManager/Write/SemanticID/{}/*", mp_SemanticIDs.fs_GetKey(SemanticID))];
 		}
 
 		co_await mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, Permissions);
@@ -223,7 +223,7 @@ namespace NMib::NCloud::NSecretsManager
 	// fsp_AddPermissionQueryIndexedByPermission adds _several_ queries with wildcard patterns where _ALL_ have to be fulfilled.
 	void CSecretsManagerDaemonActor::CServer::fsp_AddPermissionQueryIndexedByPermission
 		(
-			char const *_ReadWrite
+			char const *_pReadWrite
 			, CStr const &_SemanticID
 			, TCSet<CStrSecure> const &_Tags
 			, TCMap<CStr, TCVector<CPermissionQuery>> &o_Permissions
@@ -234,14 +234,14 @@ namespace NMib::NCloud::NSecretsManager
 
 		if (_Tags.f_IsEmpty())
 		{
-			auto PermissionString = fg_Format("SecretsManager/{}/{}/NoTag", _ReadWrite, SemanticPart);
+			auto PermissionString = fg_Format("SecretsManager/{}/{}/NoTag", _pReadWrite, SemanticPart);
 			o_Permissions[PermissionString] = {CPermissionQuery{{PermissionString}}.f_Wildcard(true).f_Description(Description)};
 		}
 		else
 		{
 			for (auto const &Tag : _Tags)
 			{
-				auto PermissionString = fg_Format("SecretsManager/{}/{}/Tag/{}", _ReadWrite, SemanticPart, Tag);
+				auto PermissionString = fg_Format("SecretsManager/{}/{}/Tag/{}", _pReadWrite, SemanticPart, Tag);
 				o_Permissions[PermissionString] = {CPermissionQuery{{PermissionString}}.f_Wildcard(true).f_Description(Description)};
 				Description.f_Clear();
 			}
@@ -254,7 +254,7 @@ namespace NMib::NCloud::NSecretsManager
 	void CSecretsManagerDaemonActor::CServer::fsp_AddPermissionQueryIndexedBySecretID
 		(
 			CSecretsManager::CSecretID const &_ID
-			, char const *_ReadWrite
+			, char const *_pReadWrite
 			, CStr const &_SemanticID
 			, TCSet<CStrSecure> const &_Tags
 			, TCMap<CStr, TCVector<CPermissionQuery>> &o_Permissions
@@ -266,14 +266,14 @@ namespace NMib::NCloud::NSecretsManager
 
 		if (_Tags.f_IsEmpty())
 		{
-			auto PermissionString = fg_Format("SecretsManager/{}/{}/NoTag", _ReadWrite, SemanticPart);
+			auto PermissionString = fg_Format("SecretsManager/{}/{}/NoTag", _pReadWrite, SemanticPart);
 			PermissionCollection.f_Insert({CPermissionQuery{{fg_Move(PermissionString)}}.f_Wildcard(true).f_Description(Description)});
 		}
 		else
 		{
 			for (auto const &Tag : _Tags)
 			{
-				CStr PermissionString = "SecretsManager/{}/{}/Tag/{}"_f << _ReadWrite << SemanticPart << Tag;
+				CStr PermissionString = "SecretsManager/{}/{}/Tag/{}"_f << _pReadWrite << SemanticPart << Tag;
 				PermissionCollection.f_Insert({CPermissionQuery{{fg_Move(PermissionString)}}.f_Wildcard(true).f_Description(Description)});
 				Description.f_Clear();
 			}
@@ -282,20 +282,20 @@ namespace NMib::NCloud::NSecretsManager
 
 	namespace
 	{
-		void fg_SetIntersection(TCSet<CStrSecure>::CIteratorConst &&_First, TCSet<CStrSecure>::CIteratorConst &&_Second, TCSet<CStr> &o_Result)
+		void fg_SetIntersection(TCSet<CStrSecure>::CIteratorConst &&_iFirst, TCSet<CStrSecure>::CIteratorConst &&_iSecond, TCSet<CStr> &o_Result)
 		{
-			while (_First && _Second)
+			while (_iFirst && _iSecond)
 			{
-				if (*_First < *_Second)
-					++_First;
+				if (*_iFirst < *_iSecond)
+					++_iFirst;
 				else
 				{
-					if (*_Second == *_First)
+					if (*_iSecond == *_iFirst)
 					{
-						o_Result[*_First];
-						++_First;
+						o_Result[*_iFirst];
+						++_iFirst;
 					}
-					++_Second;
+					++_iSecond;
 				}
 			}
 		}
