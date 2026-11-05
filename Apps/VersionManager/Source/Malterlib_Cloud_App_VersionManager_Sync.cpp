@@ -1001,7 +1001,6 @@ namespace NMib::NCloud::NVersionManager
 				{
 					TCAsyncResult<void> Result;
 					auto *pApplication = mp_Applications.f_FindEqual(_Application);
-					// NOLINTNEXTLINE(malterlib-coroutine-actor-reference): pApplication is a local of the callback, which the check takes for a pointer kept from before the suspension
 					pVersion = pApplication ? pApplication->m_Versions.f_FindEqual(_VersionID) : nullptr;
 					if (!pVersion)
 						Result.f_SetResult();

@@ -266,7 +266,6 @@ namespace NMib::NCloud
 		virtual NConcurrency::TCFuture<CSecretProperties> f_GetSecretProperties(CSecretID _ID) = 0;
 		virtual NConcurrency::TCFuture<CSecret> f_GetSecret(CSecretID _ID) = 0;
 		virtual NConcurrency::TCFuture<CSecret> f_GetSecretBySemanticID(CGetSecretBySemanticID _Options) = 0;
-		// NOLINTNEXTLINE(malterlib-conceptual-prefix): a subscription handle like CActorSubscription, which the check misses because it is derived from it
 		virtual auto f_DownloadFile(CSecretID _ID, NConcurrency::TCActorSubscriptionWithID<> _Subscription)
 			-> NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<NFile::CDirectorySyncClient>> = 0
 		;

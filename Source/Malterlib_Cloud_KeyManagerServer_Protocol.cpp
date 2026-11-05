@@ -168,7 +168,6 @@ namespace NMib::NCloud
 		}
 	}
 
-	// NOLINTNEXTLINE(malterlib-conceptual-prefix): a subscription handle like CActorSubscription, which the check misses because it is derived from it
 	auto CKeyManagerServer::CInternal::CKeyManagerImplementation::f_GetServerSyncInterface(NConcurrency::TCActorSubscriptionWithID<> _Subscription)
 		-> NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<CKeyManagerServerSync>>
 	{

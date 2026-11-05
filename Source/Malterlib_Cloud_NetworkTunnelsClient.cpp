@@ -620,7 +620,6 @@ namespace NMib::NCloud
 					;
 
 					m_NetworkTunnelsState[_Tunnels];
-					// NOLINTNEXTLINE(malterlib-conceptual-prefix): a subscription handle like CActorSubscription, which the check misses because it is derived from it
 					auto ChangesSubscription = co_await _Tunnels.f_CallActor(&ICNetworkTunnels::f_SubscribeTunnels)(fg_Move(Subscribe));
 
 					// The actor can have been removed while subscribing

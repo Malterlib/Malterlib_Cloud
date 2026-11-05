@@ -19,7 +19,7 @@ namespace NMib::NCloud
 			, CStr _BackupSource
 			, CTime _PointInTime
 			, CDirectorySyncReceive::CConfig _SyncConfig
-			, NReference::TCReference<CActorSubscription> o_Subscription // NOLINT(malterlib-parameter-naming): it can be written through
+			, NReference::TCReference<CActorSubscription> o_Subscription
 		)
 	{
 		struct CState
