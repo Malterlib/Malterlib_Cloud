@@ -61,8 +61,6 @@ namespace NMib::NCloud
 
 	struct CCloudManager : public NConcurrency::CActor
 	{
-		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/CloudManager";
-
 		enum EProtocolVersion : uint32
 		{
 			EProtocolVersion_Min       = ECloudManagerProtocolVersion_Min
@@ -199,8 +197,6 @@ namespace NMib::NCloud
 			NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (CExpectedVersions _Versions)> m_fVersionRangeChanged;
 		};
 
-		static uint32 fs_ProtocolVersion_CloudManagerToAppManager(uint32 _CloudManagerVersion);
-
 		struct CRegisterAppManagerResult
 		{
 			template <typename tf_CStream>
@@ -243,6 +239,11 @@ namespace NMib::NCloud
 			uint32 m_nRemovedHostIDs = 0;
 		};
 
+		CCloudManager();
+		~CCloudManager();
+
+		static uint32 fs_ProtocolVersion_CloudManagerToAppManager(uint32 _CloudManagerVersion);
+
 		virtual auto f_RegisterAppManager(NConcurrency::TCDistributedActorInterfaceWithID<CAppManagerInterface> _AppManager, CAppManagerInfo _AppManagerInfo)
 			-> NConcurrency::TCFuture<CRegisterAppManagerResult> = 0
 		;
@@ -260,8 +261,7 @@ namespace NMib::NCloud
 		virtual NConcurrency::TCFuture<NContainer::TCMap<NStr::CStr, CExpectedVersions>> f_EnumExpectedOsVersions() = 0;
 		virtual NConcurrency::TCFuture<void> f_SetExpectedOsVersions(NStr::CStr _OsName, CCurrentVersion _CurrentVersion, CExpectedVersionRange _ExpectedRange) = 0;
 
-		CCloudManager();
-		~CCloudManager();
+		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/CloudManager";
 	};
 }
 

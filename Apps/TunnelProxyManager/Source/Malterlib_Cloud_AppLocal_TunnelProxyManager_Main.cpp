@@ -13,21 +13,23 @@ using namespace NMib::NCloud::NTunnelProxyManager;
 
 struct CTunnelProxyManagerApplication : public CApplication
 {
-	aint f_Main()
-	{
-		NConcurrency::CDistributedDaemon Daemon
-			{
-				"MalterlibCloudTunnelProxyManager"
-				, "Malterlib Tunnel Proxy Manager"
-				, "Manages incoming and outgoing tunnels."
-				, []
-				{
-					return fg_ConstructActor<CTunnelProxyManagerApp>();
-				}
-			}
-		;
-		return Daemon.f_Run();
-	}
+	aint f_Main();
 };
+
+aint CTunnelProxyManagerApplication::f_Main()
+{
+	NConcurrency::CDistributedDaemon Daemon
+		{
+			"MalterlibCloudTunnelProxyManager"
+			, "Malterlib Tunnel Proxy Manager"
+			, "Manages incoming and outgoing tunnels."
+			, []
+			{
+				return fg_ConstructActor<CTunnelProxyManagerApp>();
+			}
+		}
+	;
+	return Daemon.f_Run();
+}
 
 DAppImplement(CTunnelProxyManagerApplication);

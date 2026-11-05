@@ -204,9 +204,9 @@ namespace NMib::NCloud
 		static constexpr pfp64 mc_DefaultHostMonitorMemoryInterval = 15_minutes;
 
 	private:
-		NConcurrency::TCFuture<void> fp_Destroy();
-
 		struct CInternal;
+
+		NConcurrency::TCFuture<void> fp_Destroy();
 
 		NStorage::TCUniquePointer<CInternal> mp_pInternal;
 	};

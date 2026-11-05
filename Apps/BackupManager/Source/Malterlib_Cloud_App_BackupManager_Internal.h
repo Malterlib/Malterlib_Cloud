@@ -19,18 +19,15 @@ namespace NMib::NCloud::NBackupManager
 	{
 		using CActorHolder = CDelegatedActorHolder;
 
-		CBackupManagerServer(CDistributedAppState &_AppState);
-		~CBackupManagerServer();
-
 		struct CBackupKey
 		{
-			CStr m_BackupName;
-			CTime m_BackupTime;
-			CStr m_BackupID;
-
 			CStr f_GetDesc() const;
 
 			auto operator <=> (CBackupKey const &_Right) const noexcept = default;
+
+			CStr m_BackupName;
+			CTime m_BackupTime;
+			CStr m_BackupID;
 		};
 
 		struct CTransferStats
@@ -76,6 +73,9 @@ namespace NMib::NCloud::NBackupManager
 
 			DMibDelegatedActorImplementation(CBackupManagerServer);
 		};
+
+		CBackupManagerServer(CDistributedAppState &_AppState);
+		~CBackupManagerServer();
 
 		TCFuture<void> f_Init();
 

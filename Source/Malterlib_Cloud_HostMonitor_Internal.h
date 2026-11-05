@@ -83,6 +83,17 @@ namespace NMib::NCloud
 			uint32 m_nNormalPatches = 0;
 		};
 
+		CInternal
+			(
+				CHostMonitor *_pThis
+				, TCActor<CDistributedAppSensorStoreLocal> const &_SensorStore
+				, TCActor<CDistributedAppLogStoreLocal> const &_LogStore
+				, TCActor<CDatabaseActor> const &_Database
+				, TCMap<CStr, CEJsonSorted> const &_SensorMetadata
+				, TCMap<CStr, CEJsonSorted> const &_LogMetadata
+			)
+		;
+
 		TCFuture<CDistributedAppSensorReporter::CVersion> f_GetOsNameAndVersion();
 
 		TCFuture<void> f_SetupDatabase();
@@ -118,17 +129,6 @@ namespace NMib::NCloud
 		;
 
 		TCFuture<void> f_OpenConfigLogReporter();
-
-		CInternal
-			(
-				CHostMonitor *_pThis
-				, TCActor<CDistributedAppSensorStoreLocal> const &_SensorStore
-				, TCActor<CDistributedAppLogStoreLocal> const &_LogStore
-				, TCActor<CDatabaseActor> const &_Database
-				, TCMap<CStr, CEJsonSorted> const &_SensorMetadata
-				, TCMap<CStr, CEJsonSorted> const &_LogMetadata
-			)
-		;
 
 		CHostMonitor *m_pThis;
 

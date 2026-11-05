@@ -73,11 +73,11 @@ namespace NMib::NCloud::NPrivate
 
 		struct CPendingBackupFile
 		{
-			CStr const &f_GetFileName() const;
-
 			~CPendingBackupFile();
 
 			DMibListLinkDS_Link(CPendingBackupFile, m_Link);
+
+			CStr const &f_GetFileName() const;
 
 			TCWeakPointer<CRunningSyncState> m_pRunningState;
 

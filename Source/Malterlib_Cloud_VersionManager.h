@@ -21,8 +21,6 @@ namespace NMib::NCloud
 {
 	struct CVersionManager : public NConcurrency::CActor
 	{
-		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/VersionManager";
-
 		enum EProtocolVersion : uint32
 		{
 			EProtocolVersion_Min                                       = 0x103
@@ -316,18 +314,12 @@ namespace NMib::NCloud
 		virtual NConcurrency::TCFuture<CStartDownloadVersion::CResult> f_DownloadVersion(CStartDownloadVersion _Params) = 0;
 		virtual NConcurrency::TCFuture<CSubscribeToUpdates::CResult> f_SubscribeToUpdates(CSubscribeToUpdates _Params) = 0;
 		virtual NConcurrency::TCFuture<CChangeTags::CResult> f_ChangeTags(CChangeTags _Params) = 0;
+
+		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/VersionManager";
 	};
 
 	struct CVersionManagerHelper
 	{
-		CVersionManagerHelper(NStr::CStr const &_RootDirectory, uint64 _QueueSize = NFile::gc_IdealNetworkQueueSize, fp64 _Timeout = 30.0);
-		~CVersionManagerHelper();
-
-		CVersionManagerHelper(CVersionManagerHelper const &_Other);
-		CVersionManagerHelper(CVersionManagerHelper &&_Other);
-		CVersionManagerHelper &operator = (CVersionManagerHelper const &_Other);
-		CVersionManagerHelper &operator = (CVersionManagerHelper &&_Other);
-
 		struct CUploadResult
 		{
 			NContainer::TCSet<NStr::CStr> m_DeniedTags;
@@ -339,6 +331,14 @@ namespace NMib::NCloud
 			CVersionManager::CVersionIDAndPlatform m_VersionID;
 			CVersionManager::CVersionInformation m_VersionInfo;
 		};
+
+		CVersionManagerHelper(NStr::CStr const &_RootDirectory, uint64 _QueueSize = NFile::gc_IdealNetworkQueueSize, fp64 _Timeout = 30.0);
+		~CVersionManagerHelper();
+
+		CVersionManagerHelper(CVersionManagerHelper const &_Other);
+		CVersionManagerHelper(CVersionManagerHelper &&_Other);
+		CVersionManagerHelper &operator = (CVersionManagerHelper const &_Other);
+		CVersionManagerHelper &operator = (CVersionManagerHelper &&_Other);
 
 		auto f_Upload
 			(

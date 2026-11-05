@@ -13,21 +13,23 @@ using namespace NMib::NCloud::NVersionManager;
 
 struct CVersionManager : public CApplication
 {
-	aint f_Main()
-	{
-		NConcurrency::CDistributedDaemon Daemon
-			{
-				"MalterlibCloudVersionManager"
-				, "Malterlib Cloud Version Manager"
-				, "Managers application distrbutions"
-				, []
-				{
-					return fg_ConstructActor<CVersionManagerDaemonActor>();
-				}
-			}
-		;
-		return Daemon.f_Run();
-	}
+	aint f_Main();
 };
+
+aint CVersionManager::f_Main()
+{
+	NConcurrency::CDistributedDaemon Daemon
+		{
+			"MalterlibCloudVersionManager"
+			, "Malterlib Cloud Version Manager"
+			, "Managers application distrbutions"
+			, []
+			{
+				return fg_ConstructActor<CVersionManagerDaemonActor>();
+			}
+		}
+	;
+	return Daemon.f_Run();
+}
 
 DAppImplement(CVersionManager);

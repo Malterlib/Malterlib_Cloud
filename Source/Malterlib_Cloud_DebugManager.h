@@ -14,8 +14,6 @@ namespace NMib::NCloud
 {
 	struct CDebugManager : public NConcurrency::CActor
 	{
-		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/DebugManager";
-
 		enum EProtocolVersion : uint32
 		{
 			EProtocolVersion_Min       = 0x101
@@ -318,6 +316,8 @@ namespace NMib::NCloud
 		static auto fs_GatherCrashDumpInfos(NContainer::TCVector<NStr::CStr> _Sources, CMetadata _DefaultMetadata, NStorage::TCOptional<NStr::CStr> _DefaultExceptionInfo)
 			-> NConcurrency::TCFuture<CCrashDumpInfos>
 		;
+
+		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/DebugManager";
 	};
 }
 

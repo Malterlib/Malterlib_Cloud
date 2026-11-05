@@ -266,22 +266,24 @@ namespace NMib::NCloud::NCloudManager
 
 		struct CAggregatedLog
 		{
-			CDistributedAppLogReporter::ELogSeverity f_MaxSeverity() const
-			{
-				CDistributedAppLogReporter::ELogSeverity Severity = CDistributedAppLogReporter::ELogSeverity_DebugVerbose3;
-
-				for (auto &Messages : m_Messages)
-				{
-					auto &LogData = m_Messages.fs_GetKey(Messages);
-					Severity = fg_Min(Severity, LogData.m_Severity);
-				}
-
-				return Severity;
-			}
+			CDistributedAppLogReporter::ELogSeverity f_MaxSeverity() const;
 
 			TCMap<CDistributedAppLogReporter::CLogData, CAggregatedLogData> m_Messages;
 			DLinkDS_List(CAggregatedLogData, m_Link) m_MessagesOrdered;
 		};
+
+		CDistributedAppLogReporter::ELogSeverity CAggregatedLog::f_MaxSeverity() const
+		{
+			CDistributedAppLogReporter::ELogSeverity Severity = CDistributedAppLogReporter::ELogSeverity_DebugVerbose3;
+
+			for (auto &Messages : m_Messages)
+			{
+				auto &LogData = m_Messages.fs_GetKey(Messages);
+				Severity = fg_Min(Severity, LogData.m_Severity);
+			}
+
+			return Severity;
+		}
 	}
 
 	TCFuture<void> CLogNotifications::fp_SendSlackNotifications()

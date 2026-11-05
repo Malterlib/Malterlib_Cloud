@@ -32,49 +32,48 @@ namespace NMib::NCloud
 
 		struct CDownloadState : public CState
 		{
+			TCFuture<void> f_Abort();
+
 			TCActor<CFileTransferReceive> m_DownloadReceive;
 			CActorSubscription m_DownloadSubscription;
-
-			TCFuture<void> f_Abort()
-			{
-				auto This = co_await fg_MoveThis(*this);
-
-				if (This.m_DownloadSubscription)
-					co_await fg_DestroySubscription(This.m_DownloadSubscription).f_Wrap() > fg_LogError("DebugManagerHelper", "Failed to abort download subscription");
-
-				if (This.m_DownloadReceive)
-					co_await fg_Move(This.m_DownloadReceive).f_Destroy().f_Wrap() > fg_LogError("DebugManagerHelper", "Failed to abort download receive");
-
-				co_return {};
-			}
 		};
+
+		TCFuture<void> CDownloadState::f_Abort()
+		{
+			auto This = co_await fg_MoveThis(*this);
+
+			if (This.m_DownloadSubscription)
+				co_await fg_DestroySubscription(This.m_DownloadSubscription).f_Wrap() > fg_LogError("DebugManagerHelper", "Failed to abort download subscription");
+
+			if (This.m_DownloadReceive)
+				co_await fg_Move(This.m_DownloadReceive).f_Destroy().f_Wrap() > fg_LogError("DebugManagerHelper", "Failed to abort download receive");
+
+			co_return {};
+		}
 
 		struct CUploadState : public CState
 		{
+			TCFuture<void> f_Abort();
+
 			TCActor<CFileTransferSend> m_UploadSend;
 			TCActorFunctor<NConcurrency::TCFuture<void> ()> m_fFinish;
-
-			TCFuture<void> f_Abort()
-			{
-				auto This = co_await fg_MoveThis(*this);
-
-				co_await fg_Move(This.m_fFinish).f_Destroy();
-				if (This.m_UploadSend)
-					co_await fg_Move(This.m_UploadSend).f_Destroy().f_Wrap() > fg_LogError("DebugManagerHelper", "Failed to abort upload send");
-
-				co_return {};
-			}
 		};
+
+		TCFuture<void> CUploadState::f_Abort()
+		{
+			auto This = co_await fg_MoveThis(*this);
+
+			co_await fg_Move(This.m_fFinish).f_Destroy();
+			if (This.m_UploadSend)
+				co_await fg_Move(This.m_UploadSend).f_Destroy().f_Wrap() > fg_LogError("DebugManagerHelper", "Failed to abort upload send");
+
+			co_return {};
+		}
 	}
 
 	struct CDebugManagerHelperInternal
 	{
-		CDebugManagerHelperInternal(uint64 _QueueSize, fp64 _Timeout, CStr const &_RootDirectory)
-			: m_QueueSize(_QueueSize)
-			, m_Timeout(_Timeout)
-			, m_RootDirectory(_RootDirectory)
-		{
-		}
+		CDebugManagerHelperInternal(uint64 _QueueSize, fp64 _Timeout, CStr const &_RootDirectory);
 
 		template <typename tf_CResult>
 		auto f_Upload
@@ -104,6 +103,13 @@ namespace NMib::NCloud
 		fp64 m_Timeout = 0.0;
 		uint64 m_QueueSize = 0;
 	};
+
+	CDebugManagerHelperInternal::CDebugManagerHelperInternal(uint64 _QueueSize, fp64 _Timeout, CStr const &_RootDirectory)
+		: m_QueueSize(_QueueSize)
+		, m_Timeout(_Timeout)
+		, m_RootDirectory(_RootDirectory)
+	{
+	}
 
 	CDebugManagerHelper::CDebugManagerHelper(CStr const &_RootDirectory, uint64 _QueueSize, fp64 _Timeout)
 		: mp_pInternal(fg_Construct(_QueueSize, _Timeout, _RootDirectory))

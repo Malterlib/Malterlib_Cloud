@@ -25,25 +25,7 @@ namespace NMib::NCloud
 	{
 		struct CFileCache
 		{
-			~CFileCache()
-			{
-				if (m_File.f_IsValid())
-				{
-					auto BlockingActorCheckout = fg_BlockingActor();
-					auto BlockingActor = BlockingActorCheckout.f_Actor();
-
-					fg_Dispatch
-						(
-							BlockingActor
-							, [File = fg_Move(m_File)]() mutable
-							{
-								File.f_Close();
-							}
-						)
-						.f_OnResultSet(BlockingActorCheckout.f_MoveResultHandler("FileTransferReceive", "Error closing file"))
-					;
-				}
-			}
+			~CFileCache();
 
 			CStr m_FileName;
 			CFile m_File;
@@ -61,6 +43,26 @@ namespace NMib::NCloud
 		bool m_bAbortByDestroy = false;
 		bool m_bTransferDone = false;
 	};
+
+	CFileTransferReceive::CInternal::CFileCache::~CFileCache()
+	{
+		if (m_File.f_IsValid())
+		{
+			auto BlockingActorCheckout = fg_BlockingActor();
+			auto BlockingActor = BlockingActorCheckout.f_Actor();
+
+			fg_Dispatch
+				(
+					BlockingActor
+					, [File = fg_Move(m_File)]() mutable
+					{
+						File.f_Close();
+					}
+				)
+				.f_OnResultSet(BlockingActorCheckout.f_MoveResultHandler("FileTransferReceive", "Error closing file"))
+			;
+		}
+	}
 
 	CFileTransferReceive::~CFileTransferReceive() = default;
 
@@ -260,33 +262,38 @@ namespace NMib::NCloud
 			using CResumeFileInfoParams::CResumeFileInfoParams;
 
 			CResumeFileInfo() = default;
-			CResumeFileInfo &operator = (CResumeFileInfo &&_Other) = default;
 			CResumeFileInfo(CResumeFileInfo &&_Other) = default;
-			CResumeFileInfo(CResumeFileInfoParams &&_Other)
-				: CResumeFileInfoParams(fg_Move(_Other))
-			{
-			}
+			CResumeFileInfo(CResumeFileInfoParams &&_Other);
 
-			~CResumeFileInfo()
-			{
-				if (!m_File.f_IsValid())
-					return;
+			~CResumeFileInfo();
 
-				auto BlockingActorCheckout = fg_BlockingActor();
-				auto BlockingActor = BlockingActorCheckout.f_Actor();
-
-				fg_Dispatch
-					(
-						BlockingActor
-						, [File = fg_Move(m_File)]() mutable
-						{
-							File.f_Close();
-						}
-					)
-					.f_OnResultSet(BlockingActorCheckout.f_MoveResultHandler("FileTransferReceive", "Error closing file"))
-				;
-			}
+			CResumeFileInfo &operator = (CResumeFileInfo &&_Other) = default;
 		};
+
+		CResumeFileInfo::CResumeFileInfo(CResumeFileInfoParams &&_Other)
+			: CResumeFileInfoParams(fg_Move(_Other))
+		{
+		}
+
+		CResumeFileInfo::~CResumeFileInfo()
+		{
+			if (!m_File.f_IsValid())
+				return;
+
+			auto BlockingActorCheckout = fg_BlockingActor();
+			auto BlockingActor = BlockingActorCheckout.f_Actor();
+
+			fg_Dispatch
+				(
+					BlockingActor
+					, [File = fg_Move(m_File)]() mutable
+					{
+						File.f_Close();
+					}
+				)
+				.f_OnResultSet(BlockingActorCheckout.f_MoveResultHandler("FileTransferReceive", "Error closing file"))
+			;
+		}
 	}
 
 	auto CFileTransferReceive::f_ReceiveFiles(NConcurrency::TCAsyncGenerator<CFileTransferSendDownloadFile> _FilesGenerator, uint64 _QueueSize, EReceiveFlag _Flags)

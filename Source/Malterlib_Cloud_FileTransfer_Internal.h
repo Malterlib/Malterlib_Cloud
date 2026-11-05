@@ -52,9 +52,6 @@ namespace NMib::NCloud
 
 		struct CStateChange
 		{
-			CStateChange() = default;
-			CStateChange(uint32 _Version);
-
 			struct CResult
 			{
 				void f_Feed(NConcurrency::CDistributedActorWriteStream &_Stream) const;
@@ -62,6 +59,9 @@ namespace NMib::NCloud
 
 				uint32 m_Version = 0;
 			};
+
+			CStateChange() = default;
+			CStateChange(uint32 _Version);
 
 			CResult f_GetResult() const;
 			void f_Feed(NConcurrency::CDistributedActorWriteStream &_Stream) const;

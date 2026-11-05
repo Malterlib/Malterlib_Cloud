@@ -34,10 +34,7 @@ namespace NMib::NCloud
 		{
 			struct CEntry
 			{
-				bool f_IsFinished() const
-				{
-					return m_Position == m_Size;
-				}
+				bool f_IsFinished() const;
 
 				CStr m_FileName;
 				CStr m_RelativeFileName;
@@ -47,6 +44,11 @@ namespace NMib::NCloud
 
 			TCLinkedList<CEntry> m_Queue;
 		};
+
+		bool CWorkQueueDeprecated::CEntry::f_IsFinished() const
+		{
+			return m_Position == m_Size;
+		}
 
 		struct CUploadQueueEntry
 		{
@@ -87,10 +89,7 @@ namespace NMib::NCloud
 			bool m_bDelayedFinish = false;
 		};
 
-		CInternal(CFileTransferSend *_pThis)
-			: m_pThis(_pThis)
-		{
-		}
+		CInternal(CFileTransferSend *_pThis);
 
 		TCFuture<TCVector<CUploadQueueEntry>> f_DetermineWhatToSend();
 		TCFuture<CFileTransferSendDownloadFile> f_SendFile(CUploadQueueEntry _UploadEntry);
@@ -113,6 +112,11 @@ namespace NMib::NCloud
 
 		bool m_bCalled = false;
 	};
+
+	CFileTransferSend::CInternal::CInternal(CFileTransferSend *_pThis)
+		: m_pThis(_pThis)
+	{
+	}
 
 	CFileTransferSend::~CFileTransferSend() = default;
 

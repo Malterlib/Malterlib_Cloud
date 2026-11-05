@@ -25,11 +25,6 @@ namespace NMib::NCloud::NCloudManager
 {
 	struct CCloudManagerServer : public CActor
 	{
-		friend struct CNotifications;
-		friend struct CUpdateNotifications;
-		friend struct CSensorNotifications;
-		friend struct CLogNotifications;
-
 		using CActorHolder = CDelegatedActorHolder;
 
 		struct CCloudManagerImplementation : public CCloudManager
@@ -118,6 +113,11 @@ namespace NMib::NCloud::NCloudManager
 		TCFuture<void> f_DumpDatabaseEntries(TCSharedPointer<CCommandLineControl> _pCommandLine, CStr _Prefix);
 
 	private:
+		friend struct CNotifications;
+		friend struct CUpdateNotifications;
+		friend struct CSensorNotifications;
+		friend struct CLogNotifications;
+
 		struct CAppManagerState
 		{
 			CStr const &f_AppManagerID() const;
@@ -158,8 +158,6 @@ namespace NMib::NCloud::NCloudManager
 
 		struct CCleanupState
 		{
-			friend struct CCloudManagerServer;
-
 			void f_LogStartup();
 			void f_Log(bool _bProgress);
 			void f_Initialize(NDatabase::CDatabaseActor::CTransactionWrite &_WriteTransaction);
@@ -167,6 +165,8 @@ namespace NMib::NCloud::NCloudManager
 			bool m_bForcedCompaction = true;
 
 		private:
+			friend struct CCloudManagerServer;
+
 			CStopwatch mp_StatsStopwatch{true};
 			CDatabaseSizeStatistics mp_OriginalStats;
 			CDatabaseSizeStatistics mp_CurrentStats;

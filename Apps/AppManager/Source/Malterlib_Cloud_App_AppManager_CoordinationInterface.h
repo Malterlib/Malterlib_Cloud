@@ -10,11 +10,6 @@ namespace NMib::NCloud::NAppManager
 {
 	struct CAppManagerCoordinationInterface : public NConcurrency::CActor
 	{
-		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/AppManagerCoordination";
-
-		CAppManagerCoordinationInterface();
-		~CAppManagerCoordinationInterface();
-
 		enum EProtocolVersion : uint32
 		{
 			EProtocolVersion_Min       = 0x103
@@ -32,10 +27,11 @@ namespace NMib::NCloud::NAppManager
 
 		struct CVersionIDAndPlatform : public CVersionManager::CVersionIDAndPlatform
 		{
+			using CVersionManager::CVersionIDAndPlatform::CVersionIDAndPlatform;
+
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
-			using CVersionManager::CVersionIDAndPlatform::CVersionIDAndPlatform;
 			using CVersionManager::CVersionIDAndPlatform::operator =;
 		};
 
@@ -95,7 +91,12 @@ namespace NMib::NCloud::NAppManager
 			>
 		;
 
+		CAppManagerCoordinationInterface();
+		~CAppManagerCoordinationInterface();
+
 		virtual TCFuture<void> f_RemoveKnownHost(CStr _Group, CStr _Application, CStr _HostID) = 0;
 		virtual auto f_SubscribeToAppChanges(TCActorFunctorWithID<TCFuture<void> (TCVector<CAppChange> _Changes, bool _bInitial)> _fOnChange) -> TCFuture<TCActorSubscriptionWithID<>> = 0;
+
+		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/AppManagerCoordination";
 	};
 }

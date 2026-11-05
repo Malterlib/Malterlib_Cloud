@@ -45,13 +45,13 @@ namespace NMib::NCloud::NAppManager
 
 		struct CUpdateScripts
 		{
+			CStr const &f_GetScript(EUpdateScript _Script) const;
+			CStr f_GetName(EUpdateScript _Script) const;
+
 			CStr m_PreUpdate;
 			CStr m_PostUpdate;
 			CStr m_PostLaunch;
 			CStr m_OnError;
-
-			CStr const &f_GetScript(EUpdateScript _Script) const;
-			CStr f_GetName(EUpdateScript _Script) const;
 		};
 
 		enum EApplicationSetting
@@ -106,6 +106,14 @@ namespace NMib::NCloud::NAppManager
 
 		struct CApplicationSettings
 		{
+			bool f_ParseSettings(CEJsonSorted const &_Params, EApplicationSetting &o_ChangedSettings, CStr &o_Error, bool _bRelaxed);
+			void f_ApplySettings(EApplicationSetting _ChangedSettings, CApplicationSettings const &_Source);
+			void f_FromVersionInfo(CVersionManager::CVersionInformation const &_Info, EApplicationSetting &o_ChangedSettings);
+			void f_FromInterfaceSettings(CAppManagerInterface::CApplicationSettings const &_Settings, EApplicationSetting &o_ChangedSettings);
+			void f_FromInterfaceAdd(CAppManagerInterface::CApplicationAdd const &_Settings, EApplicationSetting &o_ChangedSettings);
+			EApplicationSetting f_ChangedSettings(CApplicationSettings const &_Other) const;
+			bool f_Validate(CStr &o_Error) const;
+
 			// Settings that can on never change
 			CStr m_EncryptionStorage;
 			CStr m_ParentApplication;
@@ -141,14 +149,6 @@ namespace NMib::NCloud::NAppManager
 			bool m_bStopOnDependencyFailure = true;
 			bool m_bBackupEnabled = false;
 			bool m_bLaunchInProcess = false;
-
-			bool f_ParseSettings(CEJsonSorted const &_Params, EApplicationSetting &o_ChangedSettings, CStr &o_Error, bool _bRelaxed);
-			void f_ApplySettings(EApplicationSetting _ChangedSettings, CApplicationSettings const &_Source);
-			void f_FromVersionInfo(CVersionManager::CVersionInformation const &_Info, EApplicationSetting &o_ChangedSettings);
-			void f_FromInterfaceSettings(CAppManagerInterface::CApplicationSettings const &_Settings, EApplicationSetting &o_ChangedSettings);
-			void f_FromInterfaceAdd(CAppManagerInterface::CApplicationAdd const &_Settings, EApplicationSetting &o_ChangedSettings);
-			EApplicationSetting f_ChangedSettings(CApplicationSettings const &_Other) const;
-			bool f_Validate(CStr &o_Error) const;
 		};
 
 		struct CApplication

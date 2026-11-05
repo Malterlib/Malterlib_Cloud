@@ -68,21 +68,25 @@ namespace NMib::NCloud::NVersionManager
 
 	struct COptionalFuture
 	{
-		COptionalFuture(TCFuture<void> &&_Future)
-			: m_Future(fg_Move(_Future))
-		{
-		}
+		COptionalFuture(TCFuture<void> &&_Future);
 
 		COptionalFuture(COptionalFuture &&_Other) = default;
 
-		~COptionalFuture()
-		{
-			if (m_Future.f_IsValid())
-				m_Future.f_DiscardResult();
-		}
+		~COptionalFuture();
 
 		TCFuture<void> m_Future;
 	};
+
+	COptionalFuture::COptionalFuture(TCFuture<void> &&_Future)
+		: m_Future(fg_Move(_Future))
+	{
+	}
+
+	COptionalFuture::~COptionalFuture()
+	{
+		if (m_Future.f_IsValid())
+			m_Future.f_DiscardResult();
+	}
 
 	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_UploadVersion(CStartUploadVersion _Params) -> TCFuture<CStartUploadVersion::CResult>
 	{

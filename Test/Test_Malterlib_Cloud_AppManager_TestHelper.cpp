@@ -17,12 +17,14 @@ namespace
 {
 	struct CInitReconnectDelay
 	{
-		CInitReconnectDelay()
-		{
-			// Override reconnect delay for whole process
-			CDistributedAppActor_Settings::fs_GetGlobalDefaultSettings().m_ReconnectDelay = 1_ms;
-		}
+		CInitReconnectDelay();
 	};
+
+	CInitReconnectDelay::CInitReconnectDelay()
+	{
+		// Override reconnect delay for whole process
+		CDistributedAppActor_Settings::fs_GetGlobalDefaultSettings().m_ReconnectDelay = 1_ms;
+	}
 
 	assure_used CInitReconnectDelay g_InitReconnectDelay;
 }

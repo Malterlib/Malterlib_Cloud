@@ -21,20 +21,7 @@ namespace NMib::NCloud
 	{
 		struct CConnection
 		{
-			TCFuture<void> f_Destroy()
-			{
-				TCFutureVector<void> Destroys;
-
-				if (m_Socket)
-					fg_Move(m_Socket).f_Destroy() > Destroys;
-				fg_Move(m_fSendData).f_Destroy() > Destroys;
-
-				TCPromiseFuturePair<void> Promise;
-
-				fg_AllDone(Destroys) > fg_Move(Promise.m_Promise).f_ReceiveAny();
-
-				return fg_Move(Promise.m_Future);
-			}
+			TCFuture<void> f_Destroy();
 
 			TCActorInterface<CAsyncSocketActor> m_Socket;
 			ICNetworkTunnels::FSendBytes m_fSendData;
@@ -42,56 +29,13 @@ namespace NMib::NCloud
 
 		struct CTunnel
 		{
-			TCFuture<void> f_Destroy()
-			{
-				TCFutureVector<void> Destroys;
+			TCFuture<void> f_Destroy();
 
-				if (m_ListenSubscription)
-					m_ListenSubscription->f_Destroy() > Destroys;
+			TCUnsafeFuture<void> f_OnConnection(CCallbackInfo _CallbackInfo);
 
-				fg_Move(m_fOnError).f_Destroy() > Destroys;
-				fg_Move(m_fOnClose).f_Destroy() > Destroys;
-				fg_Move(m_fOnConnection).f_Destroy() > Destroys;
+			TCUnsafeFuture<void> f_OnClose(CCallbackInfo _CallbackInfo, CStr _Message);
 
-				if (m_TunnelActor)
-					fg_Move(m_TunnelActor).f_Destroy() > Destroys;
-
-				TCPromiseFuturePair<void> Promise;
-
-				fg_AllDone(Destroys) > fg_Move(Promise.m_Promise).f_ReceiveAny();
-
-				return fg_Move(Promise.m_Future);
-			}
-
-			TCUnsafeFuture<void> f_OnConnection(CCallbackInfo _CallbackInfo)
-			{
-				if (!m_fOnConnection)
-					co_return {};
-
-				co_await m_fOnConnection(_CallbackInfo).f_Wrap() > fg_LogError("Network tunnel client", "Failed to call on connection on tunnel");
-
-				co_return {};
-			}
-
-			TCUnsafeFuture<void> f_OnClose(CCallbackInfo _CallbackInfo, CStr _Message)
-			{
-				if (!m_fOnClose)
-					co_return {};
-
-				co_await m_fOnClose(_CallbackInfo, _Message).f_Wrap() > fg_LogError("Network tunnel client", "Failed to call on close on tunnel");
-
-				co_return {};
-			}
-
-			TCUnsafeFuture<void> f_OnError(CCallbackInfo _CallbackInfo, CStr _Error)
-			{
-				if (!m_fOnError)
-					co_return {};
-
-				co_await m_fOnError(_CallbackInfo, _Error).f_Wrap() > fg_LogError("Network tunnel client", "Failed to call on error on tunnel");
-
-				co_return {};
-			}
+			TCUnsafeFuture<void> f_OnError(CCallbackInfo _CallbackInfo, CStr _Error);
 
 			DMibListLinkDS_Link(CTunnel, m_ByNameLink);
 			ICNetworkTunnels::CNetworkTunnelName m_TunnelName;
@@ -118,12 +62,7 @@ namespace NMib::NCloud
 			TCSet<TCWeakDistributedActor<ICNetworkTunnels>> m_AvailableOnNetworkTunnels;
 		};
 
-		CInternal(CNetworkTunnelsClient *_pThis, TCActor<CActorDistributionManager> const &_DistributionManager, TCActor<CDistributedActorTrustManager> const &_TrustManager)
-			: m_pThis(_pThis)
-			, m_DistributionManager(_DistributionManager)
-			, m_TrustManager(_TrustManager)
-		{
-		}
+		CInternal(CNetworkTunnelsClient *_pThis, TCActor<CActorDistributionManager> const &_DistributionManager, TCActor<CDistributedActorTrustManager> const &_TrustManager);
 
 		TCFuture<void> f_Subscribe();
 
@@ -143,6 +82,84 @@ namespace NMib::NCloud
 		umint m_ConnectionID = 0;
 		umint m_TunnelID = 0;
 	};
+
+	TCFuture<void> CNetworkTunnelsClient::CInternal::CConnection::f_Destroy()
+	{
+		TCFutureVector<void> Destroys;
+
+		if (m_Socket)
+			fg_Move(m_Socket).f_Destroy() > Destroys;
+		fg_Move(m_fSendData).f_Destroy() > Destroys;
+
+		TCPromiseFuturePair<void> Promise;
+
+		fg_AllDone(Destroys) > fg_Move(Promise.m_Promise).f_ReceiveAny();
+
+		return fg_Move(Promise.m_Future);
+	}
+
+	TCFuture<void> CNetworkTunnelsClient::CInternal::CTunnel::f_Destroy()
+	{
+		TCFutureVector<void> Destroys;
+
+		if (m_ListenSubscription)
+			m_ListenSubscription->f_Destroy() > Destroys;
+
+		fg_Move(m_fOnError).f_Destroy() > Destroys;
+		fg_Move(m_fOnClose).f_Destroy() > Destroys;
+		fg_Move(m_fOnConnection).f_Destroy() > Destroys;
+
+		if (m_TunnelActor)
+			fg_Move(m_TunnelActor).f_Destroy() > Destroys;
+
+		TCPromiseFuturePair<void> Promise;
+
+		fg_AllDone(Destroys) > fg_Move(Promise.m_Promise).f_ReceiveAny();
+
+		return fg_Move(Promise.m_Future);
+	}
+
+	TCUnsafeFuture<void> CNetworkTunnelsClient::CInternal::CTunnel::f_OnConnection(CCallbackInfo _CallbackInfo)
+	{
+		if (!m_fOnConnection)
+			co_return {};
+
+		co_await m_fOnConnection(_CallbackInfo).f_Wrap() > fg_LogError("Network tunnel client", "Failed to call on connection on tunnel");
+
+		co_return {};
+	}
+
+	TCUnsafeFuture<void> CNetworkTunnelsClient::CInternal::CTunnel::f_OnClose(CCallbackInfo _CallbackInfo, CStr _Message)
+	{
+		if (!m_fOnClose)
+			co_return {};
+
+		co_await m_fOnClose(_CallbackInfo, _Message).f_Wrap() > fg_LogError("Network tunnel client", "Failed to call on close on tunnel");
+
+		co_return {};
+	}
+
+	TCUnsafeFuture<void> CNetworkTunnelsClient::CInternal::CTunnel::f_OnError(CCallbackInfo _CallbackInfo, CStr _Error)
+	{
+		if (!m_fOnError)
+			co_return {};
+
+		co_await m_fOnError(_CallbackInfo, _Error).f_Wrap() > fg_LogError("Network tunnel client", "Failed to call on error on tunnel");
+
+		co_return {};
+	}
+
+	CNetworkTunnelsClient::CInternal::CInternal
+		(
+			CNetworkTunnelsClient *_pThis
+			, TCActor<CActorDistributionManager> const &_DistributionManager
+			, TCActor<CDistributedActorTrustManager> const &_TrustManager
+		)
+		: m_pThis(_pThis)
+		, m_DistributionManager(_DistributionManager)
+		, m_TrustManager(_TrustManager)
+	{
+	}
 
 	CNetworkTunnelsClient::CNetworkTunnelsClient(TCActor<CActorDistributionManager> const &_DistributionManager, TCActor<CDistributedActorTrustManager> const &_TrustManager)
 		: mp_pInternal(fg_Construct(this, _DistributionManager, _TrustManager))

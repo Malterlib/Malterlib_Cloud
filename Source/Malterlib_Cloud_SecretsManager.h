@@ -22,8 +22,6 @@ namespace NMib::NCloud
 
 	struct CSecretsManager : public NConcurrency::CActor
 	{
-		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/SecretsManager";
-
 		enum EProtocolVersion : uint32
 		{
 			EProtocolVersion_Min = 0x101
@@ -103,14 +101,15 @@ namespace NMib::NCloud
 			CSecret() = default;
 			CSecret(CSecret const &_Other) = default;
 			CSecret(CSecret &&_Other) = default;
-			CSecret &operator = (CSecret const &_Other) = default;
-			CSecret &operator = (CSecret &&_Other) = default;
 
 			template <typename ...tfp_CParam>
 			CSecret(tfp_CParam && ...p_Params) // NOLINT(malterlib-header-declarations-only): Defined in the class because MSVC fails to match an out-of-class definition of it
 				: CSuper(fg_Forward<tfp_CParam>(p_Params)...)
 			{
 			}
+
+			CSecret &operator = (CSecret const &_Other) = default;
+			CSecret &operator = (CSecret &&_Other) = default;
 
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
@@ -277,6 +276,8 @@ namespace NMib::NCloud
 			-> NConcurrency::TCFuture<NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> ()>> = 0
 		;
 		virtual NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> f_SubscribeToChanges(CSubscribeToChanges _Params) = 0;
+
+		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/SecretsManager";
 	};
 }
 

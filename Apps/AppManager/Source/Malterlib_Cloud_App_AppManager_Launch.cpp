@@ -8,19 +8,21 @@ namespace
 {
 	struct CInProcessRegistry
 	{
-		TCFunction<TCActor<CDistributedAppActor> ()> f_GetFactory(CStr const &_ExecutablePath)
-		{
-			DMibLock(m_Lock);
-
-			if (auto pFactory = m_Factories.f_FindEqual(_ExecutablePath))
-				return *pFactory;
-
-			return nullptr;
-		}
+		TCFunction<TCActor<CDistributedAppActor> ()> f_GetFactory(CStr const &_ExecutablePath);
 
 		CMutual m_Lock;
 		TCMap<CStr, TCFunction<TCActor<CDistributedAppActor> ()>> m_Factories;
 	};
+
+	TCFunction<TCActor<CDistributedAppActor> ()> CInProcessRegistry::f_GetFactory(CStr const &_ExecutablePath)
+	{
+		DMibLock(m_Lock);
+
+		if (auto pFactory = m_Factories.f_FindEqual(_ExecutablePath))
+			return *pFactory;
+
+		return nullptr;
+	}
 
 	TCAggregate<CInProcessRegistry> g_InProcessRegistry = {DAggregateInit};
 }

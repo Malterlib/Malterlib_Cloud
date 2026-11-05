@@ -20,192 +20,145 @@ namespace
 
 struct CAppManager_Sensor_Tests : public NMib::NTest::CTest
 {
-	void f_DoTests()
+	void f_DoTests();
+};
+
+void CAppManager_Sensor_Tests::f_DoTests()
+{
+	DMibTestSuite("General") -> TCFuture<void>
 	{
-		DMibTestSuite("General") -> TCFuture<void>
-		{
-			CAppManagerTestHelper::EOption Options
-				= CAppManagerTestHelper::EOption_LaunchTestAppInApp
-				| CAppManagerTestHelper::EOption_EnableVersionManager
-				| CAppManagerTestHelper::EOption_DisablePatchMonitoring
-				| CAppManagerTestHelper::EOption_DisableDiskMonitoring
-				| CAppManagerTestHelper::EOption_DisableApplicationStatusSensors
-				| CAppManagerTestHelper::EOption_DisableEncryptionStatusSensors
-			;
+		CAppManagerTestHelper::EOption Options
+			= CAppManagerTestHelper::EOption_LaunchTestAppInApp
+			| CAppManagerTestHelper::EOption_EnableVersionManager
+			| CAppManagerTestHelper::EOption_DisablePatchMonitoring
+			| CAppManagerTestHelper::EOption_DisableDiskMonitoring
+			| CAppManagerTestHelper::EOption_DisableApplicationStatusSensors
+			| CAppManagerTestHelper::EOption_DisableEncryptionStatusSensors
+		;
 
-			if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
-				Options |= CAppManagerTestHelper::EOption_EnableOtherOutput;
+		if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
+			Options |= CAppManagerTestHelper::EOption_EnableOtherOutput;
 
-			CAppManagerTestHelper AppManagerTestHelper("AppManagerSensorTests", Options, g_Timeout);
+		CAppManagerTestHelper AppManagerTestHelper("AppManagerSensorTests", Options, g_Timeout);
 
-			auto AsyncDestroy = co_await fg_AsyncDestroy(AppManagerTestHelper);
+		auto AsyncDestroy = co_await fg_AsyncDestroy(AppManagerTestHelper);
 
-			co_await AppManagerTestHelper.f_Setup(1);
-			auto &AppManagerInfo = *AppManagerTestHelper.m_pState->m_AppManagerInfos.f_FindAny();
-			auto fShouldKeepValue = [](CEJsonSorted const &_Reading)
-				{
-					return _Reading["Identifier"].f_String().f_StartsWith("org.malterlib.testapp.test");
-				}
-			;
-
-			auto fMakeComparable = [&](CEJsonSorted &&_Readings)
-				{
-					for (auto &Reading : _Readings.f_Array())
-					{
-						Reading.f_RemoveMember("Timestamp");
-						if (!fShouldKeepValue(Reading))
-							Reading.f_RemoveMember("Value");
-					}
-
-					// We need to sort by sequence because the system clock might change
-					_Readings.f_Array().f_Sort
-						(
-							[](CEJsonSorted const &_Left, CEJsonSorted const &_Right)
-							{
-								auto Left = _Left.f_GetMemberValue("UniqueSequence", 0);
-								auto Right = _Right.f_GetMemberValue("UniqueSequence", 0);
-
-								return Left <=> Right;
-							}
-						)
-					;
-
-					return fg_Move(_Readings);
-				}
-			;
-
-			auto TestAppDirectory = AppManagerInfo.m_RootDirectory / "App/TestApp";
-
-			CEJsonSorted ExpectedSensors = _
-				[
-					_=
-					{
-						"HostID"_= ""
-						, "HostName"_= ""
-						, "Application"_= ""
-						, "Identifier"_= "org.malterlib.testapp.test.version"
-						, "IdentifierScope"_= ""
-						, "Name"_= "Test Sensor (version)"
-						, "Type"_= 5
-						, "ExpectedReportInterval"_= fp64::fs_Inf()
-						, "Flags"_= _[]
-						, "PauseReportingFor"_= fp64::fs_QNan()
-						, "UnitDivisors"_= _[]
-						, "WarnValue"_= nullptr
-						, "CriticalValue"_= nullptr
-						, "Removed"_= false
-						, "SnoozeUntil"_= NTime::CTime()
-						, "SensorMetadata"_= _={}
-					}
-					, _=
-					{
-						"HostID"_= ""
-						, "HostName"_= ""
-						, "Application"_= ""
-						, "Identifier"_= "org.malterlib.testapp.test"
-						, "IdentifierScope"_= ""
-						, "Name"_= "Test Sensor"
-						, "Type"_= 2
-						, "ExpectedReportInterval"_= fp64::fs_Inf()
-						, "Flags"_= _[]
-						, "PauseReportingFor"_= fp64::fs_QNan()
-						, "UnitDivisors"_= _
-						[
-							_=
-							{
-								"Divisor"_= 0.0
-								, "nDecimals"_= 1
-								, "UnitFormatter"_= "{fn0} B"
-							}
-							, _=
-							{
-								"Divisor"_= 1024.0
-								, "nDecimals"_= 1
-								, "UnitFormatter"_= "{fn1} KiB"
-							}
-							, _=
-							{
-								"Divisor"_= 1048576.0
-								, "nDecimals"_= 1
-								, "UnitFormatter"_= "{fn1} MiB"
-							}
-							, _=
-							{
-								"Divisor"_= 1073741824.0
-								, "nDecimals"_= 1
-								, "UnitFormatter"_= "{fn1} GiB"
-							}
-							, _=
-							{
-								"Divisor"_= 1099511627776.0
-								, "nDecimals"_= 1
-								, "UnitFormatter"_= "{fn1} TiB"
-							}
-						]
-						, "WarnValue"_= nullptr
-						, "CriticalValue"_= nullptr
-						, "Removed"_= false
-						, "SnoozeUntil"_= NTime::CTime()
-						, "SensorMetadata"_= _={}
-					}
-				]
-			;
-
-			CEJsonSorted ExpectedSensorReadings;
-			for (umint iReading = 0; iReading < 5; ++iReading)
+		co_await AppManagerTestHelper.f_Setup(1);
+		auto &AppManagerInfo = *AppManagerTestHelper.m_pState->m_AppManagerInfos.f_FindAny();
+		auto fShouldKeepValue = [](CEJsonSorted const &_Reading)
 			{
-				ExpectedSensorReadings.f_Array().f_Insert
-					(
-						_=
-						{
-							"HostID"_= ""
-							, "HostName"_= ""
-							, "Application"_= ""
-							, "Identifier"_= "org.malterlib.testapp.test"
-							, "IdentifierScope"_= ""
-							, "Name"_= "Test Sensor"
-							, "UniqueSequence"_= iReading + 1
-							, "Value"_= fp64(iReading)
-							, "OutdatedStatus"_= "Ok"
-							, "OutdatedSeconds"_= fp64::fs_Inf()
-							, "SnoozeUntil"_= NTime::CTime()
-							, "SensorMetadata"_= _={}
-						}
-					)
-				;
-				ExpectedSensorReadings.f_Array().f_Insert
-					(
-						_=
-						{
-							"HostID"_= ""
-							, "HostName"_= ""
-							, "Application"_= ""
-							, "Identifier"_= "org.malterlib.testapp.test.version"
-							, "IdentifierScope"_= ""
-							, "Name"_= "Test Sensor (version)"
-							, "UniqueSequence"_= iReading + 1
-							, "Value"_= CEJsonUserTypeSorted
-							{
-								"Version"
-								,
-								{
-									"Identifier"_j= "Ident"
-									, "Major"_j= 13
-									, "Minor"_j= 3
-									, "Revision"_j= iReading
-								}
-							}
-							, "OutdatedStatus"_= "Ok"
-							, "OutdatedSeconds"_= fp64::fs_Inf()
-							, "SnoozeUntil"_= NTime::CTime()
-							, "SensorMetadata"_= _={}
-						}
-					)
-				;
+				return _Reading["Identifier"].f_String().f_StartsWith("org.malterlib.testapp.test");
 			}
+		;
 
-			CEJsonSorted ExpectedSensorStatus = _
-				[
+		auto fMakeComparable = [&](CEJsonSorted &&_Readings)
+			{
+				for (auto &Reading : _Readings.f_Array())
+				{
+					Reading.f_RemoveMember("Timestamp");
+					if (!fShouldKeepValue(Reading))
+						Reading.f_RemoveMember("Value");
+				}
+
+				// We need to sort by sequence because the system clock might change
+				_Readings.f_Array().f_Sort
+					(
+						[](CEJsonSorted const &_Left, CEJsonSorted const &_Right)
+						{
+							auto Left = _Left.f_GetMemberValue("UniqueSequence", 0);
+							auto Right = _Right.f_GetMemberValue("UniqueSequence", 0);
+
+							return Left <=> Right;
+						}
+					)
+				;
+
+				return fg_Move(_Readings);
+			}
+		;
+
+		auto TestAppDirectory = AppManagerInfo.m_RootDirectory / "App/TestApp";
+
+		CEJsonSorted ExpectedSensors = _
+			[
+				_=
+				{
+					"HostID"_= ""
+					, "HostName"_= ""
+					, "Application"_= ""
+					, "Identifier"_= "org.malterlib.testapp.test.version"
+					, "IdentifierScope"_= ""
+					, "Name"_= "Test Sensor (version)"
+					, "Type"_= 5
+					, "ExpectedReportInterval"_= fp64::fs_Inf()
+					, "Flags"_= _[]
+					, "PauseReportingFor"_= fp64::fs_QNan()
+					, "UnitDivisors"_= _[]
+					, "WarnValue"_= nullptr
+					, "CriticalValue"_= nullptr
+					, "Removed"_= false
+					, "SnoozeUntil"_= NTime::CTime()
+					, "SensorMetadata"_= _={}
+				}
+				, _=
+				{
+					"HostID"_= ""
+					, "HostName"_= ""
+					, "Application"_= ""
+					, "Identifier"_= "org.malterlib.testapp.test"
+					, "IdentifierScope"_= ""
+					, "Name"_= "Test Sensor"
+					, "Type"_= 2
+					, "ExpectedReportInterval"_= fp64::fs_Inf()
+					, "Flags"_= _[]
+					, "PauseReportingFor"_= fp64::fs_QNan()
+					, "UnitDivisors"_= _
+					[
+						_=
+						{
+							"Divisor"_= 0.0
+							, "nDecimals"_= 1
+							, "UnitFormatter"_= "{fn0} B"
+						}
+						, _=
+						{
+							"Divisor"_= 1024.0
+							, "nDecimals"_= 1
+							, "UnitFormatter"_= "{fn1} KiB"
+						}
+						, _=
+						{
+							"Divisor"_= 1048576.0
+							, "nDecimals"_= 1
+							, "UnitFormatter"_= "{fn1} MiB"
+						}
+						, _=
+						{
+							"Divisor"_= 1073741824.0
+							, "nDecimals"_= 1
+							, "UnitFormatter"_= "{fn1} GiB"
+						}
+						, _=
+						{
+							"Divisor"_= 1099511627776.0
+							, "nDecimals"_= 1
+							, "UnitFormatter"_= "{fn1} TiB"
+						}
+					]
+					, "WarnValue"_= nullptr
+					, "CriticalValue"_= nullptr
+					, "Removed"_= false
+					, "SnoozeUntil"_= NTime::CTime()
+					, "SensorMetadata"_= _={}
+				}
+			]
+		;
+
+		CEJsonSorted ExpectedSensorReadings;
+		for (umint iReading = 0; iReading < 5; ++iReading)
+		{
+			ExpectedSensorReadings.f_Array().f_Insert
+				(
 					_=
 					{
 						"HostID"_= ""
@@ -214,14 +167,18 @@ struct CAppManager_Sensor_Tests : public NMib::NTest::CTest
 						, "Identifier"_= "org.malterlib.testapp.test"
 						, "IdentifierScope"_= ""
 						, "Name"_= "Test Sensor"
-						, "UniqueSequence"_= 5
-						, "Value"_= fp64(4.0)
+						, "UniqueSequence"_= iReading + 1
+						, "Value"_= fp64(iReading)
 						, "OutdatedStatus"_= "Ok"
 						, "OutdatedSeconds"_= fp64::fs_Inf()
 						, "SnoozeUntil"_= NTime::CTime()
 						, "SensorMetadata"_= _={}
 					}
-					, _=
+				)
+			;
+			ExpectedSensorReadings.f_Array().f_Insert
+				(
+					_=
 					{
 						"HostID"_= ""
 						, "HostName"_= ""
@@ -229,7 +186,7 @@ struct CAppManager_Sensor_Tests : public NMib::NTest::CTest
 						, "Identifier"_= "org.malterlib.testapp.test.version"
 						, "IdentifierScope"_= ""
 						, "Name"_= "Test Sensor (version)"
-						, "UniqueSequence"_= 5
+						, "UniqueSequence"_= iReading + 1
 						, "Value"_= CEJsonUserTypeSorted
 						{
 							"Version"
@@ -238,7 +195,7 @@ struct CAppManager_Sensor_Tests : public NMib::NTest::CTest
 								"Identifier"_j= "Ident"
 								, "Major"_j= 13
 								, "Minor"_j= 3
-								, "Revision"_j= 4
+								, "Revision"_j= iReading
 							}
 						}
 						, "OutdatedStatus"_= "Ok"
@@ -246,134 +203,165 @@ struct CAppManager_Sensor_Tests : public NMib::NTest::CTest
 						, "SnoozeUntil"_= NTime::CTime()
 						, "SensorMetadata"_= _={}
 					}
-				]
+				)
 			;
+		}
 
-			auto fSortSensors = [&](CEJsonSorted const &_Sensors)
+		CEJsonSorted ExpectedSensorStatus = _
+			[
+				_=
 				{
-					CEJsonSorted Return = _Sensors;
-					Return.f_Array().f_Sort
-						(
-							[](CEJsonSorted const &_Left, CEJsonSorted const &_Right)
-							{
-								auto fTuple = [](CEJsonSorted const &_Value)
-									{
-										return fg_TupleReferences
-											(
-												_Value["HostID"].f_String()
-												, _Value["Application"].f_String()
-												, _Value["Identifier"].f_String()
-												, _Value["IdentifierScope"].f_String()
-											)
-										;
-									}
-								;
-								return fTuple(_Left) <=> fTuple(_Right);
-							}
-						)
-					;
-
-					return Return;
+					"HostID"_= ""
+					, "HostName"_= ""
+					, "Application"_= ""
+					, "Identifier"_= "org.malterlib.testapp.test"
+					, "IdentifierScope"_= ""
+					, "Name"_= "Test Sensor"
+					, "UniqueSequence"_= 5
+					, "Value"_= fp64(4.0)
+					, "OutdatedStatus"_= "Ok"
+					, "OutdatedSeconds"_= fp64::fs_Inf()
+					, "SnoozeUntil"_= NTime::CTime()
+					, "SensorMetadata"_= _={}
 				}
-			;
-
-			{
-				DMibTestPath("Local Store");
-
-				co_await AppManagerTestHelper.f_LaunchTool(TestAppDirectory / "TestApp", {"--generate-sensor-readings", "--no-random-values", "5"}, TestAppDirectory);
-				co_await AppManagerTestHelper.f_LaunchTool
-					(
-						TestAppDirectory / "TestApp"
-						, {"--generate-sensor-readings", "--no-random-values", "--reading-type=Version", "5"}
-						, TestAppDirectory
-					)
-				;
-
-				auto Sensors = fg_FromString(co_await AppManagerTestHelper.f_LaunchTool(TestAppDirectory / "TestApp", {"--sensor-list", "--json"}, TestAppDirectory));
-				DMibExpect(Sensors, ==, fSortSensors(ExpectedSensors));
-
-				auto SensorReadings = fg_FromString
-					(
-						co_await AppManagerTestHelper.f_LaunchTool(TestAppDirectory / "TestApp", {"--sensor-readings-list", "--newest", "--json"}, TestAppDirectory)
-					)
-				;
-				DMibExpect(fMakeComparable(fg_Move(SensorReadings)), ==, ExpectedSensorReadings);
-
-				auto SensorStatus = fg_FromString
-					(
-						co_await AppManagerTestHelper.f_LaunchTool(TestAppDirectory / "TestApp", {"--sensor-status", "--no-only-problems", "--json"}, TestAppDirectory)
-					)
-				;
-				DMibExpect(fMakeComparable(fg_Move(SensorStatus)), ==, ExpectedSensorStatus);
-			}
-
-			auto TestAppHostID = CStr(co_await AppManagerTestHelper.f_LaunchTool(TestAppDirectory / "TestApp", {"--trust-host-id"}, TestAppDirectory)).f_Trim();
-			auto HostName = CStr("{}@{}/TestApp"_f << NProcess::NPlatform::fg_Process_GetUserName() << NProcess::NPlatform::fg_Process_GetComputerName());
-			auto fSetHostInfo = [&](CEJsonSorted const &_Json)
+				, _=
 				{
-					CEJsonSorted Return = _Json;
-
-					for (auto &Entry : Return.f_Array())
+					"HostID"_= ""
+					, "HostName"_= ""
+					, "Application"_= ""
+					, "Identifier"_= "org.malterlib.testapp.test.version"
+					, "IdentifierScope"_= ""
+					, "Name"_= "Test Sensor (version)"
+					, "UniqueSequence"_= 5
+					, "Value"_= CEJsonUserTypeSorted
 					{
-						Entry["HostID"] = TestAppHostID;
-						Entry["HostName"] = HostName;
-						Entry["Application"] = "TestApp";
+						"Version"
+						,
+						{
+							"Identifier"_j= "Ident"
+							, "Major"_j= 13
+							, "Minor"_j= 3
+							, "Revision"_j= 4
+						}
 					}
-
-					return Return;
+					, "OutdatedStatus"_= "Ok"
+					, "OutdatedSeconds"_= fp64::fs_Inf()
+					, "SnoozeUntil"_= NTime::CTime()
+					, "SensorMetadata"_= _={}
 				}
+			]
+		;
+
+		auto fSortSensors = [&](CEJsonSorted const &_Sensors)
+			{
+				CEJsonSorted Return = _Sensors;
+				Return.f_Array().f_Sort
+					(
+						[](CEJsonSorted const &_Left, CEJsonSorted const &_Right)
+						{
+							auto fTuple = [](CEJsonSorted const &_Value)
+								{
+									return fg_TupleReferences
+										(
+											_Value["HostID"].f_String()
+											, _Value["Application"].f_String()
+											, _Value["Identifier"].f_String()
+											, _Value["IdentifierScope"].f_String()
+										)
+									;
+								}
+							;
+							return fTuple(_Left) <=> fTuple(_Right);
+						}
+					)
+				;
+
+				return Return;
+			}
+		;
+
+		{
+			DMibTestPath("Local Store");
+
+			co_await AppManagerTestHelper.f_LaunchTool(TestAppDirectory / "TestApp", {"--generate-sensor-readings", "--no-random-values", "5"}, TestAppDirectory);
+			co_await AppManagerTestHelper.f_LaunchTool(TestAppDirectory / "TestApp", {"--generate-sensor-readings", "--no-random-values", "--reading-type=Version", "5"}, TestAppDirectory);
+
+			auto Sensors = fg_FromString(co_await AppManagerTestHelper.f_LaunchTool(TestAppDirectory / "TestApp", {"--sensor-list", "--json"}, TestAppDirectory));
+			DMibExpect(Sensors, ==, fSortSensors(ExpectedSensors));
+
+			auto SensorReadings = fg_FromString(co_await AppManagerTestHelper.f_LaunchTool(TestAppDirectory / "TestApp", {"--sensor-readings-list", "--newest", "--json"}, TestAppDirectory));
+			DMibExpect(fMakeComparable(fg_Move(SensorReadings)), ==, ExpectedSensorReadings);
+
+			auto SensorStatus = fg_FromString
+				(
+					co_await AppManagerTestHelper.f_LaunchTool(TestAppDirectory / "TestApp", {"--sensor-status", "--no-only-problems", "--json"}, TestAppDirectory)
+				)
 			;
+			DMibExpect(fMakeComparable(fg_Move(SensorStatus)), ==, ExpectedSensorStatus);
+		}
 
+		auto TestAppHostID = CStr(co_await AppManagerTestHelper.f_LaunchTool(TestAppDirectory / "TestApp", {"--trust-host-id"}, TestAppDirectory)).f_Trim();
+		auto HostName = CStr("{}@{}/TestApp"_f << NProcess::NPlatform::fg_Process_GetUserName() << NProcess::NPlatform::fg_Process_GetComputerName());
+		auto fSetHostInfo = [&](CEJsonSorted const &_Json)
 			{
-				DMibTestPath("Local Store AppManager");
+				CEJsonSorted Return = _Json;
 
-				CStr AppManagerPath = AppManagerInfo.m_RootDirectory / "AppManager";
+				for (auto &Entry : Return.f_Array())
+				{
+					Entry["HostID"] = TestAppHostID;
+					Entry["HostName"] = HostName;
+					Entry["Application"] = "TestApp";
+				}
 
-				auto Sensors = fg_FromString(co_await AppManagerTestHelper.f_LaunchTool(AppManagerPath, {"--sensor-list", "--json"}, AppManagerInfo.m_RootDirectory));
-				DMibExpect(Sensors, ==, fSortSensors(fSetHostInfo(ExpectedSensors)));
-
-				auto SensorReadings = fg_FromString
-					(
-						co_await AppManagerTestHelper.f_LaunchTool(AppManagerPath, {"--sensor-readings-list", "--newest", "--json"}, AppManagerInfo.m_RootDirectory)
-					)
-				;
-				DMibExpect(fMakeComparable(fg_Move(SensorReadings)), ==, fSetHostInfo(ExpectedSensorReadings));
-
-				auto SensorStatus = fg_FromString
-					(
-						co_await AppManagerTestHelper.f_LaunchTool(AppManagerPath, {"--sensor-status", "--no-only-problems", "--json"}, AppManagerInfo.m_RootDirectory)
-					)
-				;
-				DMibExpect(fSortSensors(fMakeComparable(fg_Move(SensorStatus))), ==, fSortSensors(fSetHostInfo(ExpectedSensorStatus)));
+				return Return;
 			}
+		;
 
-			{
-				DMibTestPath("Cloud Manager");
+		{
+			DMibTestPath("Local Store AppManager");
 
-				CStr CloudClientDirectory = AppManagerTestHelper.m_pState->m_RootDirectory / "MalterlibCloud";
-				CStr CloudClientPath = CloudClientDirectory / "MalterlibCloud";
+			CStr AppManagerPath = AppManagerInfo.m_RootDirectory / "AppManager";
 
-				auto Sensors = fg_FromString(co_await AppManagerTestHelper.f_LaunchTool(CloudClientPath, {"--cloud-manager-sensor-list", "--json"}, CloudClientDirectory));
-				DMibExpect(Sensors, ==, fSortSensors(fSetHostInfo(ExpectedSensors)));
+			auto Sensors = fg_FromString(co_await AppManagerTestHelper.f_LaunchTool(AppManagerPath, {"--sensor-list", "--json"}, AppManagerInfo.m_RootDirectory));
+			DMibExpect(Sensors, ==, fSortSensors(fSetHostInfo(ExpectedSensors)));
 
-				auto SensorReadings = fg_FromString
-					(
-						co_await AppManagerTestHelper.f_LaunchTool(CloudClientPath, {"--cloud-manager-sensor-readings-list", "--newest", "--json"}, CloudClientDirectory)
-					)
-				;
-				DMibExpect(fMakeComparable(fg_Move(SensorReadings)), ==, fSetHostInfo(ExpectedSensorReadings));
+			auto SensorReadings = fg_FromString(co_await AppManagerTestHelper.f_LaunchTool(AppManagerPath, {"--sensor-readings-list", "--newest", "--json"}, AppManagerInfo.m_RootDirectory));
+			DMibExpect(fMakeComparable(fg_Move(SensorReadings)), ==, fSetHostInfo(ExpectedSensorReadings));
 
-				auto SensorStatus = fg_FromString
-					(
-						co_await AppManagerTestHelper.f_LaunchTool(CloudClientPath, {"--cloud-manager-sensor-status", "--no-only-problems", "--json"}, CloudClientDirectory)
-					)
-				;
-				DMibExpect(fSortSensors(fMakeComparable(fg_Move(SensorStatus))), ==, fSortSensors(fSetHostInfo(ExpectedSensorStatus)));
-			}
+			auto SensorStatus = fg_FromString
+				(
+					co_await AppManagerTestHelper.f_LaunchTool(AppManagerPath, {"--sensor-status", "--no-only-problems", "--json"}, AppManagerInfo.m_RootDirectory)
+				)
+			;
+			DMibExpect(fSortSensors(fMakeComparable(fg_Move(SensorStatus))), ==, fSortSensors(fSetHostInfo(ExpectedSensorStatus)));
+		}
 
-			co_return {};
-		};
-	}
-};
+		{
+			DMibTestPath("Cloud Manager");
+
+			CStr CloudClientDirectory = AppManagerTestHelper.m_pState->m_RootDirectory / "MalterlibCloud";
+			CStr CloudClientPath = CloudClientDirectory / "MalterlibCloud";
+
+			auto Sensors = fg_FromString(co_await AppManagerTestHelper.f_LaunchTool(CloudClientPath, {"--cloud-manager-sensor-list", "--json"}, CloudClientDirectory));
+			DMibExpect(Sensors, ==, fSortSensors(fSetHostInfo(ExpectedSensors)));
+
+			auto SensorReadings = fg_FromString
+				(
+					co_await AppManagerTestHelper.f_LaunchTool(CloudClientPath, {"--cloud-manager-sensor-readings-list", "--newest", "--json"}, CloudClientDirectory)
+				)
+			;
+			DMibExpect(fMakeComparable(fg_Move(SensorReadings)), ==, fSetHostInfo(ExpectedSensorReadings));
+
+			auto SensorStatus = fg_FromString
+				(
+					co_await AppManagerTestHelper.f_LaunchTool(CloudClientPath, {"--cloud-manager-sensor-status", "--no-only-problems", "--json"}, CloudClientDirectory)
+				)
+			;
+			DMibExpect(fSortSensors(fMakeComparable(fg_Move(SensorStatus))), ==, fSortSensors(fSetHostInfo(ExpectedSensorStatus)));
+		}
+
+		co_return {};
+	};
+}
 
 DMibTestRegister(CAppManager_Sensor_Tests, Malterlib::Cloud);

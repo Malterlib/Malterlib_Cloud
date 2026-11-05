@@ -15,22 +15,24 @@ using namespace NMib::NCloud::NAppDistributionManager;
 
 struct CAppDistributionManager : public CApplication
 {
-	aint f_Main()
-	{
-		NConcurrency::CDistributedDaemon Daemon
-			{
-				"MalterlibCloudAppDistributionManager"
-				, "Malterlib Cloud App Distribution Manager"
-				, "Manages distributed cloud apps running on one host"
-				, []
-				{
-					return fg_ConstructActor<CAppDistributionManagerActor>();
-				}
-			}
-		;
-
-		return Daemon.f_Run();
-	}
+	aint f_Main();
 };
+
+aint CAppDistributionManager::f_Main()
+{
+	NConcurrency::CDistributedDaemon Daemon
+		{
+			"MalterlibCloudAppDistributionManager"
+			, "Malterlib Cloud App Distribution Manager"
+			, "Manages distributed cloud apps running on one host"
+			, []
+			{
+				return fg_ConstructActor<CAppDistributionManagerActor>();
+			}
+		}
+	;
+
+	return Daemon.f_Run();
+}
 
 DAppImplement(CAppDistributionManager);
