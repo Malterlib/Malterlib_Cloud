@@ -148,6 +148,8 @@ namespace NMib::NCloud
 			CManifestFile m_ManifestFile;
 		};
 
+		using FRunRSyncProtocol = NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<NContainer::CIOByteVector> (NContainer::CIOByteVector _Packet)>;
+
 		CBackupManagerBackup();
 
 		static bool fs_ApplyManifestChange(NFile::CDirectoryManifest &o_Manifest, NStr::CStr const &_FileName, CManifestChange const &_Change);
@@ -155,8 +157,6 @@ namespace NMib::NCloud
 		static NFile::CDirectoryManifestFile const &fs_ManifestFileFromChange(CManifestChange const &_Change);
 		static bool fs_ManifestChangeValid(NStr::CStr const &_FileName, CManifestChange const &_Change, NStr::CStr &o_Error);
 		static bool fs_ManifestFileValid(NStr::CStr const &_FileName, NFile::CDirectoryManifestFile const &_File, NStr::CStr &o_Error);
-
-		using FRunRSyncProtocol = NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<NContainer::CIOByteVector> (NContainer::CIOByteVector _Packet)>;
 
 		virtual auto f_StartManifestRSync(FRunRSyncProtocol _fRunProtocol, uint64 _ManifestSize, NCryptography::CHashDigest_SHA256 _ExpectedDigest)
 			-> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> = 0
@@ -173,31 +173,20 @@ namespace NMib::NCloud
 
 	struct CBackupManager : public NConcurrency::CActor
 	{
-		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/BackupManager";
-
 		enum EProtocolVersion : uint32
 		{
 			EProtocolVersion_Min       = EBackupManagerProtocolVersion_Min
 			, EProtocolVersion_Current = EBackupManagerProtocolVersion_Current
 		};
 
-		CBackupManager();
-
-		static bool fs_IsValidProtocolVersion(uint32 _Version);
-
-		static bool fs_IsValidHostname(NStr::CStr const &_String);
-		static bool fs_IsValidBackupSource(NStr::CStr const &_String, NStr::CStr *o_pFriendlyName, NStr::CStr *o_pHostID);
-		static bool fs_IsValidBackup(NStr::CStr const &_String, NStr::CStr *o_pBackupID, NTime::CTime *o_pTime);
-		static bool fs_IsValidBackupTime(NStr::CStr const &_String, NTime::CTime *o_pTime);
-
 		struct CBackupKey
 		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+
 			NStr::CStr m_FriendlyName;
 			NTime::CTime m_Time;
 			NStr::CStr m_ID;
-
-			template <typename tf_CStream>
-			void f_Stream(tf_CStream &_Stream);
 		};
 
 		struct CBackupID
@@ -335,6 +324,15 @@ namespace NMib::NCloud
 
 		// Deprecated - End
 
+		CBackupManager();
+
+		static bool fs_IsValidProtocolVersion(uint32 _Version);
+
+		static bool fs_IsValidHostname(NStr::CStr const &_String);
+		static bool fs_IsValidBackupSource(NStr::CStr const &_String, NStr::CStr *o_pFriendlyName, NStr::CStr *o_pHostID);
+		static bool fs_IsValidBackup(NStr::CStr const &_String, NStr::CStr *o_pBackupID, NTime::CTime *o_pTime);
+		static bool fs_IsValidBackupTime(NStr::CStr const &_String, NTime::CTime *o_pTime);
+
 		// Deprecated - Start
 		virtual NConcurrency::TCFuture<CStartBackup::CResult> f_StartBackup(CStartBackup _Params);
 		virtual NConcurrency::TCFuture<CStopBackup::CResult> f_StopBackup(CStopBackup _Params);
@@ -348,6 +346,8 @@ namespace NMib::NCloud
 		virtual NConcurrency::TCFuture<NContainer::TCMap<NStr::CStr, CBackupInfo>> f_ListBackups(NStr::CStr _ForBackupSource) = 0;
 
 		virtual auto f_DownloadBackup(CDownloadBackup _DownloadBackup) -> NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<NFile::CDirectorySyncClient>> = 0;
+
+		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/BackupManager";
 	};
 }
 

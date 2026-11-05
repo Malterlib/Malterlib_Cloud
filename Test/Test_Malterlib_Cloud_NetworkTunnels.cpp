@@ -31,43 +31,11 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 {
 	struct CTestNetworkTunnelServerApp : public CDistributedAppActor
 	{
-		CTestNetworkTunnelServerApp(CStr const &_ListenPath)
-			: CDistributedAppActor
-			(
-				CDistributedAppActor_Settings("TestNetworkTunnelServerApp")
-				.f_SeparateDistributionManager(true)
-				.f_KeySetting(NConcurrency::CDistributedActorTestKeySettings{})
-				.f_MinimumCryptoStrength(NCryptography::ECryptoStrength::mc_EquivalentSymmetric128bit)
-				.f_DefaultCommandLineFunctionalies(EDefaultCommandLineFunctionality_None)
-			)
-			, m_ListenPath(_ListenPath)
-		{
-		}
+		CTestNetworkTunnelServerApp(CStr const &_ListenPath);
 
-		TCFuture<void> fp_StartApp(NEncoding::CEJsonSorted const _Params) override
-		{
-			m_TunnelServer = fg_Construct(mp_State.m_DistributionManager, mp_State.m_TrustManager, mp_State.f_AuditorFactory(), "TestNetworkTunnelServerApp", "TunnelServerApp");
+		TCFuture<void> fp_StartApp(NEncoding::CEJsonSorted const _Params) override;
 
-			m_PublishedTunnels.f_Insert(co_await m_TunnelServer(&CNetworkTunnelsServer::f_PublishNetworkTunnel, "TestTunnel", m_ListenPath, 0, CEJsonSorted{}));
-
-			co_await m_TunnelServer(&CNetworkTunnelsServer::f_Start);
-
-			co_return {};
-		}
-
-		TCFuture<void> fp_StopApp() override
-		{
-			TCFutureVector<void> Destroys;
-			for (auto &Tunnel : m_PublishedTunnels)
-				Tunnel->f_Destroy() > Destroys;
-
-			co_await fg_AllDoneWrapped(Destroys);
-
-			if (m_TunnelServer)
-				co_await fg_Move(m_TunnelServer).f_Destroy();
-
-			co_return {};
-		}
+		TCFuture<void> fp_StopApp() override;
 
 		TCActor<CNetworkTunnelsServer> m_TunnelServer;
 		TCVector<CActorSubscription> m_PublishedTunnels;
@@ -76,284 +44,332 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 
 	struct CTestNetworkTunnelClientApp : public CDistributedAppActor
 	{
-		CTestNetworkTunnelClientApp()
-			: CDistributedAppActor
-			(
-				CDistributedAppActor_Settings("TestNetworkTunnelClientApp")
-				.f_SeparateDistributionManager(true)
-				.f_KeySetting(NConcurrency::CDistributedActorTestKeySettings{})
-				.f_MinimumCryptoStrength(NCryptography::ECryptoStrength::mc_EquivalentSymmetric128bit)
-				.f_DefaultCommandLineFunctionalies(EDefaultCommandLineFunctionality_None)
-			)
-		{
-		}
+		CTestNetworkTunnelClientApp();
 
-		TCFuture<void> fp_StartApp(NEncoding::CEJsonSorted const _Params) override
-		{
-			m_TunnelClient = fg_Construct(mp_State.m_DistributionManager, mp_State.m_TrustManager);
+		TCFuture<void> fp_StartApp(NEncoding::CEJsonSorted const _Params) override;
 
-			co_await m_TunnelClient(&CNetworkTunnelsClient::f_Start);
+		TCFuture<void> fp_StopApp() override;
 
-			co_return {};
-		}
-
-		TCFuture<void> fp_StopApp() override
-		{
-			TCFutureVector<void> Destroys;
-			for (auto &Subscription : m_TunnelSubscriptions)
-				Subscription->f_Destroy() > Destroys;
-
-			co_await fg_AllDoneWrapped(Destroys);
-
-			if (m_TunnelClient)
-				co_await fg_Move(m_TunnelClient).f_Destroy();
-
-			co_return {};
-		}
-
-		TCFuture<CEJsonSorted> fp_Test_Command(NStr::CStr _Command, NEncoding::CEJsonSorted const _Params) override
-		{
-			if (_Command == "OpenTunnel")
-			{
-				auto Tunnel = co_await m_TunnelClient
-					(
-						&CNetworkTunnelsClient::f_OpenTunnel
-						, CNetworkTunnelsClient::COpenTunnel
-						{
-							.m_HostID = _Params["HostID"].f_String()
-							, .m_TunnelName = _Params["TunnelName"].f_String()
-							, .m_fOnConnection = g_ActorFunctor / [](CNetworkTunnelsClient::CCallbackInfo _CallbackInfo) -> TCFuture<void> // New connection
-							{
-								if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
-									DMibConErrOut("New connection: {}\n", _CallbackInfo.m_Address.f_GetString(NNetwork::ENetAddressStringFlag_IncludePort));
-								co_return {};
-							}
-							, .m_fOnClose = g_ActorFunctor / [](CNetworkTunnelsClient::CCallbackInfo _CallbackInfo, NStr::CStr _Message) -> TCFuture<void> // On Close
-							{
-								if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
-									DMibConErrOut("Connection from '{}' closed: {}\n", _CallbackInfo.m_Address.f_GetString(NNetwork::ENetAddressStringFlag_IncludePort), _Message);
-								co_return {};
-							}
-							, .m_fOnError = g_ActorFunctor / [](CNetworkTunnelsClient::CCallbackInfo _CallbackInfo, CStr _Error) -> TCFuture<void> // On Error
-							{
-								if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
-									DMibConErrOut("Connection from '{}' error: {}\n", _CallbackInfo.m_Address.f_GetString(NNetwork::ENetAddressStringFlag_IncludePort), _Error);
-								co_return {};
-							}
-							, .m_ListenHost = _Params["ListenHost"].f_String()
-						}
-					)
-				;
-
-				m_TunnelSubscriptions.f_Insert(fg_Move(Tunnel.m_Subscription));
-
-				co_return {};
-			}
-			else if (_Command == "EnumTunnels")
-			{
-				auto Tunnels = co_await m_TunnelClient(&CNetworkTunnelsClient::f_EnumTunnels);
-
-				CEJsonSorted Return;
-
-				auto &OutTunnels = Return["Tunnels"] = EJsonType_Object;
-
-				for (auto &TunnelsForHost : Tunnels)
-				{
-					auto &OutHost = OutTunnels[Tunnels.fs_GetKey(TunnelsForHost)].f_Array();
-					for (auto &Tunnel : TunnelsForHost)
-					{
-						auto &TunnelName = TunnelsForHost.fs_GetKey(Tunnel);
-						OutHost.f_Insert(TunnelName);
-					}
-				}
-
-				co_return fg_Move(Return);
-			}
-			co_return {};
-		}
+		TCFuture<CEJsonSorted> fp_Test_Command(NStr::CStr _Command, NEncoding::CEJsonSorted const _Params) override;
 
 		TCVector<CActorSubscription> m_TunnelSubscriptions;
 		TCActor<CNetworkTunnelsClient> m_TunnelClient;
 	};
 
-	void f_DoTests()
-	{
-		DMibTestSuite("General")
-		{
-			CActorRunLoopTestHelper RunLoopHelper;
-
-			CStr SocketPath = CFile::fs_GetProgramDirectory() / "Sockets/NetworkTunnelGeneral";
-
-			CDistributedActorTestHelperCombined TestServer{SocketPath, RunLoopHelper.m_pRunLoop};
-			TestServer.f_InitServer();
-
-			CStr ProgramDirectory = CFile::fs_GetProgramDirectory();
-			CStr RootDirectory = ProgramDirectory + "/NetworkTunnelTests";
-
-			fg_TestAddCleanupPath(RootDirectory);
-
-			for (umint iTry = 0; iTry < 5; ++iTry)
-			{
-				try
-				{
-					if (CFile::fs_FileExists(RootDirectory))
-						CFile::fs_DeleteDirectoryRecursive(RootDirectory);
-					break;
-				}
-				catch (NFile::CExceptionFile const &)
-				{
-				}
-			}
-
-			CFile::fs_CreateDirectory(RootDirectory);
-
-			CTrustManagerTestHelper TrustManagerState;
-			TCActor<CDistributedActorTrustManager> TrustManager = TrustManagerState.f_TrustManager("TestHelper");
-			auto CleanupTrustManager = g_OnScopeExit / [&]
-				{
-					TrustManager->f_BlockDestroy(RunLoopHelper.m_pRunLoop->f_ActorDestroyLoop());
-				}
-			;
-
-			CStr TestHostID = TrustManager(&CDistributedActorTrustManager::f_GetHostID).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
-			CTrustedSubscriptionTestHelper Subscriptions{TrustManager};
-
-			CDistributedActorTrustManager_Address ServerAddress;
-
-			ServerAddress.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath("{}/controller.sock"_f << RootDirectory);
-			TrustManager(&CDistributedActorTrustManager::f_AddListen, ServerAddress, 0).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
-
-			CDistributedApp_LaunchHelperDependencies Dependencies;
-			Dependencies.m_Address = ServerAddress.m_URL;
-			Dependencies.m_TrustManager = TrustManager;
-			Dependencies.m_DistributionManager = TrustManager(&CDistributedActorTrustManager::f_GetDistributionManager).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
-
-			TCActor<CDistributedApp_LaunchHelper> LaunchHelper = fg_ConstructActor<CDistributedApp_LaunchHelper>(Dependencies, !!(fg_TestReportFlags() & ETestReportFlag_EnableLogs));
-			auto Cleanup = g_OnScopeExit / [&]
-				{
-					LaunchHelper->f_BlockDestroy(RunLoopHelper.m_pRunLoop->f_ActorDestroyLoop());
-				}
-			;
-
-			// Launch Tunnel Server
-			CStr TunnelServerDirectory = RootDirectory + "/TunnelServer";
-			CFile::fs_CreateDirectory(TunnelServerDirectory);
-
-			auto TunnelServerLaunch = LaunchHelper
-				(
-					&CDistributedApp_LaunchHelper::f_LaunchInProcess
-					, "TunnelServer"
-					, TunnelServerDirectory
-					, [Path = TestServer.f_GetListenSocketPath()]() -> TCActor<CDistributedAppActor>
-					{
-						return fg_Construct<CTestNetworkTunnelServerApp>(Path);
-					}
-					, NContainer::TCVector<NStr::CStr>{}
-				)
-				.f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout)
-			;
-
-			//auto &TunnelServerApp = TunnelServerLaunch.m_InProcess.f_GetActor();
-			auto pTunnelServerTrust = TunnelServerLaunch.m_pTrustInterface;
-			auto &TunnelServerTrust = *pTunnelServerTrust;
-			CStr TunnelServerHostID = TunnelServerLaunch.m_HostID;
-
-			DMibExpect(TunnelServerLaunch.m_HostID, !=, "");
-
-			// Launch Tunnel Client
-			CStr TunnelClientDirectory = RootDirectory + "/TunnelClient";
-			CFile::fs_CreateDirectory(TunnelClientDirectory);
-
-			auto TunnelClientLaunch = LaunchHelper
-				(
-					&CDistributedApp_LaunchHelper::f_LaunchInProcess
-					, "TunnelClient"
-					, TunnelClientDirectory
-					, []() -> TCActor<CDistributedAppActor>
-					{
-						return fg_Construct<CTestNetworkTunnelClientApp>();
-					}
-					, NContainer::TCVector<NStr::CStr>{}
-				)
-				.f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout)
-			;
-
-			auto pTunnelClientTrust = TunnelClientLaunch.m_pTrustInterface;
-			auto &TunnelClientTrust = *pTunnelClientTrust;
-			CStr TunnelClientHostID = TunnelClientLaunch.m_HostID;
-
-			DMibExpect(TunnelClientLaunch.m_HostID, !=, "");
-
-			auto WaitForSubscriptions = EDistributedActorTrustManagerOrderingFlag_WaitForSubscriptions;
-			auto fPermissions = [&](auto &&_HostID, auto &&_Permissions)
-				{
-					return CDistributedActorTrustManagerInterface::CAddPermissions{{_HostID, ""}, _Permissions, WaitForSubscriptions};
-				}
-			;
-
-			auto fNamespaceHosts = [&](auto &&_Namespace, auto &&_Hosts)
-				{
-					return CDistributedActorTrustManagerInterface::CChangeNamespaceHosts{_Namespace, _Hosts, WaitForSubscriptions};
-				}
-			;
-
-			CDistributedActorTrustManager_Address TunnelServerAddress;
-			{
-				TunnelServerAddress.m_URL = fg_Format("wss://[UNIX(666):{}]/", fg_GetSafeUnixSocketPath("{}/Tunnel.sock"_f << TunnelServerDirectory));
-				TunnelServerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)
-					(CDistributedActorTrustManagerInterface::CAddListen{.m_Address = TunnelServerAddress})
-					.f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout)
-				;
-			}
-			{
-				CDistributedActorTrustManagerInterface::CGenerateConnectionTicket GenerateTicket;
-				GenerateTicket.m_Address = TunnelServerAddress;
-				auto Ticket = TunnelServerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket)
-					(fg_Move(GenerateTicket))
-					.f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout)
-				;
-				auto HostInfo = TunnelClientTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)
-					(CDistributedActorTrustManagerInterface::CAddClientConnection{.m_TrustTicket = fg_Move(Ticket.m_Ticket), .m_Timeout = gs_Timeout, .m_ConnectionConcurrency = 1})
-					.f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout)
-				;
-
-				TunnelServerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
-					(fPermissions(TunnelClientHostID, TCMap<CStr, CPermissionRequirements>{{"TunnelServerApp/ConnectAll", {}}}))
-					.f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout)
-				;
-				TunnelClientTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace)
-					(fNamespaceHosts(ICNetworkTunnels::mc_pDefaultNamespace, TCSet<CStr>{TunnelServerHostID}))
-					.f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout)
-				;
-			}
-
-			auto Tunnels = TunnelClientLaunch.f_Test_Command("EnumTunnels", {}).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
-
-			DMibExpect
-				(
-					Tunnels
-					, ==
-					, CEJsonSorted
-					{
-						"Tunnels"_=
-						{
-							_(TunnelServerHostID) = _["TestTunnel"]
-						}
-					}
-				)
-			;
-
-			CStr TunnelSocketPath = CFile::fs_GetProgramDirectory() / "Sockets/NetworkTunnelGeneralTunnel";
-
-			auto TunnelListenResult = TunnelClientLaunch.f_Test_Command
-				(
-					"OpenTunnel"
-					, {"HostID"_= TunnelServerHostID, "TunnelName"_= "TestTunnel", "ListenHost"_= "UNIX:" + NNetwork::fg_GetSafeUnixSocketPath(TunnelSocketPath / "tests.sock")}
-				)
-				.f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout)
-			;
-		};
-	}
+	void f_DoTests();
 };
+
+CNetworkTunnel_Tests::CTestNetworkTunnelServerApp::CTestNetworkTunnelServerApp(CStr const &_ListenPath)
+	: CDistributedAppActor
+	(
+		CDistributedAppActor_Settings("TestNetworkTunnelServerApp")
+		.f_SeparateDistributionManager(true)
+		.f_KeySetting(NConcurrency::CDistributedActorTestKeySettings{})
+		.f_MinimumCryptoStrength(NCryptography::ECryptoStrength::mc_EquivalentSymmetric128bit)
+		.f_DefaultCommandLineFunctionalies(EDefaultCommandLineFunctionality_None)
+	)
+	, m_ListenPath(_ListenPath)
+{
+}
+
+TCFuture<void> CNetworkTunnel_Tests::CTestNetworkTunnelServerApp::fp_StartApp(NEncoding::CEJsonSorted const _Params)
+{
+	m_TunnelServer = fg_Construct(mp_State.m_DistributionManager, mp_State.m_TrustManager, mp_State.f_AuditorFactory(), "TestNetworkTunnelServerApp", "TunnelServerApp");
+
+	m_PublishedTunnels.f_Insert(co_await m_TunnelServer(&CNetworkTunnelsServer::f_PublishNetworkTunnel, "TestTunnel", m_ListenPath, 0, CEJsonSorted{}));
+
+	co_await m_TunnelServer(&CNetworkTunnelsServer::f_Start);
+
+	co_return {};
+}
+
+TCFuture<void> CNetworkTunnel_Tests::CTestNetworkTunnelServerApp::fp_StopApp()
+{
+	TCFutureVector<void> Destroys;
+	for (auto &Tunnel : m_PublishedTunnels)
+		Tunnel->f_Destroy() > Destroys;
+
+	co_await fg_AllDoneWrapped(Destroys);
+
+	if (m_TunnelServer)
+		co_await fg_Move(m_TunnelServer).f_Destroy();
+
+	co_return {};
+}
+
+CNetworkTunnel_Tests::CTestNetworkTunnelClientApp::CTestNetworkTunnelClientApp()
+	: CDistributedAppActor
+	(
+		CDistributedAppActor_Settings("TestNetworkTunnelClientApp")
+		.f_SeparateDistributionManager(true)
+		.f_KeySetting(NConcurrency::CDistributedActorTestKeySettings{})
+		.f_MinimumCryptoStrength(NCryptography::ECryptoStrength::mc_EquivalentSymmetric128bit)
+		.f_DefaultCommandLineFunctionalies(EDefaultCommandLineFunctionality_None)
+	)
+{
+}
+
+TCFuture<void> CNetworkTunnel_Tests::CTestNetworkTunnelClientApp::fp_StartApp(NEncoding::CEJsonSorted const _Params)
+{
+	m_TunnelClient = fg_Construct(mp_State.m_DistributionManager, mp_State.m_TrustManager);
+
+	co_await m_TunnelClient(&CNetworkTunnelsClient::f_Start);
+
+	co_return {};
+}
+
+TCFuture<void> CNetworkTunnel_Tests::CTestNetworkTunnelClientApp::fp_StopApp()
+{
+	TCFutureVector<void> Destroys;
+	for (auto &Subscription : m_TunnelSubscriptions)
+		Subscription->f_Destroy() > Destroys;
+
+	co_await fg_AllDoneWrapped(Destroys);
+
+	if (m_TunnelClient)
+		co_await fg_Move(m_TunnelClient).f_Destroy();
+
+	co_return {};
+}
+
+TCFuture<CEJsonSorted> CNetworkTunnel_Tests::CTestNetworkTunnelClientApp::fp_Test_Command(NStr::CStr _Command, NEncoding::CEJsonSorted const _Params)
+{
+	if (_Command == "OpenTunnel")
+	{
+		auto Tunnel = co_await m_TunnelClient
+			(
+				&CNetworkTunnelsClient::f_OpenTunnel
+				, CNetworkTunnelsClient::COpenTunnel
+				{
+					.m_HostID = _Params["HostID"].f_String()
+					, .m_TunnelName = _Params["TunnelName"].f_String()
+					, .m_fOnConnection = g_ActorFunctor / [](CNetworkTunnelsClient::CCallbackInfo _CallbackInfo) -> TCFuture<void> // New connection
+					{
+						if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
+							DMibConErrOut("New connection: {}\n", _CallbackInfo.m_Address.f_GetString(NNetwork::ENetAddressStringFlag_IncludePort));
+						co_return {};
+					}
+					, .m_fOnClose = g_ActorFunctor / [](CNetworkTunnelsClient::CCallbackInfo _CallbackInfo, NStr::CStr _Message) -> TCFuture<void> // On Close
+					{
+						if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
+							DMibConErrOut("Connection from '{}' closed: {}\n", _CallbackInfo.m_Address.f_GetString(NNetwork::ENetAddressStringFlag_IncludePort), _Message);
+						co_return {};
+					}
+					, .m_fOnError = g_ActorFunctor / [](CNetworkTunnelsClient::CCallbackInfo _CallbackInfo, CStr _Error) -> TCFuture<void> // On Error
+					{
+						if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
+							DMibConErrOut("Connection from '{}' error: {}\n", _CallbackInfo.m_Address.f_GetString(NNetwork::ENetAddressStringFlag_IncludePort), _Error);
+						co_return {};
+					}
+					, .m_ListenHost = _Params["ListenHost"].f_String()
+				}
+			)
+		;
+
+		m_TunnelSubscriptions.f_Insert(fg_Move(Tunnel.m_Subscription));
+
+		co_return {};
+	}
+	else if (_Command == "EnumTunnels")
+	{
+		auto Tunnels = co_await m_TunnelClient(&CNetworkTunnelsClient::f_EnumTunnels);
+
+		CEJsonSorted Return;
+
+		auto &OutTunnels = Return["Tunnels"] = EJsonType_Object;
+
+		for (auto &TunnelsForHost : Tunnels)
+		{
+			auto &OutHost = OutTunnels[Tunnels.fs_GetKey(TunnelsForHost)].f_Array();
+			for (auto &Tunnel : TunnelsForHost)
+			{
+				auto &TunnelName = TunnelsForHost.fs_GetKey(Tunnel);
+				OutHost.f_Insert(TunnelName);
+			}
+		}
+
+		co_return fg_Move(Return);
+	}
+	co_return {};
+}
+
+void CNetworkTunnel_Tests::f_DoTests()
+{
+	DMibTestSuite("General")
+	{
+		CActorRunLoopTestHelper RunLoopHelper;
+
+		CStr SocketPath = CFile::fs_GetProgramDirectory() / "Sockets/NetworkTunnelGeneral";
+
+		CDistributedActorTestHelperCombined TestServer{SocketPath, RunLoopHelper.m_pRunLoop};
+		TestServer.f_InitServer();
+
+		CStr ProgramDirectory = CFile::fs_GetProgramDirectory();
+		CStr RootDirectory = ProgramDirectory + "/NetworkTunnelTests";
+
+		fg_TestAddCleanupPath(RootDirectory);
+
+		for (umint iTry = 0; iTry < 5; ++iTry)
+		{
+			try
+			{
+				if (CFile::fs_FileExists(RootDirectory))
+					CFile::fs_DeleteDirectoryRecursive(RootDirectory);
+				break;
+			}
+			catch (NFile::CExceptionFile const &)
+			{
+			}
+		}
+
+		CFile::fs_CreateDirectory(RootDirectory);
+
+		CTrustManagerTestHelper TrustManagerState;
+		TCActor<CDistributedActorTrustManager> TrustManager = TrustManagerState.f_TrustManager("TestHelper");
+		auto CleanupTrustManager = g_OnScopeExit / [&]
+			{
+				TrustManager->f_BlockDestroy(RunLoopHelper.m_pRunLoop->f_ActorDestroyLoop());
+			}
+		;
+
+		CStr TestHostID = TrustManager(&CDistributedActorTrustManager::f_GetHostID).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
+		CTrustedSubscriptionTestHelper Subscriptions{TrustManager};
+
+		CDistributedActorTrustManager_Address ServerAddress;
+
+		ServerAddress.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath("{}/controller.sock"_f << RootDirectory);
+		TrustManager(&CDistributedActorTrustManager::f_AddListen, ServerAddress, 0).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
+
+		CDistributedApp_LaunchHelperDependencies Dependencies;
+		Dependencies.m_Address = ServerAddress.m_URL;
+		Dependencies.m_TrustManager = TrustManager;
+		Dependencies.m_DistributionManager = TrustManager(&CDistributedActorTrustManager::f_GetDistributionManager).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
+
+		TCActor<CDistributedApp_LaunchHelper> LaunchHelper = fg_ConstructActor<CDistributedApp_LaunchHelper>(Dependencies, !!(fg_TestReportFlags() & ETestReportFlag_EnableLogs));
+		auto Cleanup = g_OnScopeExit / [&]
+			{
+				LaunchHelper->f_BlockDestroy(RunLoopHelper.m_pRunLoop->f_ActorDestroyLoop());
+			}
+		;
+
+		// Launch Tunnel Server
+		CStr TunnelServerDirectory = RootDirectory + "/TunnelServer";
+		CFile::fs_CreateDirectory(TunnelServerDirectory);
+
+		auto TunnelServerLaunch = LaunchHelper
+			(
+				&CDistributedApp_LaunchHelper::f_LaunchInProcess
+				, "TunnelServer"
+				, TunnelServerDirectory
+				, [Path = TestServer.f_GetListenSocketPath()]() -> TCActor<CDistributedAppActor>
+				{
+					return fg_Construct<CTestNetworkTunnelServerApp>(Path);
+				}
+				, NContainer::TCVector<NStr::CStr>{}
+			)
+			.f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout)
+		;
+
+		//auto &TunnelServerApp = TunnelServerLaunch.m_InProcess.f_GetActor();
+		auto pTunnelServerTrust = TunnelServerLaunch.m_pTrustInterface;
+		auto &TunnelServerTrust = *pTunnelServerTrust;
+		CStr TunnelServerHostID = TunnelServerLaunch.m_HostID;
+
+		DMibExpect(TunnelServerLaunch.m_HostID, !=, "");
+
+		// Launch Tunnel Client
+		CStr TunnelClientDirectory = RootDirectory + "/TunnelClient";
+		CFile::fs_CreateDirectory(TunnelClientDirectory);
+
+		auto TunnelClientLaunch = LaunchHelper
+			(
+				&CDistributedApp_LaunchHelper::f_LaunchInProcess
+				, "TunnelClient"
+				, TunnelClientDirectory
+				, []() -> TCActor<CDistributedAppActor>
+				{
+					return fg_Construct<CTestNetworkTunnelClientApp>();
+				}
+				, NContainer::TCVector<NStr::CStr>{}
+			)
+			.f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout)
+		;
+
+		auto pTunnelClientTrust = TunnelClientLaunch.m_pTrustInterface;
+		auto &TunnelClientTrust = *pTunnelClientTrust;
+		CStr TunnelClientHostID = TunnelClientLaunch.m_HostID;
+
+		DMibExpect(TunnelClientLaunch.m_HostID, !=, "");
+
+		auto WaitForSubscriptions = EDistributedActorTrustManagerOrderingFlag_WaitForSubscriptions;
+		auto fPermissions = [&](auto &&_HostID, auto &&_Permissions)
+			{
+				return CDistributedActorTrustManagerInterface::CAddPermissions{{_HostID, ""}, _Permissions, WaitForSubscriptions};
+			}
+		;
+
+		auto fNamespaceHosts = [&](auto &&_Namespace, auto &&_Hosts)
+			{
+				return CDistributedActorTrustManagerInterface::CChangeNamespaceHosts{_Namespace, _Hosts, WaitForSubscriptions};
+			}
+		;
+
+		CDistributedActorTrustManager_Address TunnelServerAddress;
+		{
+			TunnelServerAddress.m_URL = fg_Format("wss://[UNIX(666):{}]/", fg_GetSafeUnixSocketPath("{}/Tunnel.sock"_f << TunnelServerDirectory));
+			TunnelServerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)
+				(CDistributedActorTrustManagerInterface::CAddListen{.m_Address = TunnelServerAddress})
+				.f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout)
+			;
+		}
+		{
+			CDistributedActorTrustManagerInterface::CGenerateConnectionTicket GenerateTicket;
+			GenerateTicket.m_Address = TunnelServerAddress;
+			auto Ticket = TunnelServerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket)
+				(fg_Move(GenerateTicket))
+				.f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout)
+			;
+			auto HostInfo = TunnelClientTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)
+				(CDistributedActorTrustManagerInterface::CAddClientConnection{.m_TrustTicket = fg_Move(Ticket.m_Ticket), .m_Timeout = gs_Timeout, .m_ConnectionConcurrency = 1})
+				.f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout)
+			;
+
+			TunnelServerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
+				(fPermissions(TunnelClientHostID, TCMap<CStr, CPermissionRequirements>{{"TunnelServerApp/ConnectAll", {}}}))
+				.f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout)
+			;
+			TunnelClientTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace)
+				(fNamespaceHosts(ICNetworkTunnels::mc_pDefaultNamespace, TCSet<CStr>{TunnelServerHostID}))
+				.f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout)
+			;
+		}
+
+		auto Tunnels = TunnelClientLaunch.f_Test_Command("EnumTunnels", {}).f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout);
+
+		DMibExpect
+			(
+				Tunnels
+				, ==
+				, CEJsonSorted
+				{
+					"Tunnels"_=
+					{
+						_(TunnelServerHostID) = _["TestTunnel"]
+					}
+				}
+			)
+		;
+
+		CStr TunnelSocketPath = CFile::fs_GetProgramDirectory() / "Sockets/NetworkTunnelGeneralTunnel";
+
+		auto TunnelListenResult = TunnelClientLaunch.f_Test_Command
+			(
+				"OpenTunnel"
+				, {"HostID"_= TunnelServerHostID, "TunnelName"_= "TestTunnel", "ListenHost"_= "UNIX:" + NNetwork::fg_GetSafeUnixSocketPath(TunnelSocketPath / "tests.sock")}
+			)
+			.f_CallSync(RunLoopHelper.m_pRunLoop, gs_Timeout)
+		;
+	};
+}
 
 DMibTestRegister(CNetworkTunnel_Tests, Malterlib::Cloud);

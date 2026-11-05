@@ -22,8 +22,6 @@ namespace NMib::NCloud
 
 	struct CCloudAPIManager : public NConcurrency::CActor
 	{
-		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/CloudAPIManager";
-
 		using CDistributedActorWriteStream = NConcurrency::CDistributedActorWriteStream;
 		using CDistributedActorReadStream = NConcurrency::CDistributedActorReadStream;
 
@@ -113,6 +111,8 @@ namespace NMib::NCloud
 		virtual NConcurrency::TCFuture<CEnsureContainer::CResult> f_EnsureContainer(CEnsureContainer _Params) = 0;
 		virtual NConcurrency::TCFuture<CSignTempURL::CResult> f_SignTempURL(CSignTempURL _Params) = 0;
 		virtual NConcurrency::TCFuture<CDeleteObject::CResult> f_DeleteObject(CDeleteObject _Params) = 0;
+
+		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/CloudAPIManager";
 	};
 }
 

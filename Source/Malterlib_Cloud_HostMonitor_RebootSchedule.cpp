@@ -22,46 +22,58 @@ namespace NMib::NCloud
 
 		struct CDateTimeEdit
 		{
-			CDateTimeEdit(CDateTimeState &_State)
-				: mp_State(_State)
-			{
-			}
+			CDateTimeEdit(CDateTimeState &_State);
 
-			~CDateTimeEdit()
-			{
-				mp_State.m_Time = fg_TimeFromDateTime(mp_State.m_DateTime);
-				mp_State.m_DateTime = CTimeConvert(mp_State.m_Time).f_ExtractDateTime();
-			}
+			~CDateTimeEdit();
 
-			CTimeConvert::CDateTime *operator -> ()
-			{
-				return &mp_State.m_DateTime;
-			}
+			CTimeConvert::CDateTime *operator -> ();
 
 		private:
 			CDateTimeState &mp_State;
 		};
+
+		CDateTimeEdit::CDateTimeEdit(CDateTimeState &_State)
+			: mp_State(_State)
+		{
+		}
+
+		CDateTimeEdit::~CDateTimeEdit()
+		{
+			mp_State.m_Time = fg_TimeFromDateTime(mp_State.m_DateTime);
+			mp_State.m_DateTime = CTimeConvert(mp_State.m_Time).f_ExtractDateTime();
+		}
+
+		CTimeConvert::CDateTime *CDateTimeEdit::operator -> ()
+		{
+			return &mp_State.m_DateTime;
+		}
 
 		struct CTimeEdit
 		{
-			CTimeEdit(CDateTimeState &_State)
-				: mp_State(_State)
-			{
-			}
+			CTimeEdit(CDateTimeState &_State);
 
-			~CTimeEdit()
-			{
-				mp_State.m_DateTime = CTimeConvert(mp_State.m_Time).f_ExtractDateTime();
-			}
+			~CTimeEdit();
 
-			CTime &operator * ()
-			{
-				return mp_State.m_Time;
-			}
+			CTime &operator * ();
 
 		private:
 			CDateTimeState &mp_State;
 		};
+
+		CTimeEdit::CTimeEdit(CDateTimeState &_State)
+			: mp_State(_State)
+		{
+		}
+
+		CTimeEdit::~CTimeEdit()
+		{
+			mp_State.m_DateTime = CTimeConvert(mp_State.m_Time).f_ExtractDateTime();
+		}
+
+		CTime &CTimeEdit::operator * ()
+		{
+			return mp_State.m_Time;
+		}
 	}
 
 	CTime CHostMonitorRebootSchedule::f_GetNextRebootTime(CTime const &_EarliestRebootTime, bool _bLocalTime) const

@@ -13,22 +13,24 @@ using namespace NMib::NCloud::NSecretsManager;
 
 struct CSecretsManagerApp : public CApplication
 {
-	aint f_Main()
-	{
-		NConcurrency::CDistributedDaemon Daemon
-			{
-				"MalterlibCloudSecretsManager"
-				, "Malterlib Cloud Secrets Manager"
-				, "Manages secrets"
-				, []
-				{
-					return fg_ConstructActor<CSecretsManagerDaemonActor>();
-				}
-			}
-		;
-
-		return Daemon.f_Run();
-	}
+	aint f_Main();
 };
+
+aint CSecretsManagerApp::f_Main()
+{
+	NConcurrency::CDistributedDaemon Daemon
+		{
+			"MalterlibCloudSecretsManager"
+			, "Malterlib Cloud Secrets Manager"
+			, "Manages secrets"
+			, []
+			{
+				return fg_ConstructActor<CSecretsManagerDaemonActor>();
+			}
+		}
+	;
+
+	return Daemon.f_Run();
+}
 
 DAppImplement(CSecretsManagerApp);

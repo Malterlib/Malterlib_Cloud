@@ -38,74 +38,82 @@ namespace NMib::NCloud
 
 		struct CDownloadState : public CState
 		{
-			TCFuture<void> f_Abort()
-			{
-				auto This = co_await fg_MoveThis(*this);
-
-				if (This.m_DownloadVersionSubscription)
-					co_await fg_DestroySubscription(This.m_DownloadVersionSubscription).f_Wrap() > fg_LogError("VersionManagerHelper", "Failed to abort download subscription");
-
-				if (This.m_DownloadVersionReceive)
-					co_await fg_Move(This.m_DownloadVersionReceive).f_Destroy().f_Wrap() > fg_LogError("VersionManagerHelper", "Failed to abort download receive");
-
-				co_return {};
-			}
+			TCFuture<void> f_Abort();
 
 			TCActor<CFileTransferReceive> m_DownloadVersionReceive;
 			CActorSubscription m_DownloadVersionSubscription;
 		};
 
+		TCFuture<void> CDownloadState::f_Abort()
+		{
+			auto This = co_await fg_MoveThis(*this);
+
+			if (This.m_DownloadVersionSubscription)
+				co_await fg_DestroySubscription(This.m_DownloadVersionSubscription).f_Wrap() > fg_LogError("VersionManagerHelper", "Failed to abort download subscription");
+
+			if (This.m_DownloadVersionReceive)
+				co_await fg_Move(This.m_DownloadVersionReceive).f_Destroy().f_Wrap() > fg_LogError("VersionManagerHelper", "Failed to abort download receive");
+
+			co_return {};
+		}
+
 		struct CUploadState : public CState
 		{
-			TCFuture<void> f_Abort()
-			{
-				auto This = co_await fg_MoveThis(*this);
-
-				co_await fg_Move(This.m_fFinish).f_Destroy();
-				if (This.m_UploadVersionSend)
-					co_await fg_Move(This.m_UploadVersionSend).f_Destroy().f_Wrap() > fg_LogError("VersionManagerHelper", "Failed to abort upload send");
-
-				co_return {};
-			}
+			TCFuture<void> f_Abort();
 
 			TCActor<CFileTransferSend> m_UploadVersionSend;
 			TCActorFunctor<NConcurrency::TCFuture<void> ()> m_fFinish;
 		};
 
+		TCFuture<void> CUploadState::f_Abort()
+		{
+			auto This = co_await fg_MoveThis(*this);
+
+			co_await fg_Move(This.m_fFinish).f_Destroy();
+			if (This.m_UploadVersionSend)
+				co_await fg_Move(This.m_UploadVersionSend).f_Destroy().f_Wrap() > fg_LogError("VersionManagerHelper", "Failed to abort upload send");
+
+			co_return {};
+		}
+
 		struct CProcessLaunchState : public CState
 		{
-			TCFuture<void> f_Abort()
-			{
-				auto This = co_await fg_MoveThis(*this);
-
-				if (This.m_Launch)
-					co_await fg_Move(This.m_Launch).f_Destroy();
-
-				if (This.m_Launch2)
-					co_await fg_Move(This.m_Launch2).f_Destroy();
-
-				co_return {};
-			}
+			TCFuture<void> f_Abort();
 
 			TCActor<CProcessLaunchActor> m_Launch;
 			TCActor<CProcessLaunchActor> m_Launch2;
 		};
+
+		TCFuture<void> CProcessLaunchState::f_Abort()
+		{
+			auto This = co_await fg_MoveThis(*this);
+
+			if (This.m_Launch)
+				co_await fg_Move(This.m_Launch).f_Destroy();
+
+			if (This.m_Launch2)
+				co_await fg_Move(This.m_Launch2).f_Destroy();
+
+			co_return {};
+		}
 	}
 
 	struct CVersionManagerHelperInternal
 	{
-		CVersionManagerHelperInternal(uint64 _QueueSize, fp64 _Timeout, CStr const &_RootDirectory)
-			: m_QueueSize(_QueueSize)
-			, m_Timeout(_Timeout)
-			, m_RootDirectory(_RootDirectory)
-		{
-		}
+		CVersionManagerHelperInternal(uint64 _QueueSize, fp64 _Timeout, CStr const &_RootDirectory);
 
 		CStr m_RootDirectory;
 		TCMap<CStr, TCWeakPointer<CState>> m_States;
 		fp64 m_Timeout = 0.0;
 		uint64 m_QueueSize = 0;
 	};
+
+	CVersionManagerHelperInternal::CVersionManagerHelperInternal(uint64 _QueueSize, fp64 _Timeout, CStr const &_RootDirectory)
+		: m_QueueSize(_QueueSize)
+		, m_Timeout(_Timeout)
+		, m_RootDirectory(_RootDirectory)
+	{
+	}
 
 	CVersionManagerHelper::CVersionManagerHelper(CStr const &_RootDirectory, uint64 _QueueSize, fp64 _Timeout)
 		: mp_pInternal(fg_Construct(_QueueSize, _Timeout, _RootDirectory))

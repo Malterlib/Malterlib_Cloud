@@ -176,8 +176,9 @@ namespace NMib::NCloud
 		NConcurrency::TCFuture<void> f_StartNewBackup(); ///< Forces a new backup to start outside of the regular scheduling configured through CConfig::m_NewBackupInterval
 
 	protected:
-		struct CInternal;
 		friend struct NPrivate::CBackupManagerClient_Instance;
+
+		struct CInternal;
 
 		NConcurrency::TCFuture<void> fp_Destroy() override;
 

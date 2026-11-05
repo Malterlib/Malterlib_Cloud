@@ -33,17 +33,19 @@ namespace NMib::NCloud::NAppDistributionManager
 		{
 			auto operator <=> (CParsedVersion const &_Right) const noexcept = default;
 
-			static CParsedVersion fs_Parse(CStr const &_String)
-			{
-				CParsedVersion Return;
-				(CStr::CParse("{}.{}.{}") >> Return.m_Major >> Return.m_Minor >> Return.m_Revision).f_Parse(_String);
-				return Return;
-			}
+			static CParsedVersion fs_Parse(CStr const &_String);
 
 			uint32 m_Major = 0;
 			uint32 m_Minor = 0;
 			uint32 m_Revision = 0;
 		};
+
+		CParsedVersion CParsedVersion::fs_Parse(CStr const &_String)
+		{
+			CParsedVersion Return;
+			(CStr::CParse("{}.{}.{}") >> Return.m_Major >> Return.m_Minor >> Return.m_Revision).f_Parse(_String);
+			return Return;
+		}
 
 		CByteVector fg_GetDigest(CStr const &_FileName)
 		{

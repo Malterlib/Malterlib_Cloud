@@ -46,15 +46,15 @@ namespace NMib::NCloud::NVersionManager
 
 		struct CVersion
 		{
-			CVersionManager::CVersionIDAndPlatform const &f_GetIdentifier() const;
-
-			CVersionManager::CVersionInformation m_VersionInfo;
-			TCAVLLink<> m_TimeLink;
-
 			struct CCompareTime
 			{
 				COrdering_Partial operator () (CVersion const &_Left, CVersion const &_Right) const;
 			};
+
+			CVersionManager::CVersionIDAndPlatform const &f_GetIdentifier() const;
+
+			CVersionManager::CVersionInformation m_VersionInfo;
+			TCAVLLink<> m_TimeLink;
 		};
 
 		struct CApplication

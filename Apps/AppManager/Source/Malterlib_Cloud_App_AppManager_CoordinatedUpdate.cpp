@@ -42,29 +42,33 @@ namespace NMib::NCloud::NAppManager
 
 	struct CAppManagerActor::CFirstApplicationUpdate
 	{
+		void f_AddApplication(EUpdateStage _WantUpdateState, uint64 _UpdateStartSequence, CRemoteApplicationWithTypeKey const &_RemoteKey);
+
+		bool f_IsValid() const;
+
 		CRemoteApplicationWithTypeKey m_RemoteKey;
 		uint64 m_UpdateStartSequence = TCLimitsInt<uint64>::mc_Max;
 		bool m_bInProgress = false;
+	};
 
-		void f_AddApplication(EUpdateStage _WantUpdateState, uint64 _UpdateStartSequence, CRemoteApplicationWithTypeKey const &_RemoteKey)
+	void CAppManagerActor::CFirstApplicationUpdate::f_AddApplication(EUpdateStage _WantUpdateState, uint64 _UpdateStartSequence, CRemoteApplicationWithTypeKey const &_RemoteKey)
+	{
+		if (_WantUpdateState >= EUpdateStage::EUpdateStage_SyncStart && _WantUpdateState != EUpdateStage::EUpdateStage_Failed && _WantUpdateState != EUpdateStage::EUpdateStage_Finished)
 		{
-			if (_WantUpdateState >= EUpdateStage::EUpdateStage_SyncStart && _WantUpdateState != EUpdateStage::EUpdateStage_Failed && _WantUpdateState != EUpdateStage::EUpdateStage_Finished)
+			bool bInProgress = _WantUpdateState > EUpdateStage::EUpdateStage_SyncStart;
+			if ((!m_bInProgress && _UpdateStartSequence < m_UpdateStartSequence) || bInProgress)
 			{
-				bool bInProgress = _WantUpdateState > EUpdateStage::EUpdateStage_SyncStart;
-				if ((!m_bInProgress && _UpdateStartSequence < m_UpdateStartSequence) || bInProgress)
-				{
-					m_bInProgress = bInProgress;
-					m_RemoteKey = _RemoteKey;
-					m_UpdateStartSequence = _UpdateStartSequence;
-				}
+				m_bInProgress = bInProgress;
+				m_RemoteKey = _RemoteKey;
+				m_UpdateStartSequence = _UpdateStartSequence;
 			}
 		}
+	}
 
-		bool f_IsValid() const
-		{
-			return m_UpdateStartSequence != TCLimitsInt<uint64>::mc_Max;
-		}
-	};
+	bool CAppManagerActor::CFirstApplicationUpdate::f_IsValid() const
+	{
+		return m_UpdateStartSequence != TCLimitsInt<uint64>::mc_Max;
+	}
 
 #define DDebugAppTurnUpdateLogic 0
 

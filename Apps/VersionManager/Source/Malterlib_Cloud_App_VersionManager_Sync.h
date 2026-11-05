@@ -58,10 +58,10 @@ namespace NMib::NCloud::NVersionManager
 	/// Key for version sequencers to prevent concurrent sync of same version
 	struct CSyncVersionKey
 	{
+		auto operator <=> (CSyncVersionKey const &_Right) const noexcept = default;
+
 		NStr::CStr m_Application;
 		CVersionManager::CVersionIDAndPlatform m_VersionIDAndPlatform;
-
-		auto operator <=> (CSyncVersionKey const &_Right) const noexcept = default;
 	};
 
 	/// State for tracking sync processing of a specific version

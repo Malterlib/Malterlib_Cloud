@@ -89,6 +89,12 @@ namespace NMib::NCloud::NAppManager
 	{
 		struct CState
 		{
+			void f_Replied()
+			{
+				m_bReplied = true;
+				fg_Move(m_LaunchActor).f_Destroy().f_DiscardResult();
+			}
+
 			TCPromise<CBashScriptOutput> m_Promise;
 			TCActor<CProcessLaunchActor> m_LaunchActor;
 			CActorSubscription m_LaunchSubscription;
@@ -98,11 +104,6 @@ namespace NMib::NCloud::NAppManager
 			CAppManagerActor::CBashScriptOutput m_Output;
 
 			bool m_bReplied = false;
-			void f_Replied()
-			{
-				m_bReplied = true;
-				fg_Move(m_LaunchActor).f_Destroy().f_DiscardResult();
-			}
 		};
 
 		TCSharedPointer<CState> pState = fg_Construct();

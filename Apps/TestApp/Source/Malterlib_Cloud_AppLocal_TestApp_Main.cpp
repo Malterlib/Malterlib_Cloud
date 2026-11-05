@@ -11,21 +11,23 @@ using namespace NMib;
 
 struct CTestAppApp : public CApplication
 {
-	aint f_Main()
-	{
-		NConcurrency::CDistributedDaemon Daemon
-			{
-				"MalterlibCloudTestApp"
-				, "Malterlib Cloud Test App"
-				, "Test"
-				, []
-				{
-					return NMib::NCloud::fg_ConstructApp_TestApp();
-				}
-			}
-		;
-		return Daemon.f_Run();
-	}
+	aint f_Main();
 };
+
+aint CTestAppApp::f_Main()
+{
+	NConcurrency::CDistributedDaemon Daemon
+		{
+			"MalterlibCloudTestApp"
+			, "Malterlib Cloud Test App"
+			, "Test"
+			, []
+			{
+				return NMib::NCloud::fg_ConstructApp_TestApp();
+			}
+		}
+	;
+	return Daemon.f_Run();
+}
 
 DAppImplement(CTestAppApp);

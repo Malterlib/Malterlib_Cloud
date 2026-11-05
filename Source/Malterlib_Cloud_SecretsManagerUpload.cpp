@@ -18,30 +18,11 @@ namespace NMib::NCloud
 		struct CState
 		{
 			template <typename tf_CResult>
-			void f_SetException(tf_CResult &&_Result)
-			{
-				m_Promise.f_SetException(fg_Forward<tf_CResult>(_Result));
-				m_bSeenException = true;
-			}
+			void f_SetException(tf_CResult &&_Result);
 
-			void f_SetFunctor(TCActorFunctorWithID<TCFuture<void> ()> &&_fFunctor)
-			{
-				if (m_bSeenException)
-					return;
+			void f_SetFunctor(TCActorFunctorWithID<TCFuture<void> ()> &&_fFunctor);
 
-				m_fFunctor = fg_Move(_fFunctor);
-				fp_CallFunctor();
-			}
-
-			void f_SetResult(CDirectorySyncSend::CSyncResult &&_SyncResult)
-			{
-				if (m_bSeenException)
-					return;
-
-				m_SyncResults = fg_Move(_SyncResult);
-				m_bSeenResult = true;
-				fp_CallFunctor();
-			}
+			void f_SetResult(CDirectorySyncSend::CSyncResult &&_SyncResult);
 
 			TCPromise<CDirectorySyncSend::CSyncResult> m_Promise;
 			TCActorFunctorWithID<TCFuture<void> ()> m_fFunctor;
@@ -52,18 +33,46 @@ namespace NMib::NCloud
 			bool m_bAborted = false;
 
 		private:
-			void fp_CallFunctor()
-			{
-				if (m_bSeenResult && m_fFunctor)
-				{
-					m_fFunctor() > [Promise = m_Promise, SyncResults = m_SyncResults](TCAsyncResult<void> &&_Result)
-						{
-							Promise.f_SetExceptionOrResult(_Result, SyncResults);
-						}
-					;
-				}
-			}
+			void fp_CallFunctor();
 		};
+
+		template <typename tf_CResult>
+		void CState::f_SetException(tf_CResult &&_Result)
+		{
+			m_Promise.f_SetException(fg_Forward<tf_CResult>(_Result));
+			m_bSeenException = true;
+		}
+
+		void CState::f_SetFunctor(TCActorFunctorWithID<TCFuture<void> ()> &&_fFunctor)
+		{
+			if (m_bSeenException)
+				return;
+
+			m_fFunctor = fg_Move(_fFunctor);
+			fp_CallFunctor();
+		}
+
+		void CState::f_SetResult(CDirectorySyncSend::CSyncResult &&_SyncResult)
+		{
+			if (m_bSeenException)
+				return;
+
+			m_SyncResults = fg_Move(_SyncResult);
+			m_bSeenResult = true;
+			fp_CallFunctor();
+		}
+
+		void CState::fp_CallFunctor()
+		{
+			if (m_bSeenResult && m_fFunctor)
+			{
+				m_fFunctor() > [Promise = m_Promise, SyncResults = m_SyncResults](TCAsyncResult<void> &&_Result)
+					{
+						Promise.f_SetExceptionOrResult(_Result, SyncResults);
+					}
+				;
+			}
+		}
 	}
 
 	TCFuture<CDirectorySyncSend::CSyncResult> DMibWorkaroundUBSanSectionErrors fg_UploadSecretFile

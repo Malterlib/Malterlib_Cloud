@@ -12,8 +12,6 @@ namespace NMib::NCloud
 {
 	struct ICNetworkTunnels : public NConcurrency::CActor
 	{
-		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/NetworkTunnel";
-
 		enum EProtocolVersion : uint32
 		{
 			EProtocolVersion_Min = 0x101
@@ -102,6 +100,8 @@ namespace NMib::NCloud
 		virtual NConcurrency::TCFuture<NContainer::TCMap<CNetworkTunnelName, CNetworkTunnel>> f_EnumerateTunnels() = 0;
 		virtual NConcurrency::TCFuture<FSendBytes> f_OpenConnection(COpenConnection _OpenConnection) = 0;
 		virtual NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> f_SubscribeTunnels(CSubscribeTunnels _Subscribe) = 0;
+
+		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/NetworkTunnel";
 	};
 }
 

@@ -13,21 +13,23 @@ using namespace NMib::NCloud::NBackupManager;
 
 struct CBackupManagerApplication : public CApplication
 {
-	aint f_Main()
-	{
-		NConcurrency::CDistributedDaemon Daemon
-			{
-				"MalterlibCloudBackupManager"
-				, "Malterlib Cloud Backup Manager"
-				, "Manages backups"
-				, []
-				{
-					return fg_ConstructActor<CBackupManagerApp>();
-				}
-			}
-		;
-		return Daemon.f_Run();
-	}
+	aint f_Main();
 };
+
+aint CBackupManagerApplication::f_Main()
+{
+	NConcurrency::CDistributedDaemon Daemon
+		{
+			"MalterlibCloudBackupManager"
+			, "Malterlib Cloud Backup Manager"
+			, "Manages backups"
+			, []
+			{
+				return fg_ConstructActor<CBackupManagerApp>();
+			}
+		}
+	;
+	return Daemon.f_Run();
+}
 
 DAppImplement(CBackupManagerApplication);

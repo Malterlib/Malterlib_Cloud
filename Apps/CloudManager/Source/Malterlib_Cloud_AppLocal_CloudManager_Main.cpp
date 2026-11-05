@@ -13,21 +13,23 @@ using namespace NMib::NCloud::NCloudManager;
 
 struct CCloudManagerApplication : public CApplication
 {
-	aint f_Main()
-	{
-		NConcurrency::CDistributedDaemon Daemon
-			{
-				"MalterlibCloudCloudManager"
-				, "Malterlib Cloud Manager"
-				, "Manages cloud apps."
-				, []
-				{
-					return fg_ConstructActor<CCloudManagerApp>();
-				}
-			}
-		;
-		return Daemon.f_Run();
-	}
+	aint f_Main();
 };
+
+aint CCloudManagerApplication::f_Main()
+{
+	NConcurrency::CDistributedDaemon Daemon
+		{
+			"MalterlibCloudCloudManager"
+			, "Malterlib Cloud Manager"
+			, "Manages cloud apps."
+			, []
+			{
+				return fg_ConstructActor<CCloudManagerApp>();
+			}
+		}
+	;
+	return Daemon.f_Run();
+}
 
 DAppImplement(CCloudManagerApplication);

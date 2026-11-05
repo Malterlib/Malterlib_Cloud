@@ -13,21 +13,23 @@ using namespace NMib::NCloud::NDebugManager;
 
 struct CDebugManagerApplication : public CApplication
 {
-	aint f_Main()
-	{
-		NConcurrency::CDistributedDaemon Daemon
-			{
-				"MalterlibCloudDebugManager"
-				, "Malterlib Debug Manager"
-				, "Stores symbols, executabels and crash dumps, and serves them."
-				, []
-				{
-					return fg_ConstructActor<CDebugManagerApp>();
-				}
-			}
-		;
-		return Daemon.f_Run();
-	}
+	aint f_Main();
 };
+
+aint CDebugManagerApplication::f_Main()
+{
+	NConcurrency::CDistributedDaemon Daemon
+		{
+			"MalterlibCloudDebugManager"
+			, "Malterlib Debug Manager"
+			, "Stores symbols, executabels and crash dumps, and serves them."
+			, []
+			{
+				return fg_ConstructActor<CDebugManagerApp>();
+			}
+		}
+	;
+	return Daemon.f_Run();
+}
 
 DAppImplement(CDebugManagerApplication);

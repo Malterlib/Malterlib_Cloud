@@ -27,11 +27,12 @@ namespace NMib::NCloud::NBackupManager
 		TCFuture<CInitialBackupFinishedResult> f_InitialBackupFinished(EInitialBackupFinishedFlag _FinishedFlags) override;
 
 	private:
+		struct CInternal;
+
 		TCFuture<void> fp_Destroy() override;
 
 		static constexpr uint32 mcp_QueueSize = NFile::gc_IdealNetworkQueueSize;
 
-		struct CInternal;
 		TCUniquePointer<CInternal> mp_pInternal;
 	};
 }

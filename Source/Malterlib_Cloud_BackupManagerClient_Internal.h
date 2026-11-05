@@ -33,25 +33,6 @@ namespace NMib::NCloud
 
 	struct CBackupManagerClient::CInternal : public CActorInternal
 	{
-		CInternal
-			(
-				CBackupManagerClient *_pThis
-				, CConfig const &_Config
-				, TCActor<CDistributedActorTrustManager> const &_TrustManager
-				, TCActorFunctor
-				<
-					TCFuture<TCActorSubscriptionWithID<>>
-					(
-						TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup> _BackupInterface
-						, CActorSubscription _ManifestFinished
-						, CStr _BackupRoot
-					)
-				>
-				&&_fOnNewBackup
-			)
-		;
-		~CInternal();
-
 		struct CWatchedPath
 		{
 			CStr const &f_GetPath() const;
@@ -118,6 +99,25 @@ namespace NMib::NCloud
 			TCActor<NPrivate::CBackupManagerClient_Instance> m_Instance2;
 			bool m_bSentActive = false;
 		};
+
+		CInternal
+			(
+				CBackupManagerClient *_pThis
+				, CConfig const &_Config
+				, TCActor<CDistributedActorTrustManager> const &_TrustManager
+				, TCActorFunctor
+				<
+					TCFuture<TCActorSubscriptionWithID<>>
+					(
+						TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup> _BackupInterface
+						, CActorSubscription _ManifestFinished
+						, CStr _BackupRoot
+					)
+				>
+				&&_fOnNewBackup
+			)
+		;
+		~CInternal();
 
 		void f_Construct(TCActor<CActorDistributionManager> const &_DistributionManager);
 		void f_NewBackupKey();

@@ -15,8 +15,6 @@ namespace NMib::NCloud
 {
 	struct CAppManagerInterface : public NConcurrency::CActor
 	{
-		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/AppManager";
-
 		enum EProtocolVersion : uint32
 		{
 			EProtocolVersion_Min                                 = 0x107
@@ -72,10 +70,10 @@ namespace NMib::NCloud
 			CVersionIDAndPlatform() = default;
 			CVersionIDAndPlatform(CVersionIDAndPlatform const &_Other) = default;
 			CVersionIDAndPlatform(CVersionIDAndPlatform &&_Other) = default;
+			CVersionIDAndPlatform(CVersionManager::CVersionIDAndPlatform const &_Other);
+
 			CVersionIDAndPlatform &operator = (CVersionIDAndPlatform const &_Other) = default;
 			CVersionIDAndPlatform &operator = (CVersionIDAndPlatform &&_Other) = default;
-
-			CVersionIDAndPlatform(CVersionManager::CVersionIDAndPlatform const &_Other);
 			CVersionIDAndPlatform &operator = (CVersionManager::CVersionIDAndPlatform const &_Right);
 
 			template <typename tf_CStream>
@@ -87,10 +85,10 @@ namespace NMib::NCloud
 			CVersionID() = default;
 			CVersionID(CVersionID const &_Other) = default;
 			CVersionID(CVersionID &&_Other) = default;
+			CVersionID(CVersionManager::CVersionID const &_Other);
+
 			CVersionID &operator = (CVersionID const &_Other) = default;
 			CVersionID &operator = (CVersionID &&_Other) = default;
-
-			CVersionID(CVersionManager::CVersionID const &_Other);
 			CVersionID &operator = (CVersionManager::CVersionID const &_Right);
 
 			template <typename tf_CStream>
@@ -102,10 +100,10 @@ namespace NMib::NCloud
 			CVersionInformation() = default;
 			CVersionInformation(CVersionInformation const &_Other) = default;
 			CVersionInformation(CVersionInformation &&_Other) = default;
+			CVersionInformation(CVersionManager::CVersionInformation const &_Other);
+
 			CVersionInformation &operator = (CVersionInformation const &_Other) = default;
 			CVersionInformation &operator = (CVersionInformation &&_Other) = default;
-
-			CVersionInformation(CVersionManager::CVersionInformation const &_Other);
 			CVersionInformation &operator = (CVersionManager::CVersionInformation const &_Right);
 
 			template <typename tf_CStream>
@@ -380,6 +378,8 @@ namespace NMib::NCloud
 		virtual NConcurrency::TCFuture<NContainer::TCMap<NStr::CStr, CApplicationInfo>> f_GetInstalled() = 0;
 		virtual auto f_SubscribeUpdateNotifications(CSubscribeUpdateNotifications _Params) -> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> = 0;
 		virtual auto f_SubscribeChangeNotifications(CSubscribeChangeNotifications _Params) -> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> = 0;
+
+		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/AppManager";
 	};
 }
 

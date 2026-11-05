@@ -23,8 +23,6 @@ namespace NMib::NCloud
 
 	struct CKeyManagerServerSync : public NConcurrency::CActor
 	{
-		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/KeyManager/ServerSync";
-
 		enum EProtocolVersion : uint32
 		{
 			EProtocolVersion_Min       = EKeyManagerProtocolVersion_Min
@@ -98,12 +96,12 @@ namespace NMib::NCloud
 		virtual NConcurrency::TCFuture<void> f_RemovePreCreatedKeys(NContainer::TCSet<CSymmetricKey> _Keys) = 0;
 		virtual NConcurrency::TCFuture<NContainer::TCSet<NStr::CStr>> f_RemoveVerifiedHosts(NContainer::TCSet<NStr::CStr> _HostIDs, NContainer::TCSet<NStr::CStr> _CheckedServers) = 0;
 		virtual NConcurrency::TCFuture<void> f_KeysVerifiedOnServers(NContainer::TCMap<CKeyManagerServerSync::CHostKeyID, NContainer::TCSet<NStr::CStr>> _KeysVerifiedOnServers) = 0;
+
+		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/KeyManager/ServerSync";
 	};
 
 	struct CKeyManager : public NConcurrency::CActor
 	{
-		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/KeyManager";
-
 		enum EProtocolVersion : uint32
 		{
 			EProtocolVersion_Min       = EKeyManagerProtocolVersion_Min
@@ -117,6 +115,8 @@ namespace NMib::NCloud
 		virtual auto f_GetServerSyncInterface(NConcurrency::TCActorSubscriptionWithID<> _Subscription)
 			-> NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<CKeyManagerServerSync>> = 0
 		;
+
+		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/KeyManager";
 	};
 }
 

@@ -13,21 +13,23 @@ using namespace NMib::NCloud::NKeyManager;
 
 struct CKeyManagerApp : public CApplication
 {
-	aint f_Main()
-	{
-		NConcurrency::CDistributedDaemon Daemon
-			{
-				"MalterlibCloudKeyManager"
-				, "Malterlib Cloud Key Manager"
-				, "Manages encrption keys for distributed Malterlib cloud applications"
-				, []
-				{
-					return fg_ConstructActor<CKeyManagerDaemonActor>();
-				}
-			}
-		;
-		return Daemon.f_Run();
-	}
+	aint f_Main();
 };
+
+aint CKeyManagerApp::f_Main()
+{
+	NConcurrency::CDistributedDaemon Daemon
+		{
+			"MalterlibCloudKeyManager"
+			, "Malterlib Cloud Key Manager"
+			, "Manages encrption keys for distributed Malterlib cloud applications"
+			, []
+			{
+				return fg_ConstructActor<CKeyManagerDaemonActor>();
+			}
+		}
+	;
+	return Daemon.f_Run();
+}
 
 DAppImplement(CKeyManagerApp);

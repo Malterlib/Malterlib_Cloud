@@ -388,24 +388,27 @@ namespace NMib::NCloud::NCloudManager
 		struct CTableDumper
 		{
 			template <typename tf_CKey, typename tf_CValue, typename ...tfp_CPrefix>
-			void f_DumpTable(tfp_CPrefix && ...p_Prefix)
-			{
-				if (m_FilterPrefix && tf_CKey::mc_Prefix != m_FilterPrefix)
-					return;
-
-				for (auto iState = m_ReadTransaction.f_ReadCursor(p_Prefix...); iState; ++iState)
-				{
-					auto Key = iState.template f_Key<tf_CKey>();
-					auto Value = iState.template f_Value<tf_CValue>();
-
-					m_TableRenderer.f_AddRow("{}"_f << tf_CKey::mc_Prefix, Key.f_ToJson().f_ToString().f_Trim(), Value.f_ToJson().f_ToString().f_Trim());
-				}
-			}
+			void f_DumpTable(tfp_CPrefix && ...p_Prefix);
 
 			CTableRenderHelper &m_TableRenderer;
 			CDatabaseSubReadTransaction &m_ReadTransaction;
 			CStr const &m_FilterPrefix;
 		};
+
+		template <typename tf_CKey, typename tf_CValue, typename ...tfp_CPrefix>
+		void CTableDumper::f_DumpTable(tfp_CPrefix && ...p_Prefix)
+		{
+			if (m_FilterPrefix && tf_CKey::mc_Prefix != m_FilterPrefix)
+				return;
+
+			for (auto iState = m_ReadTransaction.f_ReadCursor(p_Prefix...); iState; ++iState)
+			{
+				auto Key = iState.template f_Key<tf_CKey>();
+				auto Value = iState.template f_Value<tf_CValue>();
+
+				m_TableRenderer.f_AddRow("{}"_f << tf_CKey::mc_Prefix, Key.f_ToJson().f_ToString().f_Trim(), Value.f_ToJson().f_ToString().f_Trim());
+			}
+		}
 	}
 
 	TCFuture<void> CCloudManagerServer::f_DumpDatabaseEntries(TCSharedPointer<CCommandLineControl> _pCommandLine, CStr _Prefix)

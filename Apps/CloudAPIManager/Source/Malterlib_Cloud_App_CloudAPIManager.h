@@ -12,10 +12,10 @@ namespace NMib::NCloud::NCloudAPIManager
 {
 	struct CCloudAPIManagerDaemonActor : public CDistributedAppActor
 	{
+		struct CServer;
+
 		CCloudAPIManagerDaemonActor();
 		~CCloudAPIManagerDaemonActor();
-
-		struct CServer;
 
 	private:
 		TCFuture<void> fp_StartApp(NEncoding::CEJsonSorted const _Params) override;

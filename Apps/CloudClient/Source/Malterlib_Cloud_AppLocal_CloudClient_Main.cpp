@@ -13,17 +13,19 @@ using namespace NMib::NCloud::NCloudClient;
 
 struct CCloudClient : public CApplication
 {
-	aint f_Main()
-	{
-		return fg_RunApp
-			(
-				[]
-				{
-					return fg_ConstructActor<CCloudClientAppLocalActor>();
-				}
-			)
-		;
-	}
+	aint f_Main();
 };
+
+aint CCloudClient::f_Main()
+{
+	return fg_RunApp
+		(
+			[]
+			{
+				return fg_ConstructActor<CCloudClientAppLocalActor>();
+			}
+		)
+	;
+}
 
 DAppImplement(CCloudClient);

@@ -37,20 +37,20 @@ namespace NMib::NCloud::NSecretsManager
 
 	struct CSecretsDatabase
 	{
-		static constexpr uint32 mc_SecretsManagerDatabaseVersion = 0x102;
-
 		template <typename tf_CStream>
 		void f_Stream(tf_CStream &_Stream);
+
+		static constexpr uint32 mc_SecretsManagerDatabaseVersion = 0x102;
 
 		TCMap<CSecretsManager::CSecretID, CSecretPropertiesInternal> m_Secrets;
 	};
 
 	struct CSecretsDatabaseIV
 	{
-		static constexpr uint32 mc_SecretsManagerDatabaseIVVersion = 0x101;
-
 		template <typename tf_CStream>
 		void f_Stream(tf_CStream &_Stream);
+
+		static constexpr uint32 mc_SecretsManagerDatabaseIVVersion = 0x101;
 
 		uint64 m_InternalSalt = 0;
 		uint64 m_ExternalSalt = 0;
