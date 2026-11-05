@@ -15,7 +15,6 @@ namespace NMib::NCloud
 		struct CKeyManagerImplementation : public CKeyManager
 		{
 			NConcurrency::TCFuture<CSymmetricKey> f_RequestKey(NStr::CStr _Identifier, uint32 _KeySize) override;
-			// NOLINTNEXTLINE(malterlib-conceptual-prefix): a subscription handle like CActorSubscription, which the check misses because it is derived from it
 			auto f_GetServerSyncInterface(NConcurrency::TCActorSubscriptionWithID<> _Subscription)
 				-> NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<CKeyManagerServerSync>> override
 			;

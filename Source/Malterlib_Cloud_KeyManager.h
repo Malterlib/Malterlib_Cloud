@@ -85,7 +85,6 @@ namespace NMib::NCloud
 			void f_Stream(tf_CStream &_Stream);
 
 			bool m_bCanUse = false;
-			// NOLINTNEXTLINE(malterlib-conceptual-prefix): a subscription handle like CActorSubscription, which the check misses because it is derived from it
 			NConcurrency::TCActorSubscriptionWithID<> m_Subscription;
 		};
 
@@ -115,7 +114,6 @@ namespace NMib::NCloud
 		~CKeyManager();
 
 		virtual NConcurrency::TCFuture<CSymmetricKey> f_RequestKey(NStr::CStr _Identifier, uint32 _KeySize) = 0;
-		// NOLINTNEXTLINE(malterlib-conceptual-prefix): a subscription handle like CActorSubscription, which the check misses because it is derived from it
 		virtual auto f_GetServerSyncInterface(NConcurrency::TCActorSubscriptionWithID<> _Subscription)
 			-> NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<CKeyManagerServerSync>> = 0
 		;

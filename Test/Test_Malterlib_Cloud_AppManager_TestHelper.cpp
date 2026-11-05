@@ -165,7 +165,6 @@ namespace NMib::NCloud
 			)
 			-> TCFuture<void>
 		{
-			// NOLINTNEXTLINE(malterlib-variable-naming): the check takes the placeholder _ for a name
 			auto [Ticket, _, _] = co_await
 				(
 					_pVersionManagerTrust->f_CallActor(&CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket)
@@ -196,7 +195,6 @@ namespace NMib::NCloud
 			)
 			-> TCFuture<void>
 		{
-			// NOLINTNEXTLINE(malterlib-variable-naming): the check takes the placeholder _ for a name
 			auto [Ticket, _, _, _, _] = co_await
 				(
 					_pCloudManagerTrust->f_CallActor(&CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket)

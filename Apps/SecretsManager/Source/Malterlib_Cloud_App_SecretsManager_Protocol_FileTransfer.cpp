@@ -64,7 +64,6 @@ namespace NMib::NCloud::NSecretsManager
 		co_return {};
 	}
 
-	// NOLINTNEXTLINE(malterlib-conceptual-prefix): a subscription handle like CActorSubscription, which the check misses because it is derived from it
 	auto CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_DownloadFile(CSecretID _ID, NConcurrency::TCActorSubscriptionWithID<> _Subscription)
 		-> TCFuture<TCDistributedActorInterfaceWithID<CDirectorySyncClient>>
 	{

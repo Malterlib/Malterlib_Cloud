@@ -321,7 +321,6 @@ struct CAppManager_General_Tests : public NMib::NTest::CTest
 								}
 							}
 						)
-						// NOLINTNEXTLINE(malterlib-conceptual-prefix): a subscription handle like CActorSubscription, which the check misses because it is derived from it
 						> fg_Move(Promise.m_Promise) / [pUpdateNotificationsState, Promise = fg_Move(Promise.m_Promise)](NConcurrency::TCActorSubscriptionWithID<> &&_Subscription)
 						{
 							pUpdateNotificationsState->m_Subscriptions.f_Insert(fg_Move(_Subscription));

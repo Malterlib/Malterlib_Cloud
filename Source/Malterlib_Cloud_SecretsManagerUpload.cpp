@@ -72,7 +72,7 @@ namespace NMib::NCloud
 			, TCActor<CActorDistributionManager> _DistributionManager
 			, CSecretsManager::CSecretID _ID
 			, CDirectorySyncSend::CConfig _Config
-			, NReference::TCReference<CActorSubscription> o_Subscription // NOLINT(malterlib-parameter-naming): it can be written through
+			, NReference::TCReference<CActorSubscription> o_Subscription
 		)
 	{
 		NStorage::TCSharedPointer<CState> pState = fg_Construct();

@@ -146,7 +146,7 @@ namespace NMib::NCloud::NCloudManager
 		)
 		-> TCFuture<TCActorSubscriptionWithID<>>
 	{
-		TCActorSubscriptionWithID<> Subscription; // NOLINT(malterlib-conceptual-prefix): a subscription handle like CActorSubscription, which the check misses because it is derived from it
+		TCActorSubscriptionWithID<> Subscription;
 		{
 			auto pThis = m_pThis;
 			auto OnResume = co_await pThis->f_CheckDestroyedOnResume();
@@ -179,7 +179,7 @@ namespace NMib::NCloud::NCloudManager
 				co_return DMibErrorInstance("ESensorReadingsFlag_ReportNewestFirst is not supported for subscriptions");
 		}
 
-		TCActorSubscriptionWithID<> Subscription; // NOLINT(malterlib-conceptual-prefix): a subscription handle like CActorSubscription, which the check misses because it is derived from it
+		TCActorSubscriptionWithID<> Subscription;
 		{
 			auto pThis = m_pThis;
 			auto OnResume = co_await pThis->f_CheckDestroyedOnResume();
@@ -212,7 +212,7 @@ namespace NMib::NCloud::NCloudManager
 				co_return DMibErrorInstance("ESensorReadingsFlag_ReportNewestFirst is not supported for subscriptions");
 		}
 
-		TCActorSubscriptionWithID<> Subscription; // NOLINT(malterlib-conceptual-prefix): a subscription handle like CActorSubscription, which the check misses because it is derived from it
+		TCActorSubscriptionWithID<> Subscription;
 		{
 			auto pThis = m_pThis;
 			auto OnResume = co_await pThis->f_CheckDestroyedOnResume();
