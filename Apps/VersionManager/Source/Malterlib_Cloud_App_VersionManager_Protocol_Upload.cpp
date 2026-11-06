@@ -295,9 +295,11 @@ namespace NMib::NCloud::NVersionManager
 				Version.m_VersionInfo = VersionInfo;
 				Application.m_VersionsByTime.f_Insert(Version);
 
+				auto VersionIdentifier = Version.f_GetIdentifier();
+
 				// Save to database for fast startup next time
 				co_await pThis->fp_SaveVersionToDatabase(ApplicationName, VersionID, VersionInfo).f_Wrap() > fg_LogWarning("VersionManager", "Failed to save version to database");
-				co_await pThis->fp_NewVersion(ApplicationName, Version.f_GetIdentifier(), Version.m_VersionInfo, fg_RandomID());
+				co_await pThis->fp_NewVersion(ApplicationName, VersionIdentifier, VersionInfo, fg_RandomID());
 
 				co_return {};
 			}

@@ -938,11 +938,13 @@ namespace NMib::NCloud::NVersionManager
 		VersionEntry.m_VersionInfo = DestVersionInfo;
 		AppEntry.m_VersionsByTime.f_Insert(VersionEntry);
 
+		auto VersionIdentifier = VersionEntry.f_GetIdentifier();
+
 		co_await (fp_SaveVersionToDatabase(_Application, _VersionID, DestVersionInfo) % "Failed to save version to database");
 
 		fp_NewTagsKnown(DestVersionInfo.m_Tags);
 
-		co_await fp_NewVersion(_Application, VersionEntry.f_GetIdentifier(), VersionEntry.m_VersionInfo, _OriginID);
+		co_await fp_NewVersion(_Application, VersionIdentifier, DestVersionInfo, _OriginID);
 
 		DMibLogWithCategory
 			(
