@@ -67,7 +67,7 @@ namespace NMib::NCloud::NCloudAPIManager
 					int64 Expires = (TimeSinceEpoch.f_GetSeconds() + ValidTimeInSeconds) * constant_int64(1000);
 
 					CStr FullURL = fg_Format("{}/{}/{}", ServiceInfo.m_URLs["swift"], _Params.m_ContainerName, _Params.m_ObjectId);
-					NWeb::NHTTP::CURL URL(FullURL);
+					NWeb::NHTTP::CUrl URL(FullURL);
 
 					CStr HMAC_Body = fg_Format("{}\n{}\n{}", _Params.m_Method, Expires, URL.f_GetFullPath());
 

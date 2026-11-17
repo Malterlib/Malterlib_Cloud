@@ -27,7 +27,7 @@ namespace NMib::NCloud::NDebugManagerClient
 			}
 		;
 
-		NHTTP::CURL RequestURL;
+		NHTTP::CUrl RequestURL;
 		RequestURL.f_Decode(_pRequest->m_RequestedURI);
 
 		CStr BuildID;
