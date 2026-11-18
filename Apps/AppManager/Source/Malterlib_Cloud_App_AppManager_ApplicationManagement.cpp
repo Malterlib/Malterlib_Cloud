@@ -423,26 +423,53 @@ namespace NMib::NCloud::NAppManager
 	{
 		TCMap<CStr, CStr> LowPortExecutablesToGrant;
 
-		auto User = _pUniqueUserGroup->f_GetUser(_Settings.m_RunAsUser);
-		auto Group = _pUniqueUserGroup->f_GetGroup(_Settings.m_RunAsGroup);
-		auto fSetOwners = [&](CStr &&_Directory)
-			{
-				while (_Directory.f_GetLen() >= _ApplicationDir.f_GetLen())
-				{
-					if (!User.f_IsEmpty())
-						CFile::fs_SetOwner(_Directory, User);
-					if (!Group.f_IsEmpty())
-						CFile::fs_SetGroup(_Directory, Group);
-					_Directory = CFile::fs_GetPath(_Directory);
-				}
-			}
-		;
+#ifdef DPlatformFamily_Windows
+		// Windows doesn't change owners, and every reparse point counts as a link there, also one that doesn't redirect the path, like a
+		// placeholder of a cloud file provider
+		CFile::fs_CreateDirectory(_ApplicationDir + "/.home");
+		CFile::fs_CreateDirectory(_ApplicationDir + "/.tmp");
+#else
+		// The directory of a child application is in the directory of its parent
+		CStr LinkDirectory = _Settings.m_ParentApplication.f_IsEmpty() ? _ApplicationDir : CFile::fs_GetPath(_ApplicationDir);
+
+		// The application can have replaced them with links to directories of other accounts, which are replaced with directories. A link at the
+		// directory of a child application, which the account of its parent can create, is followed like the other file operations in it follow
+		// it: an application on the host isn't contained from the accounts of its directories, see fg_AppManager_ReplaceApplicationFiles. Below
+		// such a link they are only created when missing, since the links there belong to another directory, and the owners don't change, see
+		// fg_AppManager_SetApplicationDirectoryOwners
+		bool bLinkedChild = LinkDirectory != _ApplicationDir && CFile::fs_FileExists(_ApplicationDir, EFileAttrib_Link);
+		for (auto pDirectory : {".home", ".tmp"})
+		{
+			if (bLinkedChild)
+				CFile::fs_CreateDirectory(_ApplicationDir / pDirectory);
+			else
+				fg_AppManager_CreateApplicationDirectory(_ApplicationDir, pDirectory);
+		}
+
+		CStr User = _pUniqueUserGroup->f_GetUser(_Settings.m_RunAsUser);
+		CStr Group = _pUniqueUserGroup->f_GetGroup(_Settings.m_RunAsGroup);
+
+		TCSet<CStr> Directories;
+		Directories[".home"];
+		Directories[".tmp"];
 		for (auto &File : _Files)
 		{
-			CStr SourcePath = fg_Format("{}/{}", _ApplicationDir, File);
-			if (CFile::fs_FileExists(SourcePath, EFileAttrib_File | EFileAttrib_Link))
-				fSetOwners(CFile::fs_GetPath(SourcePath));
+			// An update creates the directories of the package that hold no files as root. The files get their owners when they are unpacked,
+			// but an update can keep the copy of a file of the previous version, which belongs to the account of the previous settings
+			if (CFile::fs_FileExists(_ApplicationDir / File, EFileAttrib_Link))
+				Directories[CFile::fs_GetPath(File)];
+			else if (CFile::fs_FileExists(_ApplicationDir / File, EFileAttrib_File))
+			{
+				Directories[CFile::fs_GetPath(File)];
+				if (fg_AppManager_ApplicationFileNeedsOwners(_ApplicationDir / File, User, Group))
+					Directories[File];
+			}
+			else if (CFile::fs_FileExists(_ApplicationDir / File, EFileAttrib_Directory))
+				Directories[File];
 		}
+
+		fg_AppManager_SetApplicationDirectoryOwners(LinkDirectory, _ApplicationDir, Directories, User, Group);
+#endif
 
 #ifdef DPlatformFamily_Linux
 		if (auto pLowPortExetutables = _pApplication->m_LastTriedInstalledVersionInfo.m_ExtraInfo.f_GetMember("LowPortExecutables", EJsonType_Array))
@@ -452,11 +479,15 @@ namespace NMib::NCloud::NAppManager
 				if (!Executable.f_IsString())
 					continue;
 
+				// The lookup of the path reads the file system, which can fail like setcap
 				CStr ExecutablePath = _ApplicationDir / Executable.f_String();
 				try
 				{
-					if (CFile::fs_FileExists(ExecutablePath))
-						CProcessLaunch::fs_LaunchTool("setcap", {"cap_net_bind_service=ep", ExecutablePath});
+					ExecutablePath = fg_AppManager_LowPortExecutablePath(_ApplicationDir, Executable.f_String());
+					if (ExecutablePath.f_IsEmpty())
+						continue;
+
+					CProcessLaunch::fs_LaunchTool("setcap", {"cap_net_bind_service=ep", ExecutablePath});
 					_fLogInfo("Setup low port executable support: setcap cap_net_bind_service=ep {}"_f << ExecutablePath);
 				}
 				catch (CException const &_Exception)
@@ -478,11 +509,6 @@ namespace NMib::NCloud::NAppManager
 			}
 		}
 #endif
-
-		CFile::fs_CreateDirectory(_ApplicationDir + "/.home");
-		CFile::fs_CreateDirectory(_ApplicationDir + "/.tmp");
-		fSetOwners(_ApplicationDir + "/.home");
-		fSetOwners(_ApplicationDir + "/.tmp");
 
 		CFile::fs_SetAttributes(_ApplicationDir, gc_RootAttributes);
 
@@ -715,8 +741,8 @@ namespace NMib::NCloud
 	// the file can't be read
 	NStr::CStr fg_AppManager_InstalledLowPortExecutablePath(NStr::CStr const &_Directory, NStr::CStr const &_Executable, NStr::CStr const &_InstalledDigest)
 	{
-		NStr::CStr Path = _Directory / _Executable;
-		if (!NFile::CFile::fs_FileExists(Path, NFile::EFileAttrib_File))
+		NStr::CStr Path = fg_AppManager_LowPortExecutablePath(_Directory, _Executable);
+		if (Path.f_IsEmpty())
 			return {};
 
 		// The account can have put a FIFO at the path, which would block the read without a writer

@@ -179,9 +179,14 @@ update settings.
 
 - **Trusted, out of scope**: the host, its administrator, the AppManager process, its state and its configuration.
   Authenticated API callers are trusted within their permissions; a missing or wrong permission check is a bug.
-- **Application packages and their scripts are trusted**: the AppManager doesn't defend against an application's own
-  content or update scripts, like links an application plants in its own directory. The scripts of an application in
-  a container or VM environment run inside that environment, never on the host.
+- **Application packages and their scripts are trusted**: the AppManager doesn't defend an application against its own
+  content or update scripts. The scripts of an application in a container or VM environment run inside that
+  environment, never on the host.
+- **Applications on the host aren't contained from their own account**, also in a Local environment. The operations of
+  the host as root in the application directory, like file updates, owner changes and file capabilities, don't follow
+  the links that are already there, but a running process of the account can change the directory while they run. A
+  launch sets only the capabilities that the install couldn't, and only on the files the install wrote. To
+  contain an application, run it in a container or VM environment.
 - **A container or VM environment is a boundary.** The agent runs inside it and is trusted no more than anything else
   in the environment. The host validates everything the agent sends, like paths, names, IDs and sizes, doesn't let
   the agent choose host paths or host accounts, and gives the environment no access to the host or to other

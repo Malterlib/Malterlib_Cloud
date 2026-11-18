@@ -3,6 +3,14 @@
 
 #include "Malterlib_Cloud_App_AppManager.h"
 
+#include <Mib/File/FileBeneath>
+
+#ifndef DPlatformFamily_Windows
+#	include <Mib/Core/PlatformSpecific/PosixErrNo>
+#	include <stdlib.h>
+#	include <sys/stat.h>
+#endif
+
 namespace NMib::NCloud
 {
 	// True when a directory that _File, relative to _Directory, is in is a link below _Directory
@@ -85,6 +93,139 @@ namespace NMib::NCloud
 			if (!CFile::fs_FileExists(Path, EFileAttrib_Directory))
 				CFile::fs_CreateDirectory(Path);
 		}
+	}
+
+	// Gives the directories and files in _RelativeDirectories of _Directory, the directories they are in and _Directory itself to _User and _Group; an empty
+	// name keeps that one. Root changes the owners, and the application's account can have replaced the directories in _Directory with links to
+	// directories of other accounts, which aren't followed: a directory below a link is skipped, and CFileBeneath refuses a link in the path and gives
+	// a link that is the directory itself the owner. CFileBeneath also stops at a link swapped in while this runs, which the other root operations in
+	// the directory don't, see fg_AppManager_ReplaceApplicationFiles. _LinkDirectory is _Directory or a directory that it is in, whose name is in a
+	// directory of the AppManager, where an administrator can have made it a link, for example to another volume, which CFileBeneath refuses as a
+	// root. Only that link is followed. A child application is in the directory of its parent, which belongs to the parent's account, so that is its
+	// _LinkDirectory. Not on Windows, which doesn't change owners
+	void fg_AppManager_SetApplicationDirectoryOwners
+		(
+			NStr::CStr const &_LinkDirectory
+			, NStr::CStr const &_Directory
+			, NContainer::TCSet<NStr::CStr> const &_RelativeDirectories
+			, NStr::CStr const &_User
+			, NStr::CStr const &_Group
+		)
+	{
+		using namespace NMib::NStr;
+		using namespace NMib::NFile;
+
+		if (_User.f_IsEmpty() && _Group.f_IsEmpty())
+			return;
+
+		CStr Prefix;
+		if (_Directory != _LinkDirectory)
+		{
+			if (!_Directory.f_StartsWith(_LinkDirectory + "/"))
+				DMibError("The application directory '{}' is not in '{}'"_f << _Directory << _LinkDirectory);
+
+			Prefix = _Directory.f_Extract(_LinkDirectory.f_GetLen() + 1);
+		}
+
+#ifdef DPlatformFamily_Windows
+		CStr Directory = _LinkDirectory;
+		for (umint iLink = 0; CFile::fs_FileExists(Directory, EFileAttrib_Link); ++iLink)
+		{
+			if (iLink == 32)
+				DMibError("The application directory '{}' is a chain of too many links"_f << _LinkDirectory);
+
+			CStr Target = CFile::fs_ResolveSymbolicLink(Directory);
+			Directory = CFile::fs_IsPathAbsolute(Target) ? Target : CStr(CFile::fs_GetPath(Directory) + "/" + Target);
+		}
+#else
+		// The links that lead to the application directory are resolved by the file system, in the order of the path: the file functions
+		// normalize a .. in a path as text, which after another link names a different directory
+		CStr Directory;
+		{
+			ch8 *pResolved = realpath(_LinkDirectory.f_GetStr(), nullptr);
+			if (!pResolved)
+				DMibError(NMib::NPlatform::fg_FormatErrno(CStr::CFormat("realpath('{}') when resolving the application directory") << _LinkDirectory, errno));
+
+			Directory = pResolved;
+			free(pResolved);
+		}
+#endif
+
+		NContainer::TCSet<CStr> Directories;
+		Directories[Prefix];
+		for (auto &RelativeDirectory : _RelativeDirectories)
+		{
+			CStr Relative = Prefix;
+			if (!RelativeDirectory.f_IsEmpty())
+				Relative = Prefix.f_IsEmpty() ? RelativeDirectory : CStr(Prefix / RelativeDirectory);
+
+			// The real directories above a link still change owner
+			bool bLinked = true;
+			for (CStr Path = Relative; Path != Prefix && !Path.f_IsEmpty(); Path = CFile::fs_GetPath(Path))
+			{
+				if (bLinked)
+					bLinked = fg_AppManager_HasLinkedParent(Directory, Path + "/");
+
+				if (!bLinked)
+					Directories[Path];
+			}
+		}
+
+		for (auto &Path : Directories)
+			CFileBeneath::fs_SetOwnerAndGroup(Directory, Path, _User, _Group);
+	}
+
+#ifndef DPlatformFamily_Windows
+	// Whether the regular file at _Path is to get _User and _Group from fg_AppManager_SetApplicationDirectoryOwners, an empty name keeping that
+	// one. A file that has them already keeps them, since on Linux every owner change clears the file capabilities, also one to the same owner. A
+	// file with other links shares its owner with names that can be outside the application directory, so it keeps its owner too
+	bool fg_AppManager_ApplicationFileNeedsOwners(NStr::CStr const &_Path, NStr::CStr const &_User, NStr::CStr const &_Group)
+	{
+		using namespace NMib::NStr;
+		using namespace NMib::NFile;
+
+		struct stat Stat;
+		if (::lstat(_Path.f_GetStr(), &Stat) != 0)
+			DMibError(NMib::NPlatform::fg_FormatErrno(CStr::CFormat("lstat('{}') when checking the owner of an application file") << _Path, errno));
+
+		if (!S_ISREG(Stat.st_mode))
+			return false;
+
+		bool bChangeUser = !_User.f_IsEmpty() && CFile::fs_GetOwnerOnLink(_Path) != _User;
+		bool bChangeGroup = !_Group.f_IsEmpty() && CFile::fs_GetGroupOnLink(_Path) != _Group;
+		if (!bChangeUser && !bChangeGroup)
+			return false;
+
+		if (Stat.st_nlink > 1)
+		{
+			DMibLogWithCategory(Malterlib/Cloud/AppManager, Warning, "Keeping the owner of application file '{}', which has other links", _Path);
+			return false;
+		}
+
+		return true;
+	}
+#endif
+
+	// The path of a low port executable to give setcap, or empty when _Executable, relative to _Directory, is missing, is a link or is below one.
+	// setcap runs as root, and the application's account can have replaced the files and directories in _Directory with links to files of other
+	// accounts, which would get the capability. setcap resolves the path again after this check, which only avoids the links that are already
+	// there: an application on the host isn't contained from its own account, see fg_AppManager_ReplaceApplicationFiles
+	NStr::CStr fg_AppManager_LowPortExecutablePath(NStr::CStr const &_Directory, NStr::CStr const &_Executable)
+	{
+		using namespace NMib::NStr;
+		using namespace NMib::NFile;
+
+		CStr Path = _Directory / _Executable;
+		if (fg_AppManager_HasLinkedParent(_Directory, _Executable) || CFile::fs_FileExists(Path, EFileAttrib_Link))
+		{
+			DMibLogWithCategory(Malterlib/Cloud/AppManager, Warning, "Not setting the capabilities of the low port executable '{}', which is a link or below one", Path);
+			return {};
+		}
+
+		if (!CFile::fs_FileExists(Path, EFileAttrib_File))
+			return {};
+
+		return Path;
 	}
 
 	// Replaces the files of the previous version of an application in _Directory with the files and links of the new version in

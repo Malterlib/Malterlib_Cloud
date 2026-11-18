@@ -105,6 +105,19 @@ namespace NMib::NCloud
 	bool fg_AppManager_HasLinkedParent(NStr::CStr const &_Directory, NStr::CStr const &_File);
 	void fg_AppManager_DeleteApplicationFile(NStr::CStr const &_Directory, NStr::CStr const &_File);
 	void fg_AppManager_CreateApplicationDirectory(NStr::CStr const &_Directory, NStr::CStr const &_RelativeDirectory);
+	void fg_AppManager_SetApplicationDirectoryOwners
+		(
+			NStr::CStr const &_LinkDirectory
+			, NStr::CStr const &_Directory
+			, NContainer::TCSet<NStr::CStr> const &_RelativeDirectories
+			, NStr::CStr const &_User
+			, NStr::CStr const &_Group
+		)
+	;
+#ifndef DPlatformFamily_Windows
+	bool fg_AppManager_ApplicationFileNeedsOwners(NStr::CStr const &_Path, NStr::CStr const &_User, NStr::CStr const &_Group);
+#endif
+	NStr::CStr fg_AppManager_LowPortExecutablePath(NStr::CStr const &_Directory, NStr::CStr const &_Executable);
 	NStr::CStr fg_AppManager_LowPortExecutableDigest(NStr::CStr const &_Path);
 	NStr::CStr fg_AppManager_InstalledLowPortExecutablePath(NStr::CStr const &_Directory, NStr::CStr const &_Executable, NStr::CStr const &_InstalledDigest);
 	auto fg_AppManager_ReplaceApplicationFiles

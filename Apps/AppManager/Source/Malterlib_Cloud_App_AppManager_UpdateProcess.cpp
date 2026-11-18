@@ -315,8 +315,8 @@ namespace NMib::NCloud::NAppManager
 			if (!NewSettings.f_Validate(Error))
 				co_return DMibErrorInstance(fg_Format("Updating settings resulted in invalid settings: {}", Error));
 
-			// A configuration check, not a boundary: application accounts are trusted like the application's package, and a Local environment
-			// runs on the host. A Local environment added while the update runs is therefore not checked again before the files change owner
+			// A check of the settings, not of the files: a Local environment the operator adds while the update runs isn't checked again before the
+			// files change owner, and fp_CheckLocalEnvironmentAccounts refuses its agent at the next start
 			if (CStr AccountError = fp_CheckLocalEnvironmentApplicationAccount(Application.m_Name, NewSettings); !AccountError.f_IsEmpty())
 				co_return DMibErrorInstance(fg_Format("Updating settings resulted in invalid settings: {}", AccountError));
 

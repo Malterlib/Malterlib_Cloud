@@ -215,18 +215,20 @@ namespace NMib::NCloud::NAppManager
 	namespace
 	{
 		// Blocking. The capabilities are best effort, like for host applications: a minimal image can lack setcap and a file system can reject
-		// capabilities, and an application can run without them. The agent of a container or VM runs inside the environment, so a link in the
-		// application's files only reaches files of the environment; a Local environment runs on the host, where host applications follow such
-		// links too, and application packages and their scripts are trusted
+		// capabilities, and an application can run without them. The agent of a Local environment runs as root on the host, so low port
+		// executables that are links or below one are skipped, as for host applications, see fg_AppManager_LowPortExecutablePath
 		void fg_SetLowPortExecutableCapabilities(CStr const &_Directory, TCVector<CStr> const &_LowPortExecutables)
 		{
 			for (auto &Executable : _LowPortExecutables)
 			{
-				CStr ExecutablePath = _Directory / Executable;
+				// The lookup of the path reads the file system, which can fail like setcap
 				try
 				{
-					if (CFile::fs_FileExists(ExecutablePath))
-						CProcessLaunch::fs_LaunchTool("setcap", {"cap_net_bind_service=ep", ExecutablePath});
+					CStr ExecutablePath = fg_AppManager_LowPortExecutablePath(_Directory, Executable);
+					if (ExecutablePath.f_IsEmpty())
+						continue;
+
+					CProcessLaunch::fs_LaunchTool("setcap", {"cap_net_bind_service=ep", ExecutablePath});
 				}
 				catch (CException const &_Exception)
 				{
@@ -235,7 +237,7 @@ namespace NMib::NCloud::NAppManager
 							Malterlib/Cloud/AppManager
 							, Warning
 							, "Failed to set up low port executable support running 'setcap cap_net_bind_service=ep {}': {}"
-							, ExecutablePath
+							, _Directory / Executable
 							, _Exception
 						)
 					;
@@ -953,8 +955,8 @@ namespace NMib::NCloud::NAppManager
 		}
 	}
 
-	// _Directory itself is trusted not to be a link: the agent created it, and only the application's account, trusted like its package, can
-	// replace it
+	// Only for the storage of a container or VM environment, which is the boundary: a link there, also one that replaces _Directory or a directory
+	// in it while this runs, only reaches files of the environment. Links are skipped to keep the owner changes to the application's own files
 	void CAppManagerActor::fsp_SetDirectoryOwnerSkippingLinks(CStr const &_Directory, CStr const &_User, CStr const &_Group)
 	{
 		auto Paths = CFile::fs_FindFiles(_Directory / "*", EFileAttrib_Directory | EFileAttrib_File, true, false);
@@ -1111,8 +1113,8 @@ namespace NMib::NCloud::NAppManager
 						if (!Executable.f_IsString())
 							continue;
 
-						CStr ExecutablePath = _Directory / Executable.f_String();
-						if (CFile::fs_FileExists(ExecutablePath))
+						CStr ExecutablePath = fg_AppManager_LowPortExecutablePath(_Directory, Executable.f_String());
+						if (!ExecutablePath.f_IsEmpty())
 							CProcessLaunch::fs_LaunchTool("setcap", {"cap_net_bind_service=ep", ExecutablePath});
 					}
 				}

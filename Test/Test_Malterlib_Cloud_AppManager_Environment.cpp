@@ -7,6 +7,9 @@
 
 #ifdef DPlatformFamily_Windows
 #	include <Windows.h>
+#else
+#	include <Mib/Core/PlatformSpecific/PosixUser>
+#	include <unistd.h>
 #endif
 
 namespace
@@ -1862,6 +1865,155 @@ void CAppManager_Environment_Tests::f_DoTests()
 			DMibExpectTrue(CFile::fs_FileExists(ApplicationDirectory / "Linked/Sub", EFileAttrib_Directory));
 			DMibExpectFalse(CFile::fs_FileExists(OutsideDirectory / "Sub"));
 			DMibExpectTrue(CFile::fs_FileExists(OutsideDirectory / "Data.txt", EFileAttrib_File));
+		}
+	};
+
+	DMibTestSuite("Application Owners Below Links")
+	{
+		CStr RootDirectory = CFile::fs_GetProgramDirectory() / "AppManagerApplicationOwners";
+		CStr ApplicationDirectory = RootDirectory / "App";
+		CStr OutsideDirectory = RootDirectory / "Outside";
+
+		fg_TestAddCleanupPath(RootDirectory);
+
+		if (CFile::fs_FileExists(RootDirectory))
+			CFile::fs_DeleteDirectoryRecursive(RootDirectory);
+
+		CFile::fs_CreateDirectory(ApplicationDirectory / "A/B");
+		CFile::fs_CreateDirectory(OutsideDirectory / "Sub");
+		CFile::fs_WriteStringToFile(ApplicationDirectory / "A/B/Executable", "", false);
+		CFile::fs_WriteStringToFile(OutsideDirectory / "Executable", "", false);
+		CFile::fs_CreateSymbolicLink(OutsideDirectory, ApplicationDirectory / "Linked", EFileAttrib_Directory, ESymbolicLinkFlag_None);
+		CFile::fs_CreateSymbolicLink(OutsideDirectory / "Executable", ApplicationDirectory / "LinkedExecutable", EFileAttrib_File, ESymbolicLinkFlag_None);
+		CFile::fs_CreateDirectory(ApplicationDirectory / "Real");
+		CFile::fs_CreateSymbolicLink(OutsideDirectory, ApplicationDirectory / "Real/Linked", EFileAttrib_Directory, ESymbolicLinkFlag_None);
+
+		{
+			DMibTestPath("Low Port Executables");
+
+			DMibExpect(fg_AppManager_LowPortExecutablePath(ApplicationDirectory, "A/B/Executable"), ==, ApplicationDirectory / "A/B/Executable");
+			DMibExpect(fg_AppManager_LowPortExecutablePath(ApplicationDirectory, "Linked/Executable"), ==, "");
+			DMibExpect(fg_AppManager_LowPortExecutablePath(ApplicationDirectory, "LinkedExecutable"), ==, "");
+			DMibExpect(fg_AppManager_LowPortExecutablePath(ApplicationDirectory, "Missing"), ==, "");
+		}
+
+		// A group of this user that the directories don't have shows which directories the change reaches
+		CStr CurrentGroup = CFile::fs_GetGroup(OutsideDirectory / "Sub");
+		CStr OtherGroup;
+		{
+			gid_t Groups[256];
+			int nGroups = ::getgroups(256, Groups);
+			for (int iGroup = 0; iGroup < nGroups && OtherGroup.f_IsEmpty(); ++iGroup)
+			{
+				NMib::NPlatform::CGetGrGidState State;
+				if (group *pGroup = NMib::NPlatform::fg_Helper_GetGrGid(Groups[iGroup], State); pGroup && CurrentGroup != pGroup->gr_name)
+					OtherGroup = pGroup->gr_name;
+			}
+		}
+
+		{
+			DMibTestPath("Owners");
+
+			if (OtherGroup.f_IsEmpty())
+				DMibConOut("Owners skipped: the user is in no other group\n");
+			else
+			{
+				fg_AppManager_SetApplicationDirectoryOwners(ApplicationDirectory, ApplicationDirectory, {"A/B", "Linked/Sub", "Linked", "Real/Linked/Sub"}, "", OtherGroup);
+
+				// The real directory above a link changes owner, the link and what it leads to don't
+				DMibExpect(CFile::fs_GetGroup(ApplicationDirectory / "Real"), ==, OtherGroup);
+				DMibExpect(CFile::fs_GetGroup(ApplicationDirectory / "A/B"), ==, OtherGroup);
+				DMibExpect(CFile::fs_GetGroup(ApplicationDirectory / "A"), ==, OtherGroup);
+				DMibExpect(CFile::fs_GetGroup(ApplicationDirectory), ==, OtherGroup);
+				DMibExpect(CFile::fs_GetGroup(OutsideDirectory / "Sub"), ==, CurrentGroup);
+				DMibExpect(CFile::fs_GetGroup(OutsideDirectory), ==, CurrentGroup);
+			}
+		}
+
+		{
+			DMibTestPath("Linked Application Directory");
+
+			CStr MovedDirectory = RootDirectory / "Moved";
+			CStr LinkedApplicationDirectory = RootDirectory / "LinkedApp";
+			CFile::fs_CreateDirectory(MovedDirectory / "A");
+			CFile::fs_CreateSymbolicLink(OutsideDirectory, MovedDirectory / "Linked", EFileAttrib_Directory, ESymbolicLinkFlag_None);
+			CFile::fs_CreateSymbolicLink("Moved", LinkedApplicationDirectory, EFileAttrib_Directory, ESymbolicLinkFlag_None);
+
+			CStr Group = CFile::fs_GetGroup(MovedDirectory);
+			fg_AppManager_SetApplicationDirectoryOwners(LinkedApplicationDirectory, LinkedApplicationDirectory, {"A", "Linked/Sub"}, "", Group);
+
+			DMibExpect(CFile::fs_GetGroup(MovedDirectory / "A"), ==, Group);
+			DMibExpect(CFile::fs_GetGroup(MovedDirectory), ==, Group);
+		}
+
+		// The file system resolves a .. in a link target after the links before it, unlike a textual expansion of the path
+		{
+			DMibTestPath("Linked Application Directory Through Link And Parent");
+
+			CFile::fs_CreateDirectory(RootDirectory / "Real/Sub");
+			CFile::fs_CreateDirectory(RootDirectory / "Real/Apps/App/A");
+			CFile::fs_CreateSymbolicLink("Real/Sub", RootDirectory / "Via", EFileAttrib_Directory, ESymbolicLinkFlag_None);
+			CFile::fs_CreateSymbolicLink("Via/../Apps/App", RootDirectory / "ViaApp", EFileAttrib_Directory, ESymbolicLinkFlag_None);
+
+			// The path that normalizing Via/.. as text gives leads to another directory
+			CFile::fs_CreateDirectory(RootDirectory / "Decoy/A");
+			CFile::fs_CreateDirectory(RootDirectory / "Apps");
+			CFile::fs_CreateSymbolicLink("../Decoy", RootDirectory / "Apps/App", EFileAttrib_Directory, ESymbolicLinkFlag_None);
+			CStr DecoyGroup = CFile::fs_GetGroup(RootDirectory / "Decoy/A");
+
+			if (OtherGroup.f_IsEmpty())
+				DMibConOut("Owners through link and parent skipped: the user is in no other group\n");
+			else
+			{
+				fg_AppManager_SetApplicationDirectoryOwners(RootDirectory / "ViaApp", RootDirectory / "ViaApp", {"A"}, "", OtherGroup);
+
+				DMibExpect(CFile::fs_GetGroup(RootDirectory / "Real/Apps/App/A"), ==, OtherGroup);
+				DMibExpect(CFile::fs_GetGroup(RootDirectory / "Real/Apps/App"), ==, OtherGroup);
+				DMibExpect(CFile::fs_GetGroup(RootDirectory / "Decoy/A"), ==, DecoyGroup);
+			}
+		}
+
+		// The account of the parent application owns the directory that a child application is in, so a link at the child's directory isn't followed
+		{
+			DMibTestPath("Linked Child Application Directory");
+
+			CStr ParentDirectory = RootDirectory / "Parent";
+			CStr ChildTarget = RootDirectory / "ChildTarget";
+			CFile::fs_CreateDirectory(ParentDirectory);
+			CFile::fs_CreateDirectory(ChildTarget / "A");
+			CFile::fs_CreateSymbolicLink(ChildTarget, ParentDirectory / "Child", EFileAttrib_Directory, ESymbolicLinkFlag_None);
+
+			if (OtherGroup.f_IsEmpty())
+				DMibConOut("Linked Child Application Directory skipped: the user is in no other group\n");
+			else
+			{
+				CStr TargetGroup = CFile::fs_GetGroup(ChildTarget);
+				CStr ParentGroup = CFile::fs_GetGroup(ParentDirectory);
+				fg_AppManager_SetApplicationDirectoryOwners(ParentDirectory, ParentDirectory / "Child", {"A", ".home"}, "", OtherGroup);
+
+				DMibExpect(CFile::fs_GetGroup(ChildTarget), ==, TargetGroup);
+				DMibExpect(CFile::fs_GetGroup(ChildTarget / "A"), ==, TargetGroup);
+				DMibExpect(CFile::fs_GetGroup(ParentDirectory), ==, ParentGroup);
+			}
+		}
+
+		// A real child directory gets the owners, and the directory of the parent keeps its own
+		{
+			DMibTestPath("Child Application Directory");
+
+			CStr ParentDirectory = RootDirectory / "Parent";
+			CFile::fs_DeleteFile(ParentDirectory / "Child");
+			CFile::fs_CreateDirectory(ParentDirectory / "Child/A");
+
+			if (!OtherGroup.f_IsEmpty())
+			{
+				CStr ParentGroup = CFile::fs_GetGroup(ParentDirectory);
+				fg_AppManager_SetApplicationDirectoryOwners(ParentDirectory, ParentDirectory / "Child", {"A"}, "", OtherGroup);
+
+				DMibExpect(CFile::fs_GetGroup(ParentDirectory / "Child/A"), ==, OtherGroup);
+				DMibExpect(CFile::fs_GetGroup(ParentDirectory / "Child"), ==, OtherGroup);
+				DMibExpect(CFile::fs_GetGroup(ParentDirectory), ==, ParentGroup);
+			}
 		}
 	};
 
