@@ -27,14 +27,28 @@ namespace NMib::NCloud::NAppManager
 		OutApplication.m_Version = _Application.m_LastInstalledVersion;
 		OutApplication.m_VersionInfo = _Application.m_LastInstalledVersionInfo;
 
+		// An update that stopped after it replaced the files records its version, which failed until an update of it finishes. An update that runs
+		// records it before it finishes too, which hasn't failed until it records its failure
+		bool bUpdateRunning = false;
+		for (auto &pUpdateWeak : mp_RunningUpdates)
+		{
+			auto pUpdate = pUpdateWeak.f_Lock();
+			if (pUpdate && pUpdate->m_pApplication.f_Get() == &_Application && !pUpdate->m_bFailureRecorded)
+			{
+				bUpdateRunning = true;
+				break;
+			}
+		}
+
 		if
 		(
-			fp_VersionIsNewer
+			!bUpdateRunning
+			&& fp_VersionIsNewer
 			(
 				_Application.m_LastTriedInstalledVersion
 				, _Application.m_LastTriedInstalledVersionInfo
-				, OutApplication.m_Version
-				, OutApplication.m_VersionInfo
+				, _Application.m_LastInstalledVersionFinished
+				, _Application.m_LastInstalledVersionInfoFinished
 				, _Application.m_Settings.m_UpdateTags
 				, _Application.m_Settings.m_UpdateBranches
 			)

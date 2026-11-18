@@ -222,6 +222,8 @@ namespace NMib::NCloud::NAppManager
 		ApplicationJson["LastInstalledVersionInfo"] = Application.m_LastInstalledVersionInfo.f_ToJson<CEJsonSortedYaml>();
 		ApplicationJson["LastInstalledVersionFinished"] = Application.m_LastInstalledVersionFinished.f_ToJson<CEJsonSortedYaml>();
 		ApplicationJson["LastInstalledVersionInfoFinished"] = Application.m_LastInstalledVersionInfoFinished.f_ToJson<CEJsonSortedYaml>();
+		ApplicationJson["LastMigratedVersion"] = Application.m_LastMigratedVersion.f_ToJson<CEJsonSortedYaml>();
+		ApplicationJson["LastMigratedVersionInfo"] = Application.m_LastMigratedVersionInfo.f_ToJson<CEJsonSortedYaml>();
 		ApplicationJson["LastTriedInstalledVersion"] = Application.m_LastTriedInstalledVersion.f_ToJson<CEJsonSortedYaml>();
 		ApplicationJson["LastTriedInstalledVersionInfo"] = Application.m_LastTriedInstalledVersionInfo.f_ToJson<CEJsonSortedYaml>();
 		ApplicationJson["LastTriedInstalledVersionError"] = Application.m_LastTriedInstalledVersionError;
@@ -412,6 +414,7 @@ namespace NMib::NCloud::NAppManager
 		(
 			CStr const &_ApplicationDir
 			, TCSharedPointer<CApplication> const &_pApplication
+			, CApplicationSettings const &_Settings
 			, TCVector<CStr> const &_Files
 			, TCSharedPointer<CUniqueUserGroup> const &_pUniqueUserGroup
 			, TCFunction<void (CStr const &_Info)> const &_fLogInfo
@@ -420,9 +423,8 @@ namespace NMib::NCloud::NAppManager
 	{
 		TCMap<CStr, CStr> LowPortExecutablesToGrant;
 
-		auto &Settings = _pApplication->m_Settings;
-		auto User = _pUniqueUserGroup->f_GetUser(Settings.m_RunAsUser);
-		auto Group = _pUniqueUserGroup->f_GetGroup(Settings.m_RunAsGroup);
+		auto User = _pUniqueUserGroup->f_GetUser(_Settings.m_RunAsUser);
+		auto Group = _pUniqueUserGroup->f_GetGroup(_Settings.m_RunAsGroup);
 		auto fSetOwners = [&](CStr &&_Directory)
 			{
 				while (_Directory.f_GetLen() >= _ApplicationDir.f_GetLen())

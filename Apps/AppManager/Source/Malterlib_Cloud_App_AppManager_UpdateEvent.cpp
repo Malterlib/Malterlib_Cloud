@@ -293,6 +293,8 @@ namespace NMib::NCloud::NAppManager
 			{
 				Application.m_LastInstalledVersionFinished = Application.m_LastInstalledVersion;
 				Application.m_LastInstalledVersionInfoFinished = Application.m_LastInstalledVersionInfo;
+				Application.m_LastMigratedVersion = Application.m_LastInstalledVersion;
+				Application.m_LastMigratedVersionInfo = Application.m_LastInstalledVersionInfo;
 				bUpdatedAppInfo = true;
 
 				fp_SendAppChange_AddedOrChanged(*_pState->m_pApplication);
@@ -300,6 +302,7 @@ namespace NMib::NCloud::NAppManager
 			else if (_Stage == EUpdateStage::EUpdateStage_Failed)
 			{
 				bUpdatedAppInfo = true;
+				_pState->m_bFailureRecorded = true;
 				if (Application.m_LastFailedInstalledVersionFailureStage != Application.m_UpdateStage)
 					Application.m_LastFailedInstalledVersionFailureStage = Application.m_UpdateStage;
 				if (Application.m_UpdateStage > EUpdateStage::EUpdateStage_DownloadVersion)

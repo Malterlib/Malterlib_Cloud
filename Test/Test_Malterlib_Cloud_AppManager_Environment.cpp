@@ -1077,6 +1077,238 @@ void CAppManager_Environment_Tests::f_DoTests()
 		}
 
 		{
+			DMibTestPath("Retry Of Update Stopped After File Replacement");
+
+			CStr TestDirectory = AppManagerTestHelper.f_RootDirectory() / "RetriedUpdate";
+			CStr ScriptPath = TestDirectory / "PostUpdate.sh";
+			CStr PreviousVersionsPath = TestDirectory / "PreviousVersions.txt";
+			CStr ErrorScriptPath = TestDirectory / "OnError.sh";
+			CStr ErrorScriptStartedPath = TestDirectory / "OnError.Started";
+			CStr ErrorScriptReleasePath = TestDirectory / "OnError.Release";
+
+			co_await
+				(
+					g_Dispatch / [TestDirectory, ScriptPath, PreviousVersionsPath, ErrorScriptPath, ErrorScriptStartedPath, ErrorScriptReleasePath]() -> TCFuture<void>
+					{
+						co_await ECoroutineFlag_CaptureExceptions;
+
+						for (auto &Version : {CStr("1.0.0"), CStr("1.0.1")})
+						{
+							CStr PackageDirectory = TestDirectory / Version;
+
+							CEJsonSorted VersionInfo;
+							VersionInfo["Application"] = "RetriedUpdate";
+							VersionInfo["Version"] = "master/{}"_f << Version;
+							VersionInfo["Platform"] = "TestPlatform";
+
+							CFile::fs_CreateDirectory(PackageDirectory);
+							CFile::fs_WriteStringToFile(PackageDirectory / "RetriedUpdateVersionInfo.json", VersionInfo.f_ToString());
+						}
+
+						// Fails the first update that runs it, which has replaced the files
+						CFile::fs_WriteStringToFile
+							(
+								ScriptPath
+								, "#!/bin/bash\n"
+								"echo \"$MalterlibCloud_PreviousVersionID\" >> '{0}'\n"
+								"if [ \"$MalterlibCloud_VersionID\" == 'master/1.0.1' ] && [ ! -f '{0}.Failed' ]; then\n"
+								"\ttouch '{0}.Failed'\n"
+								"\texit 1\n"
+								"fi\n"_f
+								<< PreviousVersionsPath
+							)
+						;
+
+						// Holds the failed update until the test has seen its failure
+						CFile::fs_WriteStringToFile
+							(
+								ErrorScriptPath
+								, "#!/bin/bash\n"
+								"touch '{}'\n"
+								"for i in $(seq 1 6000); do\n"
+								"\tif [ -f '{}' ]; then\n"
+								"\t\texit 0\n"
+								"\tfi\n"
+								"\tsleep 0.1\n"
+								"done\n"_f
+								<< ErrorScriptStartedPath
+								<< ErrorScriptReleasePath
+							)
+						;
+						co_return {};
+					}
+				)
+				.f_Timeout(g_Timeout, "Timed out creating packages")
+			;
+
+			TCSharedPointer<CStr> pNotifiedFailedVersion = fg_Construct();
+			TCSharedPointer<TCOptional<bool>> pAddNotifiedFailure = fg_Construct();
+			auto ChangeSubscription = co_await Interface.f_CallActor(&CAppManagerInterface::f_SubscribeChangeNotifications)
+				(
+					CAppManagerInterface::CSubscribeChangeNotifications
+					{
+						.m_fOnNotification = g_ActorFunctor / [pNotifiedFailedVersion, pAddNotifiedFailure](CAppManagerInterface::COnChangeNotificationParams _Params) -> TCFuture<void>
+						{
+							for (auto &Change : _Params.m_Changes)
+							{
+								if (Change.m_Application != "RetriedUpdate" || !Change.m_Change.f_IsOfType<CAppManagerInterface::CApplicationChange_AddOrChangeInfo>())
+									continue;
+
+								auto &Info = Change.m_Change.f_GetAsType<CAppManagerInterface::CApplicationChange_AddOrChangeInfo>().m_Info;
+								*pNotifiedFailedVersion = CStr::fs_ToStr(Info.m_FailedVersion.m_VersionID);
+								if (!*pAddNotifiedFailure)
+									*pAddNotifiedFailure = Info.m_FailedVersion.f_IsValid();
+							}
+
+							co_return {};
+						}
+						, .m_bWaitForNotification = false
+					}
+				)
+				.f_Timeout(g_Timeout, "Timed out subscribing to application changes")
+			;
+
+			auto AddResult = co_await AppManagerTestHelper.f_LaunchSimple
+				(
+					AppManagerInfo.m_RootDirectory / "AppManager"
+					,
+					{
+						"--application-add"
+						, "--from-file"
+						, TestDirectory / "1.0.0"
+						, "--name"
+						, "RetriedUpdate"
+						, "--update-script-post-update"
+						, ScriptPath
+						, "--update-script-on-error"
+						, ErrorScriptPath
+					}
+					, AppManagerInfo.m_RootDirectory
+				)
+				.f_Timeout(g_Timeout, "Timed out adding application")
+			;
+			DMibAssert(AddResult.m_ExitCode, ==, 0u);
+
+			{
+				DMibTestPath("Add Notifies No Failure");
+
+				NTime::CStopwatch Stopwatch{true};
+				while (!*pAddNotifiedFailure && Stopwatch.f_GetTime() < g_Timeout)
+					co_await fg_Timeout(0.1);
+
+				DMibAssertTrue((bool)*pAddNotifiedFailure);
+				DMibExpectFalse(**pAddNotifiedFailure);
+			}
+
+			auto fUpdate = [&]() -> TCUnsafeFuture<uint32>
+				{
+					auto Result = co_await AppManagerTestHelper.f_LaunchSimple
+						(
+							AppManagerInfo.m_RootDirectory / "AppManager"
+							, {"--application-update-from-file", "--name", "RetriedUpdate", TestDirectory / "1.0.1"}
+							, AppManagerInfo.m_RootDirectory
+						)
+						.f_Timeout(g_Timeout, "Timed out updating application")
+					;
+					co_return Result.m_ExitCode;
+				}
+			;
+
+			auto StoppedUpdate = fUpdate();
+
+			{
+				DMibTestPath("Failure Shown While The Error Script Runs");
+
+				NTime::CStopwatch Stopwatch{true};
+				bool bErrorScriptStarted = false;
+				while (!bErrorScriptStarted && Stopwatch.f_GetTime() < g_Timeout)
+				{
+					co_await fg_Timeout(0.1);
+					bErrorScriptStarted = co_await
+						(
+							g_Dispatch / [ErrorScriptStartedPath]()
+							{
+								return CFile::fs_FileExists(ErrorScriptStartedPath);
+							}
+						)
+					;
+				}
+				DMibAssertTrue(bErrorScriptStarted);
+
+				// The failure is recorded beside the error script, which holds the update until it is released below
+				CStr FailedVersion;
+				Stopwatch.f_Start();
+				while (FailedVersion != "master/1.0.1" && Stopwatch.f_GetTime() < 30.0)
+				{
+					auto Installed = co_await Interface.f_CallActor(&CAppManagerInterface::f_GetInstalled)().f_Timeout(g_Timeout, "Timed out enumerating applications");
+					if (auto pInstalled = Installed.f_FindEqual("RetriedUpdate"))
+						FailedVersion = CStr::fs_ToStr(pInstalled->m_FailedVersion.m_VersionID);
+
+					if (FailedVersion != "master/1.0.1")
+						co_await fg_Timeout(0.1);
+				}
+				DMibExpect(FailedVersion, ==, "master/1.0.1");
+			}
+
+			co_await
+				(
+					g_Dispatch / [ErrorScriptReleasePath]()
+					{
+						CFile::fs_WriteStringToFile(ErrorScriptReleasePath, "", false);
+					}
+				)
+				.f_Timeout(g_Timeout, "Timed out releasing the error script")
+			;
+
+			uint32 StoppedUpdateExitCode = co_await fg_Move(StoppedUpdate);
+			DMibExpect(StoppedUpdateExitCode, !=, 0u);
+
+			{
+				auto Installed = co_await Interface.f_CallActor(&CAppManagerInterface::f_GetInstalled)().f_Timeout(g_Timeout, "Timed out enumerating applications");
+				auto pInstalled = Installed.f_FindEqual("RetriedUpdate");
+				DMibAssertTrue(pInstalled != nullptr);
+				DMibExpect(CStr::fs_ToStr(pInstalled->m_FailedVersion.m_VersionID), ==, "master/1.0.1");
+			}
+
+			{
+				DMibTestPath("Change Notification Of Failure");
+
+				// The failure is notified once the update no longer runs
+				NTime::CStopwatch Stopwatch{true};
+				while (*pNotifiedFailedVersion != "master/1.0.1" && Stopwatch.f_GetTime() < g_Timeout)
+					co_await fg_Timeout(0.1);
+
+				DMibExpect(*pNotifiedFailedVersion, ==, "master/1.0.1");
+			}
+
+			co_await ChangeSubscription->f_Destroy();
+
+			uint32 RetriedUpdateExitCode = co_await fUpdate();
+			DMibExpect(RetriedUpdateExitCode, ==, 0u);
+
+			CStr PreviousVersions = co_await
+				(
+					g_Dispatch / [PreviousVersionsPath]()
+					{
+						return CFile::fs_ReadStringFromFile(PreviousVersionsPath);
+					}
+				)
+				.f_Timeout(g_Timeout, "Timed out reading previous versions")
+			;
+			DMibExpect(PreviousVersions, ==, "master/1.0.0\nmaster/1.0.0\n");
+
+			auto RemoveResult = co_await AppManagerTestHelper.f_LaunchSimple
+				(
+					AppManagerInfo.m_RootDirectory / "AppManager"
+					, {"--application-remove", "RetriedUpdate"}
+					, AppManagerInfo.m_RootDirectory
+				)
+				.f_Timeout(g_Timeout, "Timed out removing application")
+			;
+			DMibExpect(RemoveResult.m_ExitCode, ==, 0u);
+		}
+
+		{
 			DMibTestPath("VM Image Differing In Case");
 
 			CAppManagerInterface::CEnvironmentSettings Settings;

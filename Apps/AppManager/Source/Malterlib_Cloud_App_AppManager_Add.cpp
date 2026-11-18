@@ -948,7 +948,16 @@ namespace NMib::NCloud::NAppManager
 								_fOnInfo(Output.f_TrimRight());
 						}
 
-						auto LowPortExecutablesToGrant = fsp_UpdateApplicationFilePermissions(Directory, pApplication, pApplication->m_Files, pUniqueUserGroup, _fOnInfo);
+						auto LowPortExecutablesToGrant = fsp_UpdateApplicationFilePermissions
+							(
+								Directory
+								, pApplication
+								, pApplication->m_Settings
+								, pApplication->m_Files
+								, pUniqueUserGroup
+								, _fOnInfo
+							)
+						;
 
 						return {fg_Move(Files), fg_Move(LowPortExecutablesToGrant)};
 					}
@@ -981,10 +990,13 @@ namespace NMib::NCloud::NAppManager
 		auto InProgressScope = pApplication->f_SetInProgress("Add Application");
 		auto DestroyInProgress = co_await fg_AsyncDestroy(fg_Move(InProgressScope));
 
-		fp_OnApplicationAdded(pApplication);
-
+		// The info that the add publishes compares the version it installed with the finished one
 		pApplication->m_LastInstalledVersionFinished = pApplication->m_LastInstalledVersion;
 		pApplication->m_LastInstalledVersionInfoFinished = pApplication->m_LastInstalledVersionInfo;
+		pApplication->m_LastMigratedVersion = pApplication->m_LastInstalledVersion;
+		pApplication->m_LastMigratedVersionInfo = pApplication->m_LastInstalledVersionInfo;
+
+		fp_OnApplicationAdded(pApplication);
 
 		co_await (fp_UpdateApplicationJson(pApplication) % "Failed to save state" % Auditor);
 

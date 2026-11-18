@@ -389,6 +389,9 @@ namespace NMib::NCloud::NAppManager
 			CVersionManager::CVersionIDAndPlatform m_LastInstalledVersionFinished;
 			CVersionManager::CVersionInformation m_LastInstalledVersionInfoFinished;
 
+			CVersionManager::CVersionIDAndPlatform m_LastMigratedVersion; /// Whose post update script last succeeded, the previous version of the next update
+			CVersionManager::CVersionInformation m_LastMigratedVersionInfo;
+
 			CVersionManager::CVersionIDAndPlatform m_LastTriedInstalledVersion;
 			CVersionManager::CVersionInformation m_LastTriedInstalledVersionInfo;
 			CStr m_LastTriedInstalledVersionError;
@@ -742,6 +745,7 @@ namespace NMib::NCloud::NAppManager
 			bool m_bCancelOnAppManagerStop = false;
 			bool m_bSetLastTried = false;
 			bool m_bBypassCoordination = false;
+			bool m_bFailureRecorded = false;                           /// The application info shows the failure from here on, also while the error script runs
 		};
 
 		struct COnAppUpdateInfoChange
@@ -889,6 +893,7 @@ namespace NMib::NCloud::NAppManager
 			(
 				CStr const &_ApplicationDir
 				, TCSharedPointer<CApplication> const &_pApplication
+				, CApplicationSettings const &_Settings
 				, TCVector<CStr> const &_Files
 				, TCSharedPointer<CUniqueUserGroup> const &_pUniqueUserGroup
 				, TCFunction<void (CStr const &_Info)> const &_fLogInfo
