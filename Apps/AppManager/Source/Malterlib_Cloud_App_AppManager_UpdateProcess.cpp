@@ -715,55 +715,30 @@ namespace NMib::NCloud::NAppManager
 		{
 			auto BlockingActorCheckout = fg_BlockingActor();
 
+			State.m_Files = co_await
+				(
+					g_Dispatch(BlockingActorCheckout)
+					/ [OutputDirectory = State.m_pApplication->f_GetDirectory(), TemporaryDirectory = State.m_TempraryPath, OldFiles = State.m_pApplication->m_Files, Files = State.m_Files]
+					{
+						return fg_AppManager_ReplaceApplicationFiles(OutputDirectory, TemporaryDirectory, OldFiles, Files);
+					}
+				)
+			;
+
+			// The next update deletes the old files by this list, also when changing the owners fails
+			State.m_pApplication->m_Files = State.m_Files;
+
 			State.m_pApplication->m_LowPortExecutablesToGrant = co_await
 				(
 					g_Dispatch(BlockingActorCheckout) /
 					[
-						=
-						, OutputDirectory = State.m_pApplication->f_GetDirectory()
-						, TemporaryDirectory = State.m_TempraryPath
-						, OldFiles = State.m_pApplication->m_Files
+						OutputDirectory = State.m_pApplication->f_GetDirectory()
 						, Files = State.m_Files
 						, pApplication = State.m_pApplication
 						, pUniqueUserGroup = mp_pUniqueUserGroup
 						, fOnInfo = State.m_fOnInfo
 					]
 					{
-						// 3. Delete old files
-						for (auto &File : OldFiles)
-						{
-							CStr FullPath = fg_Format("{}/{}", OutputDirectory, File);
-							if (CFile::fs_FileExists(FullPath, EFileAttrib_Directory))
-							{
-								try
-								{
-									// Allow only empty directories to be deleted, ignore error on non-empty ones.
-									CFile::fs_DeleteDirectory(FullPath);
-								}
-								catch (CExceptionFile const &)
-								{
-								}
-							}
-							else if (CFile::fs_FileExists(FullPath, EFileAttrib_File | EFileAttrib_Link))
-								CFile::fs_DeleteFile(FullPath);
-						}
-#ifdef DPlatformFamily_Windows
-						if (CSystem::ms_PlatformVersion <= 10'0'017763)
-							NSys::fg_Thread_Sleep(5.0); // Try to work around access denied below when file is renamed
-#endif
-						// 4. Move files from temporary directory to final destination
-						for (auto &File : Files)
-						{
-							CStr SourcePath = fg_Format("{}/{}", TemporaryDirectory, File);
-							CStr DestinationPath = fg_Format("{}/{}", OutputDirectory, File);
-							if (CFile::fs_FileExists(SourcePath, EFileAttrib_File | EFileAttrib_Link))
-							{
-								CStr Directory = CFile::fs_GetPath(DestinationPath);
-								CFile::fs_CreateDirectory(Directory);
-								CFile::fs_AtomicReplaceFile(SourcePath, DestinationPath);
-							}
-						}
-
 						return fsp_UpdateApplicationFilePermissions(OutputDirectory, pApplication, Files, pUniqueUserGroup, fOnInfo);
 					}
 				)

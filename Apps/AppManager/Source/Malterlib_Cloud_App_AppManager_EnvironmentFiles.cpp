@@ -26,7 +26,11 @@ namespace NMib::NCloud
 
 	// Deletes a file of the previous version of an application in _Directory, _File being relative to it. A link is deleted
 	// itself, and a file below a link is kept, since the application can have created links to anywhere. A directory is
-	// only deleted when empty, to keep the untracked contents
+	// only deleted when empty, to keep the untracked contents. On Windows every reparse point counts as a link, also those
+	// that don't redirect, like the placeholders of cloud file providers, which the application directories of the AppManager
+	// don't hold; deleting one that isn't empty fails the update like any other file the update can't delete. The checks only
+	// avoid the links that are already there, not one that a running process of the application's account swaps in after them:
+	// an application on the host isn't contained from its own account, which is what container and VM environments are for
 	void fg_AppManager_DeleteApplicationFile(NStr::CStr const &_Directory, NStr::CStr const &_File)
 	{
 		using namespace NMib::NStr;
@@ -81,5 +85,146 @@ namespace NMib::NCloud
 			if (!CFile::fs_FileExists(Path, EFileAttrib_Directory))
 				CFile::fs_CreateDirectory(Path);
 		}
+	}
+
+	// Replaces the files of the previous version of an application in _Directory with the files and links of the new version in
+	// _SourceDirectory, which are moved. _OldFiles and _Files are relative to their directories. Root moves and deletes the files
+	// by path after checking them for links, so only the links that are already there are avoided, not one that a running process
+	// of the application's account swaps in after the checks: an application on the host, without an environment or in a Local
+	// environment, isn't contained from its own account, which is what container and VM environments are for. Returns the entries of _Files that
+	// are installed: the update scripts can remove files from _SourceDirectory, like a file whose copy in _Directory they keep, and the next
+	// update deletes the returned files. A file of the previous version that the new version has too, but whose copy the scripts removed, keeps
+	// its copy in _Directory and stays installed
+	auto fg_AppManager_ReplaceApplicationFiles
+		(
+			NStr::CStr const &_Directory
+			, NStr::CStr const &_SourceDirectory
+			, NContainer::TCVector<NStr::CStr> const &_OldFiles
+			, NContainer::TCVector<NStr::CStr> const &_Files
+		)
+		-> NContainer::TCVector<NStr::CStr>
+	{
+		using namespace NMib::NStr;
+		using namespace NMib::NFile;
+
+		// The update scripts of the application account can replace the directories of an unpack in the application directory with links to files
+		// of other accounts, which the move would bring into the application directory
+		CStr LinkCheckRoot = _SourceDirectory;
+		CStr SourcePrefix;
+		if (_SourceDirectory.f_StartsWith(_Directory + "/"))
+		{
+			LinkCheckRoot = _Directory;
+			SourcePrefix = _SourceDirectory.f_Extract(_Directory.f_GetLen() + 1) + "/";
+		}
+
+		for (auto &File : _Files)
+		{
+			if (fg_AppManager_HasLinkedParent(LinkCheckRoot, SourcePrefix + File))
+				DMibError(fg_Format("The unpacked application file '{}' is below a link", File));
+		}
+
+		NContainer::TCSet<CStr> NewFiles;
+		for (auto &File : _Files)
+			NewFiles[File];
+
+		NContainer::TCSet<CStr> OldFiles;
+		for (auto &File : _OldFiles)
+			OldFiles[File];
+
+		// A file that the application created where the new version has a directory fails the update, before anything of the old version is
+		// deleted. The old files are deleted, and a linked parent is replaced with a real directory, so neither is in the way. An entry that the
+		// update scripts removed from _SourceDirectory isn't installed, so nothing of it needs a directory. A case-insensitive file system finds
+		// an old file under another spelling, which is the same file
+		auto fIsOldFileSpelledOtherwise = [&](CStr const &_Path, CStr const &_DestinationPath)
+			{
+				for (auto &OldFile : _OldFiles)
+				{
+					if (OldFile.f_CmpNoCase(_Path) != 0 || !CFile::fs_FileExists(_Directory / OldFile, EFileAttrib_File | EFileAttrib_Link))
+						continue;
+
+					if (CFile::fs_GetUniqueIdentifierOnLink(_Directory / OldFile) == CFile::fs_GetUniqueIdentifierOnLink(_DestinationPath))
+						return true;
+				}
+
+				return false;
+			}
+		;
+
+		for (auto &File : _Files)
+		{
+			CStr SourcePath = _SourceDirectory / File;
+			if (!CFile::fs_FileExists(SourcePath, EFileAttrib_File | EFileAttrib_Link | EFileAttrib_Directory))
+				continue;
+
+			bool bDirectory = !CFile::fs_FileExists(SourcePath, EFileAttrib_File | EFileAttrib_Link) && CFile::fs_FileExists(SourcePath, EFileAttrib_Directory);
+
+			for (CStr Path = bDirectory ? File : CStr(CFile::fs_GetPath(File)); !Path.f_IsEmpty(); Path = CFile::fs_GetPath(Path))
+			{
+				if (OldFiles.f_FindEqual(Path) || fg_AppManager_HasLinkedParent(_Directory, Path))
+					continue;
+
+				CStr DestinationPath = _Directory / Path;
+				if (CFile::fs_FileExists(DestinationPath, EFileAttrib_File) && !CFile::fs_FileExists(DestinationPath, EFileAttrib_Link) && !fIsOldFileSpelledOtherwise(Path, DestinationPath))
+					DMibError(fg_Format("The application file '{}' is where the update has a directory", Path));
+			}
+		}
+
+		// A file is kept only when its copy is still there; one that is gone isn't installed, so that the next update doesn't take a file that the
+		// application creates at its path for a file of the package. The update scripts are trusted content of the package, which keep a file by
+		// removing its copy from the unpack under its exact name in the new version, also on a case-insensitive file system; a script that
+		// replaces a directory of the unpack with a file fails the update where the file can't replace the directory
+		NContainer::TCSet<CStr> KeptFiles;
+		for (auto &File : _OldFiles)
+		{
+			if
+			(
+				NewFiles.f_FindEqual(File)
+				&& !CFile::fs_FileExists(_SourceDirectory / File, EFileAttrib_File | EFileAttrib_Link | EFileAttrib_Directory)
+				&& CFile::fs_FileExists(_Directory / File, EFileAttrib_File | EFileAttrib_Link | EFileAttrib_Directory)
+			)
+			{
+				KeptFiles[File];
+				continue;
+			}
+
+			fg_AppManager_DeleteApplicationFile(_Directory, File);
+		}
+
+#ifdef DPlatformFamily_Windows
+		if (CSystem::ms_PlatformVersion <= 10'0'017763)
+			NSys::fg_Thread_Sleep(5.0); // Try to work around access denied below when file is renamed
+#endif
+
+		NContainer::TCVector<CStr> Installed;
+		for (auto &File : _Files)
+		{
+			CStr SourcePath = _SourceDirectory / File;
+			if (!CFile::fs_FileExists(SourcePath, EFileAttrib_File | EFileAttrib_Link))
+			{
+				// The next update deletes the directory, so it is created, and a file of the application in its place fails the update instead
+				// of being taken for it. The linked parents are replaced first, so the check doesn't look beyond a link
+				if (CFile::fs_FileExists(SourcePath, EFileAttrib_Directory))
+				{
+					fg_AppManager_CreateApplicationDirectory(_Directory, CFile::fs_GetPath(File));
+
+					CStr DestinationPath = _Directory / File;
+					if (CFile::fs_FileExists(DestinationPath, EFileAttrib_File) && !CFile::fs_FileExists(DestinationPath, EFileAttrib_Link))
+						DMibError(fg_Format("The application file '{}' is where the update has a directory", File));
+
+					fg_AppManager_CreateApplicationDirectory(_Directory, File);
+					Installed.f_Insert(File);
+				}
+				else if (KeptFiles.f_FindEqual(File))
+					Installed.f_Insert(File);
+				continue;
+			}
+
+			// The rename replaces a link at the destination itself
+			fg_AppManager_CreateApplicationDirectory(_Directory, CFile::fs_GetPath(File));
+			CFile::fs_AtomicReplaceFile(SourcePath, _Directory / File);
+			Installed.f_Insert(File);
+		}
+
+		return Installed;
 	}
 }

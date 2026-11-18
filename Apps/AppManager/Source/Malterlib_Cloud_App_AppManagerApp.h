@@ -107,4 +107,13 @@ namespace NMib::NCloud
 	void fg_AppManager_CreateApplicationDirectory(NStr::CStr const &_Directory, NStr::CStr const &_RelativeDirectory);
 	NStr::CStr fg_AppManager_LowPortExecutableDigest(NStr::CStr const &_Path);
 	NStr::CStr fg_AppManager_InstalledLowPortExecutablePath(NStr::CStr const &_Directory, NStr::CStr const &_Executable, NStr::CStr const &_InstalledDigest);
+	auto fg_AppManager_ReplaceApplicationFiles
+		(
+			NStr::CStr const &_Directory
+			, NStr::CStr const &_SourceDirectory
+			, NContainer::TCVector<NStr::CStr> const &_OldFiles
+			, NContainer::TCVector<NStr::CStr> const &_Files
+		)
+		-> NContainer::TCVector<NStr::CStr>
+	;
 }

@@ -949,6 +949,134 @@ void CAppManager_Environment_Tests::f_DoTests()
 		}
 
 		{
+			DMibTestPath("Host Update Deletes Files Of Previous Update");
+
+			CStr PackagesDirectory = AppManagerTestHelper.f_RootDirectory() / "UpdatedFilesPackages";
+			CStr ApplicationDirectory = AppManagerInfo.m_RootDirectory / "App/UpdatedFiles";
+
+			co_await
+				(
+					g_Dispatch / [PackagesDirectory]() -> TCFuture<void>
+					{
+						co_await ECoroutineFlag_CaptureExceptions;
+
+						for (auto &Version : {CStr("1.0.0"), CStr("1.0.1"), CStr("1.0.2")})
+						{
+							CStr PackageDirectory = PackagesDirectory / Version;
+
+							CEJsonSorted VersionInfo;
+							VersionInfo["Application"] = "UpdatedFiles";
+							VersionInfo["Version"] = "master/{}"_f << Version;
+							VersionInfo["Platform"] = "TestPlatform";
+
+							// The selector matches no OS, so nothing is installed
+							if (Version == "1.0.0")
+								VersionInfo["ExtraInfo"]["OSDependencies"]["NoSuchOS"] = _["curl"];
+
+							CFile::fs_CreateDirectory(PackageDirectory);
+							CFile::fs_WriteStringToFile(PackageDirectory / "UpdatedFilesVersionInfo.json", VersionInfo.f_ToString());
+							CFile::fs_WriteStringToFile(PackageDirectory / "Data.txt", Version);
+						}
+
+						CFile::fs_WriteStringToFile(PackagesDirectory / "1.0.1/Extra.txt", "Only in 1.0.1");
+						co_return {};
+					}
+				)
+				.f_Timeout(g_Timeout, "Timed out creating packages")
+			;
+
+			auto AddResult = co_await AppManagerTestHelper.f_LaunchSimple
+				(
+					AppManagerInfo.m_RootDirectory / "AppManager"
+					, {"--application-add", "--from-file", PackagesDirectory / "1.0.0", "--name", "UpdatedFiles"}
+					, AppManagerInfo.m_RootDirectory
+				)
+				.f_Timeout(g_Timeout, "Timed out adding application")
+			;
+			DMibAssert(AddResult.m_ExitCode, ==, 0u);
+
+			for (auto &Version : {CStr("1.0.1"), CStr("1.0.2")})
+			{
+				DMibTestPath(Version);
+
+				auto UpdateResult = co_await AppManagerTestHelper.f_LaunchSimple
+					(
+						AppManagerInfo.m_RootDirectory / "AppManager"
+						, {"--application-update-from-file", "--name", "UpdatedFiles", PackagesDirectory / Version}
+						, AppManagerInfo.m_RootDirectory
+					)
+					.f_Timeout(g_Timeout, "Timed out updating application")
+				;
+				DMibAssert(UpdateResult.m_ExitCode, ==, 0u);
+			}
+
+			auto [Data, bExtraExists] = co_await
+				(
+					g_Dispatch / [ApplicationDirectory]()
+					{
+						return fg_Tuple(CFile::fs_ReadStringFromFile(ApplicationDirectory / "Data.txt"), CFile::fs_FileExists(ApplicationDirectory / "Extra.txt"));
+					}
+				)
+				.f_Timeout(g_Timeout, "Timed out reading application files")
+			;
+			DMibExpect(Data, ==, "1.0.2");
+			DMibExpectFalse(bExtraExists);
+
+			{
+				DMibTestPath("Same Version Keeps Installed Time");
+
+				auto InstalledBefore = co_await Interface.f_CallActor(&CAppManagerInterface::f_GetInstalled)().f_Timeout(g_Timeout, "Timed out enumerating applications");
+				auto pBefore = InstalledBefore.f_FindEqual("UpdatedFiles");
+				DMibAssertTrue(pBefore != nullptr);
+
+				// A version without OS dependencies has none
+				DMibExpectTrue(pBefore->m_OSDependencies.f_IsEmpty());
+				NTime::CTime InstalledTime = pBefore->m_VersionInfo.m_Time;
+				DMibAssertTrue(InstalledTime.f_IsValid());
+
+				co_await
+					(
+						g_Dispatch / [VersionInfoFile = PackagesDirectory / "1.0.2/UpdatedFilesVersionInfo.json", InstalledTime]
+						{
+							CFile::fs_SetWriteTime(VersionInfoFile, InstalledTime + NTime::CTimeSpanConvert::fs_CreateSpanFromSeconds(60.0));
+
+#ifndef DPlatformFamily_Windows
+							// The target of a link can only exist where the package is installed
+							CFile::fs_CreateSymbolicLink("/MalterlibTestMissingTarget", CFile::fs_GetPath(VersionInfoFile) / "MissingTarget", EFileAttrib_File, ESymbolicLinkFlag_None);
+#endif
+						}
+					)
+					.f_Timeout(g_Timeout, "Timed out changing package time")
+				;
+
+				auto UpdateResult = co_await AppManagerTestHelper.f_LaunchSimple
+					(
+						AppManagerInfo.m_RootDirectory / "AppManager"
+						, {"--application-update-from-file", "--name", "UpdatedFiles", PackagesDirectory / "1.0.2"}
+						, AppManagerInfo.m_RootDirectory
+					)
+					.f_Timeout(g_Timeout, "Timed out updating application")
+				;
+				DMibAssert(UpdateResult.m_ExitCode, ==, 0u);
+
+				auto InstalledAfter = co_await Interface.f_CallActor(&CAppManagerInterface::f_GetInstalled)().f_Timeout(g_Timeout, "Timed out enumerating applications");
+				auto pAfter = InstalledAfter.f_FindEqual("UpdatedFiles");
+				DMibAssertTrue(pAfter != nullptr);
+				DMibExpect(pAfter->m_VersionInfo.m_Time, ==, InstalledTime);
+			}
+
+			auto RemoveResult = co_await AppManagerTestHelper.f_LaunchSimple
+				(
+					AppManagerInfo.m_RootDirectory / "AppManager"
+					, {"--application-remove", "UpdatedFiles"}
+					, AppManagerInfo.m_RootDirectory
+				)
+				.f_Timeout(g_Timeout, "Timed out removing application")
+			;
+			DMibExpect(RemoveResult.m_ExitCode, ==, 0u);
+		}
+
+		{
 			DMibTestPath("VM Image Differing In Case");
 
 			CAppManagerInterface::CEnvironmentSettings Settings;
@@ -1504,9 +1632,214 @@ void CAppManager_Environment_Tests::f_DoTests()
 			DMibExpectTrue(CFile::fs_FileExists(OutsideDirectory / "Data.txt", EFileAttrib_File));
 		}
 	};
-#endif
 
-#ifndef DPlatformFamily_Windows
+	DMibTestSuite("Replace Application Files Below Links")
+	{
+		CStr RootDirectory = CFile::fs_GetProgramDirectory() / "AppManagerReplaceApplicationFiles";
+		CStr ApplicationDirectory = RootDirectory / "App";
+		CStr SourceDirectory = RootDirectory / "Source";
+		CStr OutsideDirectory = RootDirectory / "Outside";
+
+		fg_TestAddCleanupPath(RootDirectory);
+
+		if (CFile::fs_FileExists(RootDirectory))
+			CFile::fs_DeleteDirectoryRecursive(RootDirectory);
+
+		CFile::fs_CreateDirectory(ApplicationDirectory);
+		CFile::fs_CreateDirectory(SourceDirectory / "Linked");
+		CFile::fs_CreateDirectory(OutsideDirectory);
+		CFile::fs_WriteStringToFile(OutsideDirectory / "Data.txt", "Outside", false);
+		CFile::fs_WriteStringToFile(ApplicationDirectory / "Old.txt", "Old", false);
+		CFile::fs_WriteStringToFile(SourceDirectory / "Linked/New.txt", "New", false);
+		CFile::fs_WriteStringToFile(SourceDirectory / "Top.txt", "Top", false);
+		CFile::fs_CreateSymbolicLink(OutsideDirectory, ApplicationDirectory / "Linked", EFileAttrib_Directory, ESymbolicLinkFlag_None);
+		CFile::fs_CreateSymbolicLink(OutsideDirectory, ApplicationDirectory / "OldLink", EFileAttrib_Directory, ESymbolicLinkFlag_None);
+
+		// Removed.txt stands for a file that an update script removed from the unpack, so it is not installed
+		auto Installed = fg_AppManager_ReplaceApplicationFiles
+			(
+				ApplicationDirectory
+				, SourceDirectory
+				, {"Old.txt", "OldLink", "Linked/Data.txt"}
+				, {"Linked", "Linked/New.txt", "Top.txt", "Removed.txt"}
+			)
+		;
+		DMibExpect(Installed, ==, fg_CreateVector<CStr>("Linked", "Linked/New.txt", "Top.txt"));
+
+		{
+			DMibTestPath("Old Files");
+
+			DMibExpectFalse(CFile::fs_FileExists(ApplicationDirectory / "Old.txt"));
+			DMibExpectFalse(CFile::fs_FileExists(ApplicationDirectory / "OldLink", EFileAttrib_Link));
+			DMibExpectTrue(CFile::fs_FileExists(OutsideDirectory / "Data.txt", EFileAttrib_File));
+		}
+
+		{
+			DMibTestPath("New Files");
+
+			DMibExpectFalse(CFile::fs_FileExists(ApplicationDirectory / "Linked", EFileAttrib_Link));
+			DMibExpect(CFile::fs_ReadStringFromFile(ApplicationDirectory / "Linked/New.txt"), ==, "New");
+			DMibExpect(CFile::fs_ReadStringFromFile(ApplicationDirectory / "Top.txt"), ==, "Top");
+			DMibExpectFalse(CFile::fs_FileExists(OutsideDirectory / "New.txt"));
+		}
+
+		{
+			DMibTestPath("Unpack Below Link");
+
+			CStr UnpackDirectory = ApplicationDirectory / "TempVersion/Unpack";
+			CFile::fs_CreateDirectory(UnpackDirectory);
+			CFile::fs_CreateSymbolicLink(OutsideDirectory, UnpackDirectory / "Linked", EFileAttrib_Directory, ESymbolicLinkFlag_None);
+
+			DMibExpectException
+				(
+					fg_AppManager_ReplaceApplicationFiles(ApplicationDirectory, UnpackDirectory, {}, {"Linked/Data.txt"})
+					, DMibErrorInstance("The unpacked application file 'Linked/Data.txt' is below a link")
+				)
+			;
+
+			DMibExpectTrue(CFile::fs_FileExists(OutsideDirectory / "Data.txt", EFileAttrib_File));
+			DMibExpectFalse(CFile::fs_FileExists(ApplicationDirectory / "Linked/Data.txt"));
+		}
+
+		{
+			DMibTestPath("Unpack Root Below Link");
+
+			CFile::fs_DeleteFile(ApplicationDirectory / "TempVersion/Unpack/Linked");
+			CFile::fs_DeleteDirectoryRecursive(ApplicationDirectory / "TempVersion");
+			CFile::fs_CreateDirectory(OutsideDirectory / "Unpack");
+			CFile::fs_WriteStringToFile(OutsideDirectory / "Unpack/Secret.txt", "Secret", false);
+			CFile::fs_CreateSymbolicLink(OutsideDirectory, ApplicationDirectory / "TempVersion", EFileAttrib_Directory, ESymbolicLinkFlag_None);
+
+			DMibExpectException
+				(
+					fg_AppManager_ReplaceApplicationFiles(ApplicationDirectory, ApplicationDirectory / "TempVersion/Unpack", {}, {"Secret.txt"})
+					, DMibErrorInstance("The unpacked application file 'Secret.txt' is below a link")
+				)
+			;
+
+			DMibExpectTrue(CFile::fs_FileExists(OutsideDirectory / "Unpack/Secret.txt", EFileAttrib_File));
+			DMibExpectFalse(CFile::fs_FileExists(ApplicationDirectory / "Secret.txt"));
+		}
+
+		{
+			DMibTestPath("Empty Directories");
+
+			CStr EmptySource = RootDirectory / "EmptySource";
+			CFile::fs_CreateDirectory(EmptySource / "Empty");
+			CFile::fs_CreateDirectory(EmptySource / "InTheWay");
+			CFile::fs_WriteStringToFile(ApplicationDirectory / "InTheWay", "Application", false);
+
+			DMibExpect(fg_AppManager_ReplaceApplicationFiles(ApplicationDirectory, EmptySource, {}, {"Empty"}), ==, fg_CreateVector<CStr>("Empty"));
+			DMibExpectTrue(CFile::fs_FileExists(ApplicationDirectory / "Empty", EFileAttrib_Directory));
+
+			DMibExpectException
+				(
+					fg_AppManager_ReplaceApplicationFiles(ApplicationDirectory, EmptySource, {}, {"InTheWay"})
+					, DMibErrorInstance("The application file 'InTheWay' is where the update has a directory")
+				)
+			;
+			DMibExpect(CFile::fs_ReadStringFromFile(ApplicationDirectory / "InTheWay"), ==, "Application");
+		}
+
+		{
+			DMibTestPath("Empty Directory Below Link");
+
+			// The link replaced by a directory, not the file beyond it, decides
+			CStr EmptySource = RootDirectory / "EmptyBelowLinkSource";
+			CFile::fs_CreateDirectory(EmptySource / "LinkedParent/Empty");
+			CFile::fs_WriteStringToFile(OutsideDirectory / "Empty", "Outside", false);
+			CFile::fs_CreateSymbolicLink(OutsideDirectory, ApplicationDirectory / "LinkedParent", EFileAttrib_Directory, ESymbolicLinkFlag_None);
+
+			DMibExpect(fg_AppManager_ReplaceApplicationFiles(ApplicationDirectory, EmptySource, {}, {"LinkedParent/Empty"}), ==, fg_CreateVector<CStr>("LinkedParent/Empty"));
+			DMibExpectFalse(CFile::fs_FileExists(ApplicationDirectory / "LinkedParent", EFileAttrib_Link));
+			DMibExpectTrue(CFile::fs_FileExists(ApplicationDirectory / "LinkedParent/Empty", EFileAttrib_Directory));
+			DMibExpect(CFile::fs_ReadStringFromFile(OutsideDirectory / "Empty"), ==, "Outside");
+		}
+
+		{
+			DMibTestPath("File Kept By Update Script");
+
+			// The update script removed the copy of Kept.txt in the unpack to keep the copy of the previous version
+			CStr KeptSource = RootDirectory / "KeptSource";
+			CFile::fs_CreateDirectory(KeptSource);
+			CFile::fs_WriteStringToFile(ApplicationDirectory / "Kept.txt", "Live", false);
+			CFile::fs_WriteStringToFile(ApplicationDirectory / "Dropped.txt", "Live", false);
+
+			DMibExpect(fg_AppManager_ReplaceApplicationFiles(ApplicationDirectory, KeptSource, {"Kept.txt", "Dropped.txt"}, {"Kept.txt"}), ==, fg_CreateVector<CStr>("Kept.txt"));
+			DMibExpect(CFile::fs_ReadStringFromFile(ApplicationDirectory / "Kept.txt"), ==, "Live");
+			DMibExpectFalse(CFile::fs_FileExists(ApplicationDirectory / "Dropped.txt"));
+		}
+
+		{
+			DMibTestPath("Kept File Without Copy");
+
+			// The script removed the copy in the unpack, and the previous version has none left either
+			CStr KeptSource = RootDirectory / "KeptWithoutCopySource";
+			CFile::fs_CreateDirectory(KeptSource);
+
+			DMibExpect(fg_AppManager_ReplaceApplicationFiles(ApplicationDirectory, KeptSource, {"Gone.txt"}, {"Gone.txt"}), ==, TCVector<CStr>());
+		}
+
+		{
+			DMibTestPath("Directory Conflict Keeps Old Files");
+
+			CStr ConflictSource = RootDirectory / "ConflictSource";
+			CFile::fs_CreateDirectory(ConflictSource / "Blocked");
+			CFile::fs_CreateDirectory(ConflictSource / "Nested");
+			CFile::fs_WriteStringToFile(ConflictSource / "Nested/File.txt", "New", false);
+			CFile::fs_WriteStringToFile(ApplicationDirectory / "Blocked", "Application", false);
+			CFile::fs_WriteStringToFile(ApplicationDirectory / "Old.txt", "Old", false);
+
+			DMibExpectException
+				(
+					fg_AppManager_ReplaceApplicationFiles(ApplicationDirectory, ConflictSource, {"Old.txt"}, {"Blocked"})
+					, DMibErrorInstance("The application file 'Blocked' is where the update has a directory")
+				)
+			;
+			DMibExpect(CFile::fs_ReadStringFromFile(ApplicationDirectory / "Old.txt"), ==, "Old");
+
+			{
+				DMibTestPath("Parent Of A File");
+
+				CFile::fs_WriteStringToFile(ApplicationDirectory / "Nested", "Application", false);
+				DMibExpectException
+					(
+						fg_AppManager_ReplaceApplicationFiles(ApplicationDirectory, ConflictSource, {"Old.txt"}, {"Nested/File.txt"})
+						, DMibErrorInstance("The application file 'Nested' is where the update has a directory")
+					)
+				;
+				DMibExpect(CFile::fs_ReadStringFromFile(ApplicationDirectory / "Old.txt"), ==, "Old");
+			}
+		}
+
+		{
+			DMibTestPath("Entry Removed By The Scripts");
+
+			// The application's file stays where the removed entry would have had its directory
+			CStr RemovedSource = RootDirectory / "RemovedSource";
+			CFile::fs_CreateDirectory(RemovedSource);
+			CFile::fs_WriteStringToFile(ApplicationDirectory / "Config", "Application", false);
+
+			auto Installed = fg_AppManager_ReplaceApplicationFiles(ApplicationDirectory, RemovedSource, {}, {"Config/Default.json"});
+			DMibExpectTrue(Installed.f_IsEmpty());
+			DMibExpect(CFile::fs_ReadStringFromFile(ApplicationDirectory / "Config"), ==, "Application");
+		}
+
+		{
+			DMibTestPath("Old File Spelled Otherwise");
+
+			// On a case-insensitive file system the old file is at the path of the new directory, which replaces it
+			CStr CaseSource = RootDirectory / "CaseSource";
+			CFile::fs_CreateDirectory(CaseSource / "Settings");
+			CFile::fs_WriteStringToFile(CaseSource / "Settings/Default.json", "New", false);
+			CFile::fs_WriteStringToFile(ApplicationDirectory / "settings", "Old", false);
+
+			auto Installed = fg_AppManager_ReplaceApplicationFiles(ApplicationDirectory, CaseSource, {"settings"}, {"Settings/Default.json"});
+			DMibExpect(Installed.f_GetLen(), ==, 1u);
+			DMibExpect(CFile::fs_ReadStringFromFile(ApplicationDirectory / "Settings/Default.json"), ==, "New");
+		}
+	};
+
 	DMibTestSuite("Environment Socket Directory")
 	{
 		{
