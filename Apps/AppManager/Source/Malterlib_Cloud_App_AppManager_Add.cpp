@@ -988,6 +988,7 @@ namespace NMib::NCloud::NAppManager
 								, pApplication->m_Files
 								, pUniqueUserGroup
 								, _fOnInfo
+								, true
 							)
 						;
 

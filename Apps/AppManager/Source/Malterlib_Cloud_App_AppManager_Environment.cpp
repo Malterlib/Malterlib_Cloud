@@ -3140,8 +3140,8 @@ namespace NMib::NCloud::NAppManager
 	// A local agent runs on the host with the privileges of this AppManager, so its executable, its source and its state must
 	// not live in a directory an application account is configured to write. A child application lives in the directory of its root
 	// application. A SelfUpdate.<host platform> agent application can resolve to the self update source, which cannot run as its own user.
-	// This checks the configuration, not the files: application accounts are trusted like the packages and scripts of their applications,
-	// and a Local environment isn't a boundary, so files that a former run as user still owns aren't verified
+	// This checks the settings, when they change and at every agent start, not the files: files that a run as user the operator removed from the
+	// settings still owns aren't verified
 	CStr CAppManagerActor::fp_CheckLocalEnvironmentAccounts(CEnvironmentSettings const &_Settings)
 	{
 		if (_Settings.m_Type != CAppManagerInterface::EEnvironmentType_Local)

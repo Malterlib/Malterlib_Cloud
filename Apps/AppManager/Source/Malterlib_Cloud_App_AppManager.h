@@ -897,6 +897,7 @@ namespace NMib::NCloud::NAppManager
 				, TCVector<CStr> const &_Files
 				, TCSharedPointer<CUniqueUserGroup> const &_pUniqueUserGroup
 				, TCFunction<void (CStr const &_Info)> const &_fLogInfo
+				, bool _bReassignFiles
 			)
 			-> TCMap<CStr, CStr>
 		;
