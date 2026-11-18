@@ -42,24 +42,36 @@ namespace NMib::NCloud::NAppManager
 		pUpdateState->m_VersionID = _Pending.m_VersionID;
 		pUpdateState->m_VersionTime = _Pending.m_VersionTime;
 		pUpdateState->m_VersionRetrySequence = _Pending.m_VersionRetrySequence;
+		pUpdateState->m_bSetLastTried = true;
 		pUpdateState->m_fOnInfo = [Name = (*pApplication)->m_Name](CStr const &_Info)
 			{
 				DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Pending self update '{}': {}", Name, _Info);
 			}
 		;
 
-		fg_Move(mp_InitialStartupResultFuture) > [this, pUpdateState, CleanupAutoUpdate](TCAsyncResult<void> &&_Result)
+		// The update events hold the state until they have recorded the result
+		mp_pPendingSelfUpdate = pUpdateState.f_Weak();
+
+		// Automatic updates stay blocked until the event has recorded the result, since an installed version counts as finished only then
+		auto fOnRecorded = [CleanupAutoUpdate](TCAsyncResult<void> &&_Result)
+			{
+				if (!_Result)
+					DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to record the result of the pending self update: {}", _Result.f_GetExceptionStr());
+			}
+		;
+
+		fg_Move(mp_InitialStartupResultFuture) > [this, pUpdateState, fOnRecorded](TCAsyncResult<void> &&_Result)
 			{
 				if (!_Result)
 				{
 					CStr Error = fg_Format("Pending self update failed: {}", fsp_LimitErrorLogSize(_Result.f_GetExceptionStr(), 128));
 					DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "{}", Error);
-					fp_OnUpdateEvent(pUpdateState, EUpdateStage::EUpdateStage_Failed, Error).f_DiscardResult();
+					fp_OnUpdateEvent(pUpdateState, EUpdateStage::EUpdateStage_Failed, Error) > fg_TempCopy(fOnRecorded);
 					return;
 				}
 
 				DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Pending self update finished");
-				fp_OnUpdateEvent(pUpdateState, EUpdateStage::EUpdateStage_Finished, {}).f_DiscardResult();
+				fp_OnUpdateEvent(pUpdateState, EUpdateStage::EUpdateStage_Finished, {}) > fg_TempCopy(fOnRecorded);
 			}
 		;
 	}
@@ -115,6 +127,13 @@ namespace NMib::NCloud::NAppManager
 		co_await (fp_UpdateApplication_UpdateApplicationFiles(_pState) % "Failed to update application files");
 		co_await (fp_UpdateApplication_SaveApplicationState(_pState) % "Failed to save application state");
 		co_await (fp_UpdateApplication_PostUpdate(_pState) % "Failed post update");
+
+		{
+			auto &Application = *_pState->m_pApplication;
+			Application.m_LastMigratedVersion = Application.m_LastInstalledVersion;
+			Application.m_LastMigratedVersionInfo = Application.m_LastInstalledVersionInfo;
+			co_await (fp_UpdateApplicationJson(_pState->m_pApplication) % "Failed to save application state");
+		}
 
 		auto pCanDestroy = mp_pCanDestroy;
 		if (!pCanDestroy)
@@ -750,11 +769,12 @@ namespace NMib::NCloud::NAppManager
 						OutputDirectory = State.m_pApplication->f_GetDirectory()
 						, Files = State.m_Files
 						, pApplication = State.m_pApplication
+						, Settings = State.m_pNewSettings ? *State.m_pNewSettings : State.m_pApplication->m_Settings
 						, pUniqueUserGroup = mp_pUniqueUserGroup
 						, fOnInfo = State.m_fOnInfo
 					]
 					{
-						return fsp_UpdateApplicationFilePermissions(OutputDirectory, pApplication, Files, pUniqueUserGroup, fOnInfo);
+						return fsp_UpdateApplicationFilePermissions(OutputDirectory, pApplication, Settings, Files, pUniqueUserGroup, fOnInfo);
 					}
 				)
 			;
@@ -774,15 +794,31 @@ namespace NMib::NCloud::NAppManager
 	{
 		auto &State = *_pState;
 
-		if (auto pException = State.f_CheckAbort())
-			co_return pException;
+		// The files of the new version are in place, with the owners of the new settings, so the settings and the version that match them are
+		// saved also when the update is cancelled or its notification fails. The save is outside, so a deletion while it runs doesn't replace the
+		// result of the notification
+		TCAsyncResult<void> EventResult;
+		{
+			auto OnResume = co_await fg_OnResume
+				(
+					[&]() -> CExceptionPointer
+					{
+						if (State.m_pApplication->m_bDeleted)
+							return DMibErrorInstance("Application has been deleted, aborting");
 
-		State.m_fOnInfo("Saving application state");
+						return {};
+					}
+				)
+			;
 
-		co_await fp_OnUpdateEvent(_pState, EUpdateStage::EUpdateStage_SaveApplicationState, {});
+			State.m_fOnInfo("Saving application state");
 
-		if (auto pException = State.f_CheckAbort())
-			co_return pException;
+			// A cancelled update doesn't wait for the subscribers of the notification, since shutdown waits for it
+			if (auto pException = State.f_CheckAbort())
+				EventResult.f_SetException(fg_Move(pException));
+			else
+				EventResult = co_await fp_OnUpdateEvent(_pState, EUpdateStage::EUpdateStage_SaveApplicationState, {}).f_Wrap();
+		}
 
 		bool bSettingsChange = false;
 		if (State.m_pNewSettings)
@@ -804,9 +840,16 @@ namespace NMib::NCloud::NAppManager
 		if (bSettingsChange)
 			fp_SendAppChange_AddedOrChanged(*State.m_pApplication);
 
-		State.m_pApplication->m_bPreventLaunch_Update = false;
+		// An update that stops here skips its post update script, so the application stays blocked from launching, also after a restart of the
+		// AppManager, like an update that stops before its files are replaced
+		if (EventResult && !State.f_CheckAbort())
+			State.m_pApplication->m_bPreventLaunch_Update = false;
 
 		co_await fp_UpdateApplicationJson(State.m_pApplication);
+
+		if (!EventResult)
+			co_return EventResult.f_GetException();
+
 		co_return {};
 	}
 

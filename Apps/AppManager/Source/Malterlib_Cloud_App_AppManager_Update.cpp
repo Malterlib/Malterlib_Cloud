@@ -284,8 +284,10 @@ namespace NMib::NCloud::NAppManager
 		pState->m_pRemoteStorageEnvironment = fp_ApplicationRemoteStorageEnvironment(*pApplication);
 		pState->m_fOnInfo = fg_Move(_fOnInfo);
 		pState->m_UniqueUpdateID = fg_RandomID();
-		pState->m_LastInstalledVersion = pApplication->m_LastInstalledVersion;
-		pState->m_LastInstalledVersionInfo = pApplication->m_LastInstalledVersionInfo;
+		// The scripts get m_LastMigratedVersion as the previous version, so that the retry of an update that stopped after replacing the files
+		// migrates from the version before it
+		pState->m_LastInstalledVersion = pApplication->m_LastMigratedVersion;
+		pState->m_LastInstalledVersionInfo = pApplication->m_LastMigratedVersionInfo;
 		pState->m_VersionID = VersionID;
 		pState->m_VersionTime = VersionInfo.m_Time;
 		pState->m_VersionRetrySequence = VersionInfo.m_RetrySequence;
@@ -301,11 +303,15 @@ namespace NMib::NCloud::NAppManager
 
 		mp_RunningUpdates[pState];
 
-		auto RunningUpdatesScope = g_ActorSubscription / [this, pStateWeak = pState.f_Weak()]() mutable -> TCFuture<void>
+		auto RunningUpdatesScope = g_ActorSubscription / [this, pStateWeak = pState.f_Weak(), pApplication]() mutable -> TCFuture<void>
 			{
 				mp_RunningUpdates.f_Remove(pStateWeak);
 				if (mp_RunningUpdates.f_IsEmpty() && !mp_CancelRunningUpdatesOnStopAppManagerPromise.f_IsSet())
 					mp_CancelRunningUpdatesOnStopAppManagerPromise.f_SetResult();
+
+				// The application info leaves out the version the update tries until it records a failure, and an update can end without one
+				if (!pApplication->m_bDeleted)
+					fp_SendAppChange_AddedOrChanged(*pApplication);
 
 				co_return {};
 			}

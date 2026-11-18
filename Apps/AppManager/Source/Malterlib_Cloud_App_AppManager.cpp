@@ -606,6 +606,35 @@ namespace NMib::NCloud::NAppManager
 				else
 					Application.m_LastFailedInstalledVersionFailureStage = EUpdateStage::EUpdateStage_Failed;
 
+				// State saved without the migrated version: the installed version has migrated unless the update that recorded the failure saved
+				// its files and failed before starting the new application, which leaves the version of the last finished update. The state
+				// records only the last attempt, so a failure before the files were saved is of a retry, whose earlier attempt counts as migrated.
+				// The failure stage is all that the state tells, so a post-update script that finished after a cancel of its update counts as not run
+				bool bFailureOfInstalledVersion
+					= Application.m_LastTriedInstalledVersion == Application.m_LastInstalledVersion
+					&& Application.m_LastTriedInstalledVersionInfo.m_Time == Application.m_LastInstalledVersionInfo.m_Time
+					&& Application.m_LastTriedInstalledVersionInfo.m_RetrySequence == Application.m_LastInstalledVersionInfo.m_RetrySequence
+				;
+				bool bInstalledVersionMigrated
+					= !bFailureOfInstalledVersion
+					|| Application.m_LastFailedInstalledVersionFailureStage < EUpdateStage::EUpdateStage_SaveApplicationState
+					||
+					(
+						Application.m_LastFailedInstalledVersionFailureStage >= EUpdateStage::EUpdateStage_StartNewApp
+						&& Application.m_LastFailedInstalledVersionFailureStage <= EUpdateStage::EUpdateStage_Finished
+					)
+				;
+
+				if (auto pValue = ApplicationJson.f_GetMember("LastMigratedVersion", EJsonType_Object))
+					Application.m_LastMigratedVersion = CVersionManager::CVersionIDAndPlatform::fs_FromJson(*pValue);
+				else
+					Application.m_LastMigratedVersion = bInstalledVersionMigrated ? Application.m_LastInstalledVersion : Application.m_LastInstalledVersionFinished;
+
+				if (auto pValue = ApplicationJson.f_GetMember("LastMigratedVersionInfo", EJsonType_Object))
+					Application.m_LastMigratedVersionInfo = CVersionManager::CVersionInformation::fs_FromJson(*pValue);
+				else
+					Application.m_LastMigratedVersionInfo = bInstalledVersionMigrated ? Application.m_LastInstalledVersionInfo : Application.m_LastInstalledVersionInfoFinished;
+
 				if
 				(
 					Application.m_LastTriedInstalledVersion != Application.m_LastInstalledVersionFinished

@@ -173,10 +173,13 @@ namespace NMib::NCloud::NAppManager
 		if (_Flags & EFindVersionFlag_ForAdd)
 			return VersionID;
 
+		// An update that stopped after it replaced the files records the version, which only counts as installed once the update finishes
+		bool bCurrentFinished = _pApplication->m_LastInstalledVersionFinished == CurrentVersionID && _pApplication->m_LastInstalledVersionInfoFinished.m_Time == CurrentVersionInfo.m_Time;
+
 		if
 		(
 			VersionID.m_VersionID.m_Branch == CurrentVersionID.m_VersionID.m_Branch
-			&& (VersionID < CurrentVersionID || (VersionID == CurrentVersionID && o_VersionInfo.m_Time == CurrentVersionInfo.m_Time))
+			&& (VersionID < CurrentVersionID || (VersionID == CurrentVersionID && o_VersionInfo.m_Time == CurrentVersionInfo.m_Time && bCurrentFinished))
 		)
 		{
 			if (_RequiredTags.f_IsEmpty())

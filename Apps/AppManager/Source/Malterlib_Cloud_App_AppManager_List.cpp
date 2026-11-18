@@ -27,14 +27,35 @@ namespace NMib::NCloud::NAppManager
 		OutApplication.m_Version = _Application.m_LastInstalledVersion;
 		OutApplication.m_VersionInfo = _Application.m_LastInstalledVersionInfo;
 
+		// The version of an update that stopped after replacing the files has failed until an update of it finishes; that of a running update,
+		// also a self update that finishes when the startup of this process ends, hasn't failed until it records a failure. Until a running
+		// update records the version it tries, the last tried version is that of an earlier update
+		auto fUpdateRunning = [&](TCWeakPointer<CUpdateApplicationState> const &_pUpdateWeak)
+			{
+				auto pUpdate = _pUpdateWeak.f_Lock();
+				return pUpdate && pUpdate->m_pApplication.f_Get() == &_Application && pUpdate->m_bSetLastTried && !pUpdate->m_bFailureRecorded;
+			}
+		;
+
+		bool bUpdateRunning = fUpdateRunning(mp_pPendingSelfUpdate);
+		for (auto &pUpdateWeak : mp_RunningUpdates)
+		{
+			if (fUpdateRunning(pUpdateWeak))
+			{
+				bUpdateRunning = true;
+				break;
+			}
+		}
+
 		if
 		(
-			fp_VersionIsNewer
+			!bUpdateRunning
+			&& fp_VersionIsNewer
 			(
 				_Application.m_LastTriedInstalledVersion
 				, _Application.m_LastTriedInstalledVersionInfo
-				, OutApplication.m_Version
-				, OutApplication.m_VersionInfo
+				, _Application.m_LastInstalledVersionFinished
+				, _Application.m_LastInstalledVersionInfoFinished
 				, _Application.m_Settings.m_UpdateTags
 				, _Application.m_Settings.m_UpdateBranches
 			)
