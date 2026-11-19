@@ -36,6 +36,14 @@ namespace NMib::NCloud::NAppManager
 		{
 			auto &Application = *pApplication;
 
+			// The guests of container and VM environments report the resources of their applications, so those requests do not raise the
+			// host-wide limits, which the host configuration sets for them
+			if (auto *pEnvironment = mp_Environments.f_FindEqual(Application.m_Settings.m_LaunchEnvironment))
+			{
+				if ((*pEnvironment)->m_Settings.m_Type != CAppManagerInterface::EEnvironmentType_Local)
+					continue;
+			}
+
 			if (Application.m_RegisterInfo.m_Resources_Threads)
 				nThreads += *Application.m_RegisterInfo.m_Resources_Threads;
 

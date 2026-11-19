@@ -377,6 +377,11 @@ namespace NMib::NCloud::NAppManager
 			if (ChangedSettings & (EApplicationSetting_VersionManagerApplication | EApplicationSetting_UpdateGroup | EApplicationSetting_AutoUpdate))
 				fp_OnAppUpdateInfoChange(pApplication);
 
+			// The host limits leave out the resource requests of applications in container and VM environments, and the application registers
+			// the same requests again in its new environment
+			if (ChangedSettings & EApplicationSetting_LaunchEnvironment)
+				fp_UpdateLimits();
+
 			fp_SendAppChange_AddedOrChanged(*pApplication);
 
 			_fOnInfo("Saving application state and update application files");
