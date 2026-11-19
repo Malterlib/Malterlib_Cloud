@@ -576,6 +576,55 @@ void CAppManager_Environment_Tests::f_DoTests()
 			DMibExpect(OtherApplicationResult.m_ExitCode, !=, 0u);
 			DMibExpectTrue(OtherApplicationResult.f_GetCombinedOut().f_Find("The package is for application 'OtherApplication'") >= 0);
 
+			// The version info of an archive package is read from the archive, also when it starts with a UTF-8 byte order mark
+			CStr OtherApplicationArchive = AppManagerTestHelper.f_RootDirectory() / "OtherApplicationAgent.tar";
+
+			// The archive tool blocks while it runs, so it runs on a blocking actor, where the timeout of the test can end the wait for it
+			auto BlockingActorCheckout = fg_BlockingActor();
+			co_await
+				(
+					g_Dispatch(BlockingActorCheckout) / [OtherApplicationDirectory, OtherApplicationArchive, BsdTar = AppManagerInfo.m_RootDirectory / "bin/bsdtar"]()
+					{
+						CProcessLaunch::fs_LaunchTool(BsdTar, {"-cf", OtherApplicationArchive, "-C", OtherApplicationDirectory, "."});
+					}
+				)
+				.f_Timeout(g_Timeout, "Timed out creating archive package")
+			;
+
+			auto ArchiveResult = co_await AppManagerTestHelper.f_LaunchSimple
+				(
+					AppManagerInfo.m_RootDirectory / "AppManager"
+					, {"--application-update-from-file", "--name", "SelfUpdate.Linux-riscv64", OtherApplicationArchive}
+					, AppManagerInfo.m_RootDirectory
+				)
+				.f_Timeout(g_Timeout, "Timed out updating agent application")
+			;
+			DMibExpect(ArchiveResult.m_ExitCode, !=, 0u);
+			DMibExpectTrue(ArchiveResult.f_GetCombinedOut().f_Find("The package is for application 'OtherApplication'") >= 0);
+
+			CStr NoVersionInfoDirectory = AppManagerTestHelper.f_RootDirectory() / "NoVersionInfoAgentUpdate";
+			co_await
+				(
+					g_Dispatch(BlockingActorCheckout) / [NoVersionInfoDirectory]
+					{
+						CFile::fs_CreateDirectory(NoVersionInfoDirectory);
+						CFile::fs_WriteStringToFile(NoVersionInfoDirectory / "AppManager", "Not an agent");
+					}
+				)
+				.f_Timeout(g_Timeout, "Timed out creating package")
+			;
+
+			auto NoVersionInfoResult = co_await AppManagerTestHelper.f_LaunchSimple
+				(
+					AppManagerInfo.m_RootDirectory / "AppManager"
+					, {"--application-update-from-file", "--name", "SelfUpdate.Linux-riscv64", NoVersionInfoDirectory}
+					, AppManagerInfo.m_RootDirectory
+				)
+				.f_Timeout(g_Timeout, "Timed out updating agent application")
+			;
+			DMibExpect(NoVersionInfoResult.m_ExitCode, !=, 0u);
+			DMibExpectTrue(NoVersionInfoResult.f_GetCombinedOut().f_Find("has no readable version info") >= 0);
+
 			auto Installed = co_await Interface.f_CallActor(&CAppManagerInterface::f_GetInstalled)().f_Timeout(g_Timeout, "Timed out enumerating applications");
 			auto pAgent = Installed.f_FindEqual("SelfUpdate.Linux-riscv64");
 			DMibAssertTrue(pAgent != nullptr);

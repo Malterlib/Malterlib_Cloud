@@ -1103,31 +1103,54 @@ namespace NMib::NCloud::NAppManager
 	// the future
 	auto CAppManagerActor::fp_ReadPackageVersionInfo(CStr _Package, TCFunction<void (CStr const &_Info)> _fOnInfo) -> TCFuture<TCOptional<CPackageVersionInfo>>
 	{
+		// As in fsp_UnpackApplication, a directory is read as a directory whatever its name, and a file as an archive
+		bool bArchive = false;
 		{
 			auto BlockingActorCheckout = fg_BlockingActor();
 
-			_Package = co_await
+			auto [Package, bPackageIsArchive] = co_await
 				(
-					g_Dispatch(BlockingActorCheckout) / [_Package]() -> CStr
+					g_Dispatch(BlockingActorCheckout) / [_Package]()
 					{
 						if (!CFile::fs_FileExists(_Package, EFileAttrib_Directory))
-							return _Package;
+							return fg_Tuple(_Package, CFile::fs_FileExists(_Package, EFileAttrib_File));
 
+						// Adding and updating an application read a sole entry with a tar suffix in place of the directory
 						auto Files = CFile::fs_FindFiles(_Package / "*");
 						if (Files.f_GetLen() == 1 && (Files[0].f_EndsWith(".tar.gz") || Files[0].f_EndsWith(".tar.zst") || Files[0].f_EndsWith(".tar")))
-							return Files[0];
+							return fg_Tuple(Files[0], CFile::fs_FileExists(Files[0], EFileAttrib_File));
 
-						return _Package;
+						return fg_Tuple(_Package, false);
 					}
 				)
 			;
+
+			_Package = fg_Move(Package);
+			bArchive = bPackageIsArchive;
 		}
 
 		CStr VersionInfoContents;
 		CTime VersionTime;
 
-		if (_Package.f_EndsWith(".tar.gz") || _Package.f_EndsWith(".tar.zst") || _Package.f_EndsWith(".tar"))
+		if (bArchive)
 		{
+			TCActor<CProcessLaunchActor> LaunchListActor(fg_Construct());
+			auto AutoDestroyLaunchList = co_await fg_AsyncDestroy(LaunchListActor);
+
+			CProcessLaunchActor::CSimpleLaunch LaunchList
+				{
+					mp_State.m_RootDirectory / "bin/bsdtar"
+					,
+					{
+						"-tvvf"
+						, _Package
+					}
+					, CFile::fs_GetPath(_Package)
+					, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode
+				}
+			;
+
+			// The first matching member, as CVersionManagerHelper and CloudClient select it on upload
 			TCActor<CProcessLaunchActor> LaunchActor(fg_Construct());
 			auto AutoDestroyLaunch = co_await fg_AsyncDestroy(LaunchActor);
 
@@ -1139,22 +1162,6 @@ namespace NMib::NCloud::NAppManager
 						"-xqOf"
 						, _Package
 						, "*VersionInfo.json"
-					}
-					, CFile::fs_GetPath(_Package)
-					, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode
-				}
-			;
-
-			TCActor<CProcessLaunchActor> LaunchListActor(fg_Construct());
-			auto AutoDestroyLaunchList = co_await fg_AsyncDestroy(LaunchListActor);
-
-			CProcessLaunchActor::CSimpleLaunch LaunchList
-				{
-					mp_State.m_RootDirectory / "bin/bsdtar"
-					,
-					{
-						"-tvvf"
-						, _Package
 					}
 					, CFile::fs_GetPath(_Package)
 					, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode
@@ -1212,10 +1219,14 @@ namespace NMib::NCloud::NAppManager
 						Newest = FileTime;
 				}
 
+				// The newest member, as CVersionManagerHelper chooses the version time of an archive it uploads
 				VersionTime = CTimeConvert::fs_FromUnixMilliseconds(CTimeConvert(Newest).f_UnixMilliseconds());
 			}
 
+			// The JSON can start with the UTF-8 byte order mark that fs_WriteStringToFile writes by default
 			VersionInfoContents = LaunchResult->f_GetStdOut();
+			if (VersionInfoContents.f_StartsWith("\xEF\xBB\xBF"))
+				VersionInfoContents = VersionInfoContents.f_Extract(3);
 		}
 		else
 		{
