@@ -5,11 +5,14 @@
 #include <Mib/Cryptography/RandomID>
 #include <Mib/Concurrency/ActorSubscription>
 #include <Mib/Concurrency/AsyncDestroy>
+#include <Mib/Stream/Streams/Vector>
 
 #include "Malterlib_Cloud_App_AppManager.h"
 
 #ifdef DPlatformFamily_Windows
 #	include <Mib/Core/PlatformSpecific/WindowsFilePath>
+#else
+#	include <sys/stat.h>
 #endif
 
 namespace NMib::NCloud::NAppManager
@@ -1038,48 +1041,49 @@ namespace NMib::NCloud::NAppManager
 	// _fOnInfo. Errors reading a directory package fail the future
 	auto CAppManagerActor::fp_ReadPackageVersionInfo(CStr _Package, TCFunction<void (CStr const &_Info)> _fOnInfo) -> TCFuture<TCOptional<CPackageVersionInfo>>
 	{
+		// Like the unpack, a directory is read as a directory whatever its name and any other file as an archive
+		bool bArchive = false;
 		{
 			auto BlockingActorCheckout = fg_BlockingActor();
 
-			_Package = co_await
+			auto [Package, bPackageIsArchive] = co_await
 				(
-					g_Dispatch(BlockingActorCheckout) / [_Package]() -> CStr
+					g_Dispatch(BlockingActorCheckout) / [_Package]()
 					{
-						if (!CFile::fs_FileExists(_Package, EFileAttrib_Directory))
-							return _Package;
+						// Only a regular file is read as an archive: bsdtar would wait for a writer of a named pipe without end
+						auto fIsRegularFile = [](CStr const &_Path)
+							{
+#ifdef DPlatformFamily_Windows
+								return CFile::fs_FileExists(_Path, EFileAttrib_File);
+#else
+								struct stat Stat;
+								return ::stat(_Path.f_GetStr(), &Stat) == 0 && S_ISREG(Stat.st_mode);
+#endif
+							}
+						;
 
+						if (!CFile::fs_FileExists(_Package, EFileAttrib_Directory))
+							return fg_Tuple(_Package, fIsRegularFile(_Package));
+
+						// The unpack unwraps an entry of such a name also when it is a directory, which it then copies as a directory
 						auto Files = CFile::fs_FindFiles(_Package / "*");
 						if (Files.f_GetLen() == 1 && (Files[0].f_EndsWith(".tar.gz") || Files[0].f_EndsWith(".tar.zst") || Files[0].f_EndsWith(".tar")))
-							return Files[0];
+							return fg_Tuple(Files[0], fIsRegularFile(Files[0]));
 
-						return _Package;
+						return fg_Tuple(_Package, false);
 					}
 				)
 			;
+
+			_Package = fg_Move(Package);
+			bArchive = bPackageIsArchive;
 		}
 
 		CStr VersionInfoContents;
 		CTime VersionTime;
 
-		if (_Package.f_EndsWith(".tar.gz") || _Package.f_EndsWith(".tar.zst") || _Package.f_EndsWith(".tar"))
+		if (bArchive)
 		{
-			TCActor<CProcessLaunchActor> LaunchActor(fg_Construct());
-			auto AutoDestroyLaunch = co_await fg_AsyncDestroy(LaunchActor);
-
-			CProcessLaunchActor::CSimpleLaunch Launch
-				{
-					mp_State.m_RootDirectory / "bin/bsdtar"
-					,
-					{
-						"-xqOf"
-						, _Package
-						, "*VersionInfo.json"
-					}
-					, CFile::fs_GetPath(_Package)
-					, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode
-				}
-			;
-
 			TCActor<CProcessLaunchActor> LaunchListActor(fg_Construct());
 			auto AutoDestroyLaunchList = co_await fg_AsyncDestroy(LaunchListActor);
 
@@ -1096,12 +1100,50 @@ namespace NMib::NCloud::NAppManager
 				}
 			;
 
-			auto [LaunchResult, LaunchListResult] = co_await
-				(
-					LaunchActor(&CProcessLaunchActor::f_LaunchSimple, fg_Move(Launch)) + LaunchListActor(&CProcessLaunchActor::f_LaunchSimple, fg_Move(LaunchList))
-				)
-				.f_Wrap()
+			// The first member that matches, as CVersionManagerHelper and CloudClient select it when they upload, so that the version matches what the
+			// version manager records for the same package. The member is raw file contents, which can be UTF-16 or UTF-32 with NUL bytes, so the output
+			// is captured as bytes; the text capture of process output isn't binary safe. The launch blocks until bsdtar exits, also when the
+			// coroutine is torn down and at shutdown, which only waits on a package that doesn't end, like a file on a stalled file system: a path the
+			// operator or an API caller with the add permission chose, who are trusted
+			auto BlockingActorCheckout = fg_BlockingActor();
+			auto ExtractVersionInfo = g_Dispatch(BlockingActorCheckout) / [BsdTar = mp_State.m_RootDirectory / "bin/bsdtar", _Package]() -> CStr
+				{
+					CByteVector StdOut;
+					CByteVector StdErr;
+
+					CProcessLaunchParams Params;
+					Params.m_WorkingDirectory = CFile::fs_GetPath(_Package);
+					Params.m_fOnOutputBinary = [&](EProcessLaunchOutputType _OutputType, CIOByteVector const &_Output)
+						{
+							if (_OutputType == EProcessLaunchOutputType_StdOut)
+								StdOut.f_Insert(_Output.f_GetArray(), _Output.f_GetLen());
+							else
+								StdErr.f_Insert(_Output.f_GetArray(), _Output.f_GetLen());
+						}
+					;
+
+					// Only output that isn't from the streams of the process, like launch errors, arrives as text
+					CStr TextStdOut;
+					CStr TextErrors;
+					uint32 ExitCode = 0;
+					if (!CProcessLaunch::fs_LaunchBlock(BsdTar, {"-xqOf", _Package, "*VersionInfo.json"}, TextStdOut, TextErrors, ExitCode, Params))
+						DMibError("Failed to launch bsdtar: {}"_f << TextErrors);
+
+					if (ExitCode)
+					{
+						CStr ErrorOutput(reinterpret_cast<ch8 const *>(StdErr.f_GetArray()), StdErr.f_GetLen());
+						DMibError("bsdtar failed with exit code {}: {}"_f << ExitCode << fg_ConcatOutput(ErrorOutput, TextErrors));
+					}
+
+					// The member is raw file contents, which can start with a byte order mark like a version info file read from a directory. The
+					// decoding throws here, where the dispatch returns the error
+					NStream::TCBinaryStreamConstMemoryPtr<> Stream;
+					Stream.f_OpenRead(StdOut.f_GetArray(), StdOut.f_GetLen());
+					return fg_ReadTextStream(Stream, true);
+				}
 			;
+
+			auto [LaunchResult, LaunchListResult] = co_await (fg_Move(ExtractVersionInfo) + LaunchListActor(&CProcessLaunchActor::f_LaunchSimple, fg_Move(LaunchList))).f_Wrap();
 
 			if (!LaunchResult)
 			{
@@ -1147,10 +1189,11 @@ namespace NMib::NCloud::NAppManager
 						Newest = FileTime;
 				}
 
+				// The newest member, as CVersionManagerHelper chooses the version time of an archive it uploads
 				VersionTime = CTimeConvert::fs_FromUnixMilliseconds(CTimeConvert(Newest).f_UnixMilliseconds());
 			}
 
-			VersionInfoContents = LaunchResult->f_GetStdOut();
+			VersionInfoContents = fg_Move(*LaunchResult);
 		}
 		else
 		{
