@@ -112,6 +112,31 @@ namespace NMib::NCloud::NAppManager
 		return m_bLaunching || !m_ProcessLaunch.f_IsOfType<void>() || m_bLaunched;
 	}
 
+	// Whether the operations in progress that f_IsInProgress sees all wait for the container or VM guest of their application, which can hold
+	// them for as long as their guest calls take
+	bool CAppManagerActor::CApplication::f_InProgressWaitsOnlyForGuest() const
+	{
+		auto fHostWork = [](CApplication const &_Application)
+			{
+				return _Application.m_bOperationInProgress && !_Application.m_nGuestWaits;
+			}
+		;
+
+		if (fHostWork(*this))
+			return false;
+
+		if (m_pParentApplication && fHostWork(*m_pParentApplication))
+			return false;
+
+		for (auto &Child : m_Children)
+		{
+			if (fHostWork(Child))
+				return false;
+		}
+
+		return true;
+	}
+
 	bool CAppManagerActor::CApplication::f_IsInProgress() const
 	{
 		if (m_bOperationInProgress)
@@ -295,24 +320,52 @@ namespace NMib::NCloud::NAppManager
 							}
 						;
 
-						TCFutureVector<uint32> ChildrenCloses;
-
-						// Stop all children and dependents first
+						// Stop all children and dependents first. An operation of the application that waits for stops in container or VM guests
+						// only waits for the guests, like the update of a host application with dependents in guests, so the stops that wait for
+						// the host are waited for first, and the rest waits only for guests
+						TCFutureVector<uint32> HostChildrenCloses;
+						TCFutureVector<uint32> GuestChildrenCloses;
 						for (auto &pDependent : pApplication->f_GetDependents())
-							pDependent->f_Stop(EStopFlag_AutoStart) > ChildrenCloses;
+						{
+							bool bGuestOnly = pApplication->m_pThis->fp_StopWaitsOnlyForGuests(*pDependent);
+							pDependent->f_Stop(EStopFlag_AutoStart) > (bGuestOnly ? GuestChildrenCloses : HostChildrenCloses);
+						}
 
 						for (auto &ChildApp : pApplication->m_Children)
-							ChildApp.f_Stop(EStopFlag_AutoStart) > ChildrenCloses;
+						{
+							bool bGuestOnly = pApplication->m_pThis->fp_StopWaitsOnlyForGuests(ChildApp);
+							ChildApp.f_Stop(EStopFlag_AutoStart) > (bGuestOnly ? GuestChildrenCloses : HostChildrenCloses);
+						}
+
+						bool bChildrenGuestWait = !GuestChildrenCloses.f_IsEmpty();
 
 						pApplication->m_pThis->fp_AppLaunchStateChanged(pApplication, "Stopping", CAppManagerInterface::EStatusSeverity_Warning);
 
-						auto [ChildrenCloseResults, SaveStateResult] = co_await ((fg_AllDoneWrapped(ChildrenCloses) + fg_Move(SaveStateFuture)) % "Failed to stop child application");
+						auto [HostChildrenCloseResults, SaveStateResult] = co_await ((fg_AllDoneWrapped(HostChildrenCloses) + fg_Move(SaveStateFuture)) % "Failed to stop child application");
+
+						if (bChildrenGuestWait)
+							++pApplication->m_nGuestWaits;
+						auto EndChildrenGuestWait = g_OnScopeExit / [pApplication, bChildrenGuestWait]
+							{
+								if (bChildrenGuestWait)
+									--pApplication->m_nGuestWaits;
+							}
+						;
+
+						auto GuestChildrenCloseResults = co_await fg_AllDoneWrapped(GuestChildrenCloses);
+
+						EndChildrenGuestWait.f_Clear();
+						if (bChildrenGuestWait)
+							--pApplication->m_nGuestWaits;
 
 						CStr ChildCloseErrors;
-						for (auto &ChildCloseResult : ChildrenCloseResults)
+						for (auto *pChildrenCloseResults : {&HostChildrenCloseResults, &GuestChildrenCloseResults})
 						{
-							if (!ChildCloseResult)
-								fg_AddStrSep(ChildCloseErrors, ChildCloseResult.f_GetExceptionStr(), "\n");
+							for (auto &ChildCloseResult : *pChildrenCloseResults)
+							{
+								if (!ChildCloseResult)
+									fg_AddStrSep(ChildCloseErrors, ChildCloseResult.f_GetExceptionStr(), "\n");
+							}
 						}
 
 						if (!ChildCloseErrors.f_IsEmpty())
@@ -339,6 +392,18 @@ namespace NMib::NCloud::NAppManager
 
 							if (pEnvironment->m_AgentInterface && !pApplication->m_bDeleted)
 							{
+								// The pre stop and the stop through the agent wait for the guest of a container or VM, which can hold them for an hour
+								// each; a Local environment runs on the host
+								bool bGuestWait = pEnvironment->m_Settings.m_Type != CAppManagerInterface::EEnvironmentType_Local;
+								if (bGuestWait)
+									++pApplication->m_nGuestWaits;
+								auto EndGuestWait = g_OnScopeExit / [pApplication, bGuestWait]
+									{
+										if (bGuestWait)
+											--pApplication->m_nGuestWaits;
+									}
+								;
+
 								// The application registers its distributed app interface with this AppManager, so its pre stop goes through
 								// this AppManager rather than the agent
 								if (pApplication->m_AppInterface && pApplication->m_AppInterface->f_InterfaceVersion() >= CDistributedAppInterfaceClient::EProtocolVersion_SupportPreStop)

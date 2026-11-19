@@ -357,6 +357,7 @@ namespace NMib::NCloud::NAppManager
 									, pState->m_LastInstalledVersion
 									, pState->m_LastInstalledVersionInfo
 									, pStopwatch->f_GetTime()
+									, true
 								)
 								.f_Wrap()
 							;

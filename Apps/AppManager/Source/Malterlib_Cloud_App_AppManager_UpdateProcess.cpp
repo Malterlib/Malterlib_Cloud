@@ -478,6 +478,13 @@ namespace NMib::NCloud::NAppManager
 
 		State.m_fOnInfo("Transferring the application files into the environment");
 
+		++State.m_pApplication->m_nGuestWaits;
+		auto EndGuestWait = g_OnScopeExit / [pApplication = State.m_pApplication]
+			{
+				--pApplication->m_nGuestWaits;
+			}
+		;
+
 		if (_pEnvironment->m_bStoppedManually)
 			co_return DMibErrorInstance("Environment '{}' was stopped. Start it with --environment-start."_f << _pEnvironment->m_Name);
 
@@ -656,6 +663,7 @@ namespace NMib::NCloud::NAppManager
 				, State.m_LastInstalledVersion
 				, State.m_LastInstalledVersionInfo
 				, State.m_pStopwatch->f_GetTime()
+				, true
 			)
 		;
 		co_return {};
@@ -678,6 +686,13 @@ namespace NMib::NCloud::NAppManager
 		if (State.m_pRemoteStorageEnvironment)
 		{
 			auto pEnvironment = State.m_pRemoteStorageEnvironment;
+
+			++State.m_pApplication->m_nGuestWaits;
+			auto EndGuestWait = g_OnScopeExit / [pApplication = State.m_pApplication]
+				{
+					--pApplication->m_nGuestWaits;
+				}
+			;
 
 			co_await fp_EnsureEnvironmentStarted(pEnvironment);
 
@@ -839,6 +854,7 @@ namespace NMib::NCloud::NAppManager
 				, State.m_LastInstalledVersion
 				, State.m_LastInstalledVersionInfo
 				, State.m_pStopwatch->f_GetTime()
+				, true
 			)
 		;
 		co_return {};
@@ -892,6 +908,7 @@ namespace NMib::NCloud::NAppManager
 					, State.m_LastInstalledVersion
 					, State.m_LastInstalledVersionInfo
 					, State.m_pStopwatch->f_GetTime()
+					, false
 				)
 				> fg_LogError("Malterlib/Cloud/AppManager", "Error script failed")
 			;
@@ -929,6 +946,7 @@ namespace NMib::NCloud::NAppManager
 				, State.m_LastInstalledVersion
 				, State.m_LastInstalledVersionInfo
 				, State.m_pStopwatch->f_GetTime()
+				, true
 			)
 			.f_Wrap()
 		;

@@ -866,6 +866,14 @@ namespace NMib::NCloud::NAppManager
 				pStageState->m_TempraryPath = UnpackDirectory;
 				pStageState->m_Files = Files;
 
+				// The staging and the apply wait for the guest, which holds back environment stops only for the limit of guest deferrals
+				++pPendingInstallEnvironment->m_nPendingInstallGuestWaits;
+				auto EndGuestWait = g_OnScopeExit / [pPendingInstallEnvironment]
+					{
+						--pPendingInstallEnvironment->m_nPendingInstallGuestWaits;
+					}
+				;
+
 				co_await (fp_StageApplicationInEnvironment(pStageState, pRemoteStorageEnvironment) % "Failed to stage the application in the environment" % Auditor);
 
 				CAppManagerEnvironmentInterface::CApplicationApply Apply;
@@ -899,6 +907,8 @@ namespace NMib::NCloud::NAppManager
 				;
 
 				pStageState->m_AgentStageCleanup.f_Clear();
+				EndGuestWait.f_Clear();
+				--pPendingInstallEnvironment->m_nPendingInstallGuestWaits;
 
 				co_await CleanupUnpack->f_Destroy();
 			}
@@ -988,6 +998,15 @@ namespace NMib::NCloud::NAppManager
 		Cleanup->f_Clear();
 
 		auto InProgressScope = pApplication->f_SetInProgress("Add Application");
+
+		// From here the operation of the application holds back the idle waits and removals of its environment, and its launch counts the waits
+		// for the guest
+		if (pPendingInstallEnvironment)
+		{
+			PendingInstall.f_Clear();
+			--pPendingInstallEnvironment->m_nPendingInstalls;
+		}
+
 		auto DestroyInProgress = co_await fg_AsyncDestroy(fg_Move(InProgressScope));
 
 		// The info that the add publishes compares the version it installed with the finished one

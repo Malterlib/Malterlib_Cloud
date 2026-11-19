@@ -162,7 +162,8 @@ executable runs there, and the agent installs them inside the environment before
 the package manager of the platform. On Arch Linux, which supports no partial upgrades, installing a missing package
 upgrades the whole system. The dependencies of the AppManager's own distribution are the tools of the host monitor of
 its agents, so the host doesn't install them for a self update source, and an agent that can't install them still
-launches the applications of its environment.
+launches the applications of its environment. An installation inside a container or VM holds back environment
+stops, and the launches and scripts that wait for it, for at most an hour.
 
 Agents in containers and VMs run their own host monitor, configured from the host's automatic update settings: they
 patch the environment's OS and ask the host to restart the environment when an update needs it. The agent of a
@@ -172,7 +173,11 @@ reboots and environment stops for at most an hour, and the host refuses updates 
 environment, reboots or shuts down. The sensors of applications in a container or VM hold back automatic host reboots and
 automatic environment restarts for at most an hour in all, however the guests report them. A manual environment
 restart doesn't wait for them, while a manual host reboot is refused as long as anything holds it back, guests
-included. Local agents share the host OS, which the host AppManager patches and reboots, so they get no automatic
+included. The shutdown before a host reboot waits for the calls already in progress in container and VM
+environments, like update scripts, file applies and stops, only for an hour from its start; then it force-stops those
+environments, dropping the connections of their agents and applications and killing the container or VM, and goes
+on. A shutdown without a reboot waits for them as long as their timeouts allow. Both end sooner when the shutdown
+timeouts of the AppManager and its daemon do. Local agents share the host OS, which the host AppManager patches and reboots, so they get no automatic
 update settings.
 
 ## Threat model

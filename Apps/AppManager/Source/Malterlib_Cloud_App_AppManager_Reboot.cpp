@@ -23,21 +23,39 @@ namespace NMib::NCloud::NAppManager
 #else
 		CStopwatch Stopwatch{true};
 
+		// The guests of container and VM environments prevent the reboot for a limited time each, which the reboot waits out, but together they
+		// prevent it for at most the limit of one. The host's own reasons abort it once they have prevented it for 10 minutes in all; the time only
+		// guests prevent it doesn't count
+		fp64 HostPreventedSeconds = 0.0;
 		while (true)
 		{
 			if (mp_bRebooting)
 				co_return ERebootResult::mc_AlreadyScheduled;
 
-			if (Stopwatch.f_GetTime() > 10_minutes)
+			if (HostPreventedSeconds > 10_minutes)
 			{
 				DMibLogWithCategory(Malterlib/Cloud/AppManager, Critical, "Aborted reboot due to timeout. Reboot has to be scheduled manually.");
 				co_return ERebootResult::mc_AlreadyScheduled;
 			}
 
-			if (!co_await fp_CheckAndLogPreventedReboot({.m_bErrorOnPreventReboot = _bErrorOnPreventReboot, .m_bCriticalLog = Stopwatch.f_GetTime() > 5_minutes}))
+			CStopwatch IterationStopwatch{true};
+			auto Prevented = co_await fp_CheckAndLogPreventedReboot
+				(
+					{
+						.m_bErrorOnPreventReboot = _bErrorOnPreventReboot
+						, .m_bCriticalLog = Stopwatch.f_GetTime() > 5_minutes
+						, .m_bIgnoreGuestDeferrals = Stopwatch.f_GetTime() >= CAppManagerGuestDeferral::mc_LimitSeconds
+					}
+				)
+			;
+
+			if (Prevented == EPreventedReboot::mc_None)
 				break;
 
 			co_await fg_Timeout(10.0);
+
+			if (Prevented == EPreventedReboot::mc_Host)
+				HostPreventedSeconds += IterationStopwatch.f_GetTime();
 		}
 
 		if (mp_bRebooting)

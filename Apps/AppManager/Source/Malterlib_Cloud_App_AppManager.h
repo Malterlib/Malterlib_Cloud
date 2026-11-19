@@ -234,6 +234,7 @@ namespace NMib::NCloud::NAppManager
 			void f_SetStatus(CStr const &_Status, CAppManagerInterface::EStatusSeverity _Severity);
 			bool f_IsStarted() const;
 			bool f_AgentUpdateDefers() const;
+			bool f_AgentConfigurationDefers() const;
 			void f_SetAgentUpdateInProgress(CStr &&_Description);
 
 			CIntrusiveRefCount m_RefCount;
@@ -277,6 +278,7 @@ namespace NMib::NCloud::NAppManager
 			umint m_nStorageRemovals = 0;                /// Application storage removals that need the agent; the last one stops a manually stopped environment
 			bool m_bWindowOpen = false;                  /// Set while a window session is prepared or runs; it reserves the guest image bundle
 			umint m_nPendingInstalls = 0;                /// Adds of applications assigned to the environment that have reached unpacking
+			umint m_nPendingInstallGuestWaits = 0;       /// The pending installs that wait for the guest, which stages and applies their files
 			umint m_nRunningScripts = 0;                 /// Update script calls to the agent awaiting a reply or timeout; stops and restarts wait for them
 			TCDistributedActorInterface<CDistributedAppInterfaceClient> m_AgentAppInterface;
 			TCDistributedActorInterface<CAppManagerEnvironmentInterface> m_AgentInterface;
@@ -287,6 +289,8 @@ namespace NMib::NCloud::NAppManager
 			umint m_nPendingAgentConfigurations = 0;
 			umint m_AgentConfigurationSequence = 0;      /// Sequence of the newest agent configuration sent, whose result sets m_AgentConfigurationError
 			TCVector<TCPromise<void>> m_OnAgentConfigured;
+			CAppManagerGuestDeferral m_AgentConfigurationDeferral;
+			fp64 m_LastAgentConfigurationStart = 0.0;    /// CAppManagerGuestDeferral::fs_Now when the newest agent configuration was sent
 			CStr m_AgentConfigurationError;              /// Failure of the newest agent configuration; launches retry the configuration
 			CStr m_AgentUpdateInProgress;                /// Description of the OS updates or dependency installs the agent reports; see f_AgentUpdateDefers
 			CAppManagerGuestDeferral m_AgentUpdateDeferral;
@@ -296,6 +300,7 @@ namespace NMib::NCloud::NAppManager
 			bool m_bStartEnsuredContainerSystem = false; /// Set while a start runs on the container system it ensured; a colima restart waits for that start
 			bool m_bStarted = false;
 			bool m_bStopping = false;
+			bool m_bForceStopped = false;                /// The shutdown before a host reboot ran out the guest deferral limit; the agent is refused from then on
 			bool m_bRemoving = false;
 			bool m_bReplacingContainerAfterPull = false; /// New starts fail and automatic launches are deferred while the container is replaced
 			umint m_nStops = 0;                          /// Stops so far, which tell a restart that waits whether another restart came first
@@ -360,6 +365,7 @@ namespace NMib::NCloud::NAppManager
 			TCFuture<void> f_InProgressWait();
 			bool f_DependenciesSatisfied(CStr &o_State, CAppManagerInterface::EStatusSeverity &o_Severity, bool &o_bNeedsEncryption) const;
 			bool f_IsLaunched() const;
+			bool f_InProgressWaitsOnlyForGuest() const;
 
 			TCVector<TCSharedPointer<CApplication>> f_GetDependents() const;
 
@@ -428,6 +434,8 @@ namespace NMib::NCloud::NAppManager
 			bool m_bPendingStop = false;
 
 			CDistributedAppSensorReporter::ESensorInfoFlag m_PreventRebootSensorFlags = CDistributedAppSensorReporter::ESensorInfoFlag::mc_None;
+			CAppManagerGuestDeferral m_PreventRebootDeferral; /// Limits the sensors of an application in a container or VM environment, see fp_ApplicationPreventsReboot
+			umint m_nGuestWaits = 0;                          /// Steps of the operation in progress that wait for the container or VM guest; see f_InProgressWaitsOnlyForGuest
 
 			CStr m_OperationInProgressDescription;
 			CStopwatch m_OperationInProgressStopwatch;
@@ -798,12 +806,28 @@ namespace NMib::NCloud::NAppManager
 			CDistributedAppSensorReporter::CSensorInfo m_SensorInfo;
 			CActorSubscription m_SensorSubscription;
 			TCOptional<CDistributedAppSensorReader_SensorKeyAndReading> m_LastReading;
+			CDistributedAppSensorReporter::ESensorInfoFlag m_PreventedFlags = CDistributedAppSensorReporter::ESensorInfoFlag::mc_None; /// From the last reading
+		};
+
+		struct CSensorRebootPreventionCounts
+		{
+			umint m_nPreventRebootOnWarning = 0;
+			umint m_nPreventRebootOnError = 0;
+			umint m_nPreventRebootOnOutdated = 0;
 		};
 
 		struct CCheckAndLogPreventedRebootParams
 		{
 			bool m_bErrorOnPreventReboot = false;
 			bool m_bCriticalLog = false;
+			bool m_bIgnoreGuestDeferrals = false;
+		};
+
+		enum class EPreventedReboot : uint32
+		{
+			mc_None
+			, mc_GuestDeferrals /// Only guests of container or VM environments prevent the reboot, each for a limited time
+			, mc_Host
 		};
 
 		enum class ERebootResult : uint32
@@ -922,13 +946,14 @@ namespace NMib::NCloud::NAppManager
 				, CVersionManager::CVersionIDAndPlatform _PreviousVersionID
 				, CVersionManager::CVersionInformation _PreviousVersionInformation
 				, fp64 _TimeSinceUpdateStart
+				, bool _bOperationWaits
 			)
 			-> TCFuture<void>
 		;
 		TCFuture<void> fp_RunBashScript(CAppManagerEnvironmentInterface::CEnvironmentScript _Script, NStr::CStrSecure _RunAsUserPassword = {});
 		TCFuture<bool> fp_SelfUpdate(TCSharedPointer<CApplication> _pApplication);
 		TCFuture<ERebootResult> fp_Reboot(bool _bErrorOnPreventReboot);
-		TCFuture<bool> fp_CheckAndLogPreventedReboot(CCheckAndLogPreventedRebootParams _Params);
+		TCFuture<EPreventedReboot> fp_CheckAndLogPreventedReboot(CCheckAndLogPreventedRebootParams _Params);
 
 		TCFuture<uint32> fp_CommandLine_EnumApplications(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_AddApplication(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
@@ -1014,14 +1039,17 @@ namespace NMib::NCloud::NAppManager
 		;
 		TCFuture<CStr> fp_FetchVMAgentGuestLog(TCSharedPointer<CEnvironment> _pEnvironment, NVirtualization::CMacOSGuestProvisioning _Provisioning);
 		void fp_RestartEnvironmentsForAgentApplication(CStr const &_ApplicationName);
-		TCFuture<void> fp_WaitForEnvironmentIdle(TCSharedPointer<CEnvironment> _pEnvironment);
+		TCFuture<void> fp_WaitForEnvironmentIdle(TCSharedPointer<CEnvironment> _pEnvironment, fp64 _GuestDeferralsEnd = fp64::fs_Inf());
 		CStr fp_FindApplicationPreventingEnvironmentRestart(CEnvironment const &_Environment);
 		TCFuture<void> fp_RestartEnvironmentWhenIdle(TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<void> fp_SetEnvironmentSensorStatus(TCSharedPointer<CEnvironment> _pEnvironment, CStr _Status, CAppManagerInterface::EStatusSeverity _Severity);
 		TCFuture<void> fp_StopEnvironmentInternal(TCSharedPointer<CEnvironment> _pEnvironment);
+		TCFuture<void> fp_ForceStopGuestEnvironmentsAfter(TCFuture<void> _Timeout);
+		TCFuture<void> fp_ForceStopGuestEnvironment(TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<void> fp_SetEnvironmentStoppedManually(TCSharedPointer<CEnvironment> _pEnvironment, bool _bStoppedManually);
 		TCFuture<void> fp_PullEnvironment(CStr _Name, CCallingHostInfo _CallingHostInfo);
 		TCFuture<void> fp_StopEnvironmentContainer(TCSharedPointer<CEnvironment> _pEnvironment);
+		TCFuture<void> fp_KillEnvironmentContainer(TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<bool> fp_EnvironmentContainerExists(TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<bool> fp_OwnContainerSystemStopped(TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<void> fp_PullEnvironmentContainerImage(TCSharedPointer<CEnvironment> _pEnvironment);
@@ -1031,6 +1059,7 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<void> fp_ConfirmEnvironmentAppStart(TCSharedPointer<CApplication> _pApplication);
 		void fp_SendEnvironmentAgentConfig(CEnvironment &_Environment);
 		TCFuture<void> fp_WaitForEnvironmentAgentConfiguration(TCSharedPointer<CEnvironment> _pEnvironment);
+		TCFuture<void> fp_WaitForPendingAgentConfigurations(TCSharedPointer<CEnvironment> _pEnvironment);
 		void fp_OnEnvironmentApplicationStateChange(TCSharedPointer<CEnvironment> const &_pEnvironment, CAppManagerEnvironmentInterface::CApplicationStateChange const &_Change);
 		TCFuture<CStr> fp_GetEnvironmentAgentExecutable(TCSharedPointer<CEnvironment> _pEnvironment, TCSharedPointer<CStr> _pError);
 		CStr fp_GetContainerRuntimeExecutable(TCSharedPointer<CEnvironment> const &_pEnvironment);
@@ -1341,11 +1370,25 @@ namespace NMib::NCloud::NAppManager
 
 		static CStr fsp_LimitErrorLogSize(CStr const &_String, umint _ExtraSize);
 
-		TCFuture<void> fp_RebootPrevention_WatchSensor(CStr _Application, CDistributedAppSensorReporter::CSensorInfo _SensorInfo);
+		TCFuture<void> fp_RebootPrevention_WatchSensor(TCSharedPointer<CApplication> _pApplication, CDistributedAppSensorReporter::CSensorInfo _SensorInfo);
 		TCFuture<void> fp_RebootPrevention_RemoveApplication(CStr _Application);
 		TCFuture<void> fp_RebootPrevention_WatchInitialSensors();
 		TCFuture<void> fp_RebootPrevention_UpdateApplications();
-		void fp_RebootPrevention_UpdateApplicationFlags(CSensorRebootWatch const &_Watch, NTime::CTime const &_Now);
+		void fp_RebootPrevention_UpdateWatchFlags(CDistributedAppSensorReporter::CSensorInfoKey const &_Key, CSensorRebootWatch &_Watch, NTime::CTime const &_Now);
+		void fp_RebootPrevention_SetWatchFlags
+			(
+				CDistributedAppSensorReporter::CSensorInfoKey const &_Key
+				, CSensorRebootWatch &_Watch
+				, CDistributedAppSensorReporter::ESensorInfoFlag _Prevented
+			)
+		;
+		void fp_RebootPrevention_UpdateApplicationFlags(CStr const &_Application);
+		void fp_RebootPrevention_RemoveWatch(CDistributedAppSensorReporter::CSensorInfoKey const &_Key);
+		void fp_RebootPrevention_SetApplicationFlags(CApplication &_Application, CDistributedAppSensorReporter::ESensorInfoFlag _Prevented);
+		bool fp_ApplicationPreventsReboot(CApplication const &_Application, fp64 _Now);
+		bool fp_ApplicationRunsInGuest(CApplication const &_Application);
+		bool fp_StopWaitsOnlyForGuests(CApplication const &_Application);
+		bool fp_StopWaitsOnlyForGuests(CApplication const &_Application, TCSet<CApplication const *> &o_Visited);
 
 		static constexpr uint32 mcp_CurrentAppMangerVersion = 0x101;
 
@@ -1495,6 +1538,9 @@ namespace NMib::NCloud::NAppManager
 
 		CStr mp_LastPreventRebootDescription;
 		TCMap<CDistributedAppSensorReporter::CSensorInfoKey, CSensorRebootWatch> mp_SensorRebootPreventionWatch;
+		TCMap<CStr, TCSet<CDistributedAppSensorReporter::CSensorInfoKey>> mp_SensorRebootPreventionWatchByApplication; /// The keys of mp_SensorRebootPreventionWatch
+		TCMap<CStr, TCMap<CStr, CSensorRebootPreventionCounts>> mp_SensorRebootPreventionCounts;                       /// Per application and reporting host ID, the watches per flag
+		CSequencer mp_SensorRebootPreventionWatchSequencer{"AppManagerActor SensorRebootPreventionWatchSequencer"};
 		CActorSubscription mp_SensorRebootPreventionTimerSubscription;
 	};
 

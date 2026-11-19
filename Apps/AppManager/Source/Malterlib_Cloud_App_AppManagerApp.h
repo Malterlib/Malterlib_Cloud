@@ -51,6 +51,7 @@ namespace NMib::NCloud
 	{
 		void f_Update(bool _bActive, fp64 _Now);
 		bool f_Defers(fp64 _Now) const;
+		fp64 f_End() const;
 
 		static fp64 fs_Now();
 

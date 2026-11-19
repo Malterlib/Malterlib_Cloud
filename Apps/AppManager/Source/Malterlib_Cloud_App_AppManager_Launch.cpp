@@ -328,6 +328,7 @@ namespace NMib::NCloud::NAppManager
 						if (_pApplication->m_AssociatedHostID != _HostID)
 						{
 							_pApplication->m_AssociatedHostID = _HostID;
+							fp_RebootPrevention_UpdateApplicationFlags(_pApplication->m_Name);
 							fp_SendAppChange_AddedOrChanged(*_pApplication);
 						}
 
@@ -721,6 +722,7 @@ namespace NMib::NCloud::NAppManager
 							if (_pApplication->m_AssociatedHostID != _HostID)
 							{
 								_pApplication->m_AssociatedHostID = _HostID;
+								fp_RebootPrevention_UpdateApplicationFlags(_pApplication->m_Name);
 								fp_SendAppChange_AddedOrChanged(*_pApplication);
 							}
 

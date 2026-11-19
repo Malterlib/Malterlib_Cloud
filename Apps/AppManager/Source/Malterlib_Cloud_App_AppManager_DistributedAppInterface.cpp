@@ -169,6 +169,9 @@ namespace NMib::NCloud::NAppManager
 			Application.m_AssociatedHostID = HostID;
 			bApplicationJsonChanged = true;
 			bHostIDChanged = true;
+
+			// The sensors of the previous host stop counting
+			pThis->fp_RebootPrevention_UpdateApplicationFlags(Application.m_Name);
 		}
 
 		if (!Application.m_RegisterInfo.f_IsSameIgnoringLaunchID(_RegisterInfo))

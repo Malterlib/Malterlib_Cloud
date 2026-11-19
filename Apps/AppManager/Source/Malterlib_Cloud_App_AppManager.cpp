@@ -1091,6 +1091,19 @@ namespace NMib::NCloud::NAppManager
 
 		mp_bStoppingApp = true;
 
+		// Before a host reboot, the waits below for the guests of container and VM environments end at the latest with the guest deferral limit
+		// from here. A shutdown without a reboot waits for them as long as their own timeouts allow. Both also end earlier: the shutdown of the
+		// distributed app disconnects every host, the agents and applications of the guests too, after its kill hosts timeout, and the stop
+		// timeout of the daemon ends the process; the reboot stops what still runs then
+		CActorSubscription GuestLimitTimer;
+		TCFuture<void> GuestLimitForceStop;
+		if (mp_bRebooting)
+		{
+			auto TimeoutAbortable = co_await fg_TimeoutAbortable(CAppManagerGuestDeferral::mc_LimitSeconds);
+			GuestLimitTimer = fg_Move(TimeoutAbortable.m_Subscription);
+			GuestLimitForceStop = fp_ForceStopGuestEnvironmentsAfter(fg_Move(TimeoutAbortable.m_Future));
+		}
+
 		if (mp_RebootScheduleTimerSubscrption)
 			co_await fg_Exchange(mp_RebootScheduleTimerSubscrption, nullptr)->f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy reboot timer subscription");
 
@@ -1101,6 +1114,26 @@ namespace NMib::NCloud::NAppManager
 		co_await fg_Move(CanDestroyFuture);
 
 		co_await fp_CancelAllApplicationUpdatesOnStopAppManager();
+
+		// The initial installs that reached unpacking aren't updates, and stopping their environment in the middle of staging or applying their
+		// files cuts them off. Their guest calls end with their timeouts, or with the force-stop at the guest deferral limit before a reboot
+		while (true)
+		{
+			bool bPendingInstalls = false;
+			for (auto &pEnvironment : mp_Environments)
+			{
+				if (pEnvironment->m_nPendingInstalls)
+				{
+					bPendingInstalls = true;
+					break;
+				}
+			}
+
+			if (!bPendingInstalls)
+				break;
+
+			co_await fg_Timeout(1.0);
+		}
 
 		{
 			TCFutureVector<uint32> ApplicationStops;
@@ -1145,6 +1178,12 @@ namespace NMib::NCloud::NAppManager
 				fp_StopEnvironmentInternal(pEnvironment) > EnvironmentStops;
 
 			co_await fg_AllDone(EnvironmentStops).f_Wrap() > LogError.f_Warning("Failed to stop environments");
+		}
+
+		if (GuestLimitTimer)
+		{
+			co_await GuestLimitTimer->f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy the guest deferral limit timer");
+			co_await fg_Move(GuestLimitForceStop).f_Wrap() > LogError.f_Warning("Failed to force-stop environments");
 		}
 
 		{
