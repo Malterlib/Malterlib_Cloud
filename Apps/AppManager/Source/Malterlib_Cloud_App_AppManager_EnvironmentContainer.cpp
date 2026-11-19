@@ -1643,6 +1643,29 @@ namespace NMib::NCloud::NAppManager
 		co_return DMibErrorInstance("Failed to stop container '{}': {}"_f << ContainerName << (Result ? CStr(Result->f_GetErrorOut().f_Trim()) : Result.f_GetExceptionStr()));
 	}
 
+	// Kills the container without the grace period of a stop, which its processes could use to hold up the stop
+	TCFuture<void> CAppManagerActor::fp_KillEnvironmentContainer(TCSharedPointer<CEnvironment> _pEnvironment)
+	{
+		if (_pEnvironment->m_ContainerFingerprint.f_IsEmpty())
+			co_return {};
+
+		CStr ContainerName = fp_GetContainerName(_pEnvironment);
+
+		CProcessLaunchActor::CSimpleLaunch SimpleLaunch
+			(
+				fp_BuildContainerCommandParams(_pEnvironment, fg_CreateVector<CStr>("kill", ContainerName))
+				, CProcessLaunchActor::ESimpleLaunchFlag_None
+			)
+		;
+		SimpleLaunch.m_LogName = "Environment/{}/ContainerKill"_f << _pEnvironment->m_Name;
+
+		auto Result = co_await CProcessLaunchActor::fs_LaunchSimple(SimpleLaunch);
+		if (Result.m_ExitCode != 0)
+			co_return DMibErrorInstance("Failed to kill container '{}': {}"_f << ContainerName << Result.f_GetErrorOut().f_Trim());
+
+		co_return {};
+	}
+
 	// True when the container system that the AppManager runs for _pEnvironment is known not to run, so it runs none of its containers. It doesn't
 	// run after a host restart until an environment starts, and the stops of environments that aren't running don't start it
 	TCFuture<bool> CAppManagerActor::fp_OwnContainerSystemStopped(TCSharedPointer<CEnvironment> _pEnvironment)

@@ -83,7 +83,7 @@ namespace NMib::NCloud::NAppManager
 		auto Reporter = co_await pThis->mp_SensorStore(&CDistributedAppSensorStoreLocal::f_OpenSensorReporter, fg_TempCopy(SensorInfo));
 
 		if (pApplication)
-			co_await pThis->fp_RebootPrevention_WatchSensor(pApplication->m_Name, SensorInfo);
+			co_await pThis->fp_RebootPrevention_WatchSensor(pApplication, SensorInfo);
 
 		DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "[{}] Application '{}' opened sensor reporter:\n{}", CallingHostInfo.f_GetHostInfo().f_GetDesc(), ScopeName, SensorInfo);
 

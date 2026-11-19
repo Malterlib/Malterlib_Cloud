@@ -899,6 +899,14 @@ namespace NMib::NCloud::NAppManager
 				pStageState->m_TempraryPath = UnpackDirectory;
 				pStageState->m_Files = Files;
 
+				// The staging and the apply wait for the guest, which holds back environment stops only for the limit of guest deferrals
+				++pPendingInstallEnvironment->m_nPendingInstallGuestWaits;
+				auto EndGuestWait = g_OnScopeExit / [pPendingInstallEnvironment]
+					{
+						--pPendingInstallEnvironment->m_nPendingInstallGuestWaits;
+					}
+				;
+
 				co_await (fp_StageApplicationInEnvironment(pStageState, pRemoteStorageEnvironment) % "Failed to stage the application in the environment" % Auditor);
 
 				CAppManagerEnvironmentInterface::CApplicationApply Apply;
@@ -920,6 +928,15 @@ namespace NMib::NCloud::NAppManager
 				if (!pRemoteStorageEnvironment->m_AgentInterface)
 					co_return Auditor.f_Exception(fg_Format("The agent of environment '{}' disconnected before the application files were applied", pRemoteStorageEnvironment->m_Name));
 
+				// A stop in the middle of the apply leaves files that a retry without --force-install refuses, so the apply holds back environment
+				// stops past the guest deferral limit, bounded by its own timeout
+				++pRemoteStorageEnvironment->m_nFileApplies;
+				auto EndFileApply = g_OnScopeExit / [pRemoteStorageEnvironment]
+					{
+						--pRemoteStorageEnvironment->m_nFileApplies;
+					}
+				;
+
 				co_await
 					(
 						pRemoteStorageEnvironment->m_AgentInterface.f_CallActor(&CAppManagerEnvironmentInterface::f_ApplyApplicationFiles)
@@ -931,6 +948,10 @@ namespace NMib::NCloud::NAppManager
 				;
 
 				pStageState->m_AgentStageCleanup.f_Clear();
+				EndFileApply.f_Clear();
+				--pRemoteStorageEnvironment->m_nFileApplies;
+				EndGuestWait.f_Clear();
+				--pPendingInstallEnvironment->m_nPendingInstallGuestWaits;
 
 				co_await CleanupUnpack->f_Destroy();
 			}
@@ -1021,6 +1042,14 @@ namespace NMib::NCloud::NAppManager
 		Cleanup->f_Clear();
 
 		auto InProgressScope = pApplication->f_SetInProgress("Add Application");
+
+		// From here the operation of the application holds back the idle waits and removals of its environment
+		if (pPendingInstallEnvironment)
+		{
+			PendingInstall.f_Clear();
+			--pPendingInstallEnvironment->m_nPendingInstalls;
+		}
+
 		auto DestroyInProgress = co_await fg_AsyncDestroy(fg_Move(InProgressScope));
 
 		// The info that the add publishes compares the version it installed with the finished one

@@ -162,7 +162,8 @@ it starts its container or VM, also one that was stopped manually, which the las
   starts and update scripts that need it, until it is started or restarted manually. Deleting application data and
   opening the VM window boot it without ending the manual stop. A stop or restart waits until the
   operations in the environment are idle, but for a container or VM at most an hour for the operations that only
-  wait for its guest, like update scripts and file applies in it. Closing the encryption of a parent application, or
+  wait for its guest, like update scripts in it. The file applies of updates are waited for until they end, within
+  their own timeout of an hour, since a stopped apply leaves the application without complete files. Closing the encryption of a parent application, or
   of an application that the extra mounts of a container are in, stops those environments without waiting for them to
   be idle, so work in them that must finish needs the environment stopped first.
 - Stopping an environment stops its applications through the agent first. When the agent is lost, the host clears
@@ -184,19 +185,27 @@ the package manager of the platform: apt, dnf or microdnf, zypper, apk or pacman
 that match an OS without one fail the installation. On Arch Linux, which supports no partial upgrades, installing a
 missing package upgrades the whole system. The dependencies of the AppManager's own distribution are the tools of the
 host monitor of its agents, so the host doesn't install them for a self update source, and an agent that can't install them still
-launches the applications of its environment.
+launches the applications of its environment. An installation inside a container or VM holds back environment
+stops, and the launches and scripts that wait for it, for at most an hour.
 
 Agents in containers and VMs run their own host monitor, configured from the host's automatic update settings: they
 patch the environment's OS and ask the host to restart the environment when an update needs it. The agent of a
 read-only container only monitors. Only Linux guests
 are patched; a macOS VM guest logs that it doesn't install the updates. An update an agent reports holds back host
 reboots and environment stops for at most an hour, and the host refuses updates that start once it stops the
-environment, reboots or shuts down. The sensors of applications in a container or VM hold back automatic host reboots and
-automatic environment restarts for at most an hour in all, however the guests report them. A manual environment
-restart doesn't wait for them, while a manual host reboot is refused as long as anything holds it back, guests
-included. The AppManager reboots only Linux hosts, so on macOS hosts what this section says about host reboots
-doesn't apply, while environment restarts are held back the same way. Local agents share the host OS, which the host
-AppManager patches and reboots, so they get no automatic update settings.
+environment, reboots or shuts down. The sensors of applications in a container or VM hold back automatic host
+reboots and automatic environment restarts for at most an hour in all, however the guests report them. A manual
+environment restart doesn't wait for them, while a manual host reboot is refused as long as anything holds it back,
+guests included. The shutdown before a host reboot waits for the calls already in progress in container and VM
+environments, like update scripts, file applies and stops, only for an hour from its start; then it force-stops those
+environments, dropping the connections of their agents and applications and killing the containers and the VMs it
+runs. That ends the calls that wait for the guests, and calls that the lost connections don't end wait for their own
+timeouts. A VM in the window of a command line client isn't killed. A shutdown without a reboot waits for
+them as long as their timeouts allow. Both end sooner when the shutdown timeouts of the AppManager and its daemon do. The AppManager reboots only Linux
+hosts, so on macOS hosts what this section says about host reboots doesn't apply, while environment restarts are held
+back the same way.
+Local agents share the host OS, which the host AppManager patches and reboots, so they get no automatic update
+settings.
 
 ## Threat model
 

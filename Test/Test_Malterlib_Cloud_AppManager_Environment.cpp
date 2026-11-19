@@ -3052,6 +3052,7 @@ void CAppManager_Environment_Tests::f_DoTests()
 			DMibExpectFalse(Deferral.f_Defers(fAt(0)));
 
 			Deferral.f_Update(true, fAt(0));
+			DMibExpect(Deferral.f_End(), ==, fAt(c_Limit));
 			DMibExpectTrue(Deferral.f_Defers(fAt(c_Limit - 1)));
 			DMibExpectFalse(Deferral.f_Defers(fAt(c_Limit)));
 
@@ -3068,6 +3069,7 @@ void CAppManager_Environment_Tests::f_DoTests()
 			DMibExpectFalse(Deferral.f_Defers(fAt(c_Limit - 10)));
 
 			Deferral.f_Update(true, fAt(c_Limit - 5));
+			DMibExpect(Deferral.f_End(), ==, fAt(c_Limit));
 			DMibExpectTrue(Deferral.f_Defers(fAt(c_Limit - 5)));
 			DMibExpectFalse(Deferral.f_Defers(fAt(c_Limit + 5)));
 

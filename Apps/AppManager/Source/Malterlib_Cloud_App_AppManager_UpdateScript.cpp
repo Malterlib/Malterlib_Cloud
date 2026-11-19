@@ -187,6 +187,7 @@ namespace NMib::NCloud::NAppManager
 			, CVersionManager::CVersionIDAndPlatform _PreviousVersionID
 			, CVersionManager::CVersionInformation _PreviousVersionInformation
 			, fp64 _TimeSinceUpdateStart
+			, bool _bOperationWaits
 		)
 		-> TCFuture<void>
 	{
@@ -289,6 +290,18 @@ namespace NMib::NCloud::NAppManager
 
 			if (pEnvironment->m_bStoppedManually)
 				co_return DMibErrorInstance("Cannot run update script: environment '{}' was stopped. Start it with --environment-start."_f << pEnvironment->m_Name);
+
+			// A script that runs in the background, like the error script of a failed start, is counted by m_nRunningScripts instead. A Local
+			// environment is the host
+			bool bGuestWait = _bOperationWaits && pEnvironment->m_Settings.m_Type != CAppManagerInterface::EEnvironmentType_Local;
+			if (bGuestWait)
+				++_pApplication->m_nGuestWaits;
+			auto EndGuestWait = g_OnScopeExit / [_pApplication, bGuestWait]
+				{
+					if (bGuestWait)
+						--_pApplication->m_nGuestWaits;
+				}
+			;
 
 			co_await fp_EnsureEnvironmentStarted(pEnvironment);
 

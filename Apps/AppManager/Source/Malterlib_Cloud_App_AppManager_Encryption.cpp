@@ -77,6 +77,23 @@ namespace NMib::NCloud::NAppManager
 		{
 			pEncryptionApplication->m_bClosingEncryption = true;
 
+			// A force-stop marks the environment stopped and disconnects its guest before it kills the container or VM, which keeps using the
+			// storage until then
+			{
+				TCVector<TCSharedPointer<CEnvironment>> ForceStoppingEnvironments;
+				for (auto &pEnvironment : mp_Environments)
+				{
+					if (pEnvironment->m_bForceStopping)
+						ForceStoppingEnvironments.f_Insert(fg_TempCopy(pEnvironment));
+				}
+
+				for (auto &pEnvironment : ForceStoppingEnvironments)
+				{
+					if (pEnvironment->m_bForceStopping)
+						co_await pEnvironment->m_OnForceStopFinished.f_Insert().f_Future();
+				}
+			}
+
 			// Environments storing their data inside this application, or inside its children, must release the storage first
 			{
 				TCVector<TCSharedPointer<CEnvironment>> ConfinedEnvironments;

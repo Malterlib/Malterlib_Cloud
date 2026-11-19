@@ -494,6 +494,13 @@ namespace NMib::NCloud::NAppManager
 	{
 		auto &State = *_pState;
 
+		++State.m_pApplication->m_nGuestWaits;
+		auto EndGuestWait = g_OnScopeExit / [pApplication = State.m_pApplication]
+			{
+				--pApplication->m_nGuestWaits;
+			}
+		;
+
 		// The transfer below is outside, since a failed transfer destroys the stage send and the stage finish
 		{
 			auto OnResume = co_await fg_OnResume
@@ -684,6 +691,7 @@ namespace NMib::NCloud::NAppManager
 				, State.m_LastInstalledVersion
 				, State.m_LastInstalledVersionInfo
 				, State.m_pStopwatch->f_GetTime()
+				, true
 			)
 		;
 		co_return {};
@@ -706,6 +714,13 @@ namespace NMib::NCloud::NAppManager
 		if (State.m_pRemoteStorageEnvironment)
 		{
 			auto pEnvironment = State.m_pRemoteStorageEnvironment;
+
+			++State.m_pApplication->m_nGuestWaits;
+			auto EndGuestWait = g_OnScopeExit / [pApplication = State.m_pApplication]
+				{
+					--pApplication->m_nGuestWaits;
+				}
+			;
 
 			co_await fp_EnsureEnvironmentStarted(pEnvironment);
 
@@ -732,6 +747,15 @@ namespace NMib::NCloud::NAppManager
 				auto CaptureScope = co_await (g_CaptureExceptions % "Failed to encode the extra info of the version");
 				Apply.m_VersionExtraInfo = State.m_pVersionInfo->m_ExtraInfo.f_ToString(nullptr);
 			}
+
+			// The apply deletes the old files before it moves the new ones into place, so a stop in the middle leaves the application without
+			// complete files
+			++pEnvironment->m_nFileApplies;
+			auto EndFileApply = g_OnScopeExit / [pEnvironment]
+				{
+					--pEnvironment->m_nFileApplies;
+				}
+			;
 
 			co_await pEnvironment->m_AgentInterface.f_CallActor(&CAppManagerEnvironmentInterface::f_ApplyApplicationFiles)
 				(fg_Move(Apply))
@@ -875,6 +899,7 @@ namespace NMib::NCloud::NAppManager
 				, State.m_LastInstalledVersion
 				, State.m_LastInstalledVersionInfo
 				, State.m_pStopwatch->f_GetTime()
+				, true
 			)
 		;
 		co_return {};
@@ -928,6 +953,7 @@ namespace NMib::NCloud::NAppManager
 					, State.m_LastInstalledVersion
 					, State.m_LastInstalledVersionInfo
 					, State.m_pStopwatch->f_GetTime()
+					, false
 				)
 				> fg_LogError("Malterlib/Cloud/AppManager", "Error script failed")
 			;
@@ -965,6 +991,7 @@ namespace NMib::NCloud::NAppManager
 				, State.m_LastInstalledVersion
 				, State.m_LastInstalledVersionInfo
 				, State.m_pStopwatch->f_GetTime()
+				, true
 			)
 			.f_Wrap()
 		;

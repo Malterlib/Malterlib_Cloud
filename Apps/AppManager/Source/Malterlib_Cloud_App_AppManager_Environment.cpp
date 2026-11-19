@@ -360,6 +360,19 @@ namespace NMib::NCloud::NAppManager
 		return m_AgentUpdateDeferral.f_Defers(CAppManagerGuestDeferral::fs_Now());
 	}
 
+	// The agent of a container or VM is a guest, which can leave configurations unanswered, and each of its registrations makes the host send
+	// another, so its pending configurations defer environment stops only within the limit of CAppManagerGuestDeferral
+	bool CAppManagerActor::CEnvironment::f_AgentConfigurationDefers() const
+	{
+		if (!m_nPendingAgentConfigurations)
+			return false;
+
+		if (m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_Local)
+			return true;
+
+		return m_AgentConfigurationDeferral.f_Defers(CAppManagerGuestDeferral::fs_Now());
+	}
+
 	// An empty description clears the reported update and ends its deferral
 	void CAppManagerActor::CEnvironment::f_SetAgentUpdateInProgress(CStr &&_Description)
 	{
@@ -2421,49 +2434,66 @@ namespace NMib::NCloud::NAppManager
 		co_return {};
 	}
 
-	TCFuture<void> CAppManagerActor::fp_WaitForEnvironmentIdle(TCSharedPointer<CEnvironment> _pEnvironment)
+	// The agent updates and configurations of a container or VM environment stop deferring at _GuestDeferralsEnd, a time of
+	// CAppManagerGuestDeferral::fs_Now, so a caller that waits out other guest deferrals first can hold all of them to one limit. They also stop
+	// within the limit of CAppManagerGuestDeferral from the start of the wait, also those that start while it waits, so a guest alone never fails it
+	TCFuture<void> CAppManagerActor::fp_WaitForEnvironmentIdle(TCSharedPointer<CEnvironment> _pEnvironment, fp64 _GuestDeferralsEnd)
 	{
 		auto CheckDestroy = co_await f_CheckDestroyedOnResume();
 
+		fp64 WaitStart = CAppManagerGuestDeferral::fs_Now();
+		fp64 GuestDeferralsEnd = fg_Min(_GuestDeferralsEnd, WaitStart + CAppManagerGuestDeferral::mc_LimitSeconds);
+		bool bGuest = _pEnvironment->m_Settings.m_Type != CAppManagerInterface::EEnvironmentType_Local;
+
 		// Stopping the agent in the middle of an update operation on an application would corrupt it
-		CStopwatch Stopwatch{true};
 		while (true)
 		{
 			if (_pEnvironment->m_bDeleted)
 				co_return {};
 
+			fp64 Now = CAppManagerGuestDeferral::fs_Now();
+			bool bGuestDeferralsEnded = bGuest && Now >= GuestDeferralsEnd;
+
+			// An operation that only waits for the guest, like a script it runs, is a guest deferral
 			bool bInProgress = false;
 			for (auto &pApplication : mp_Applications)
 			{
-				if (pApplication->m_Settings.m_LaunchEnvironment != _pEnvironment->m_Name)
+				if (pApplication->m_Settings.m_LaunchEnvironment != _pEnvironment->m_Name || !pApplication->f_IsInProgress())
 					continue;
 
-				if (pApplication->f_IsInProgress())
+				if (!bGuest || !pApplication->f_InProgressWaitsOnlyForGuest() || !bGuestDeferralsEnded)
 				{
 					bInProgress = true;
 					break;
 				}
 			}
 
-			// The agent configuration installs the OS dependencies of the environment
-			if (_pEnvironment->m_nPendingAgentConfigurations)
+			// An add whose files the guest stages or applies only waits for the guest
+			if (_pEnvironment->m_nPendingInstalls > _pEnvironment->m_nPendingInstallGuestWaits || (_pEnvironment->m_nPendingInstalls && !bGuestDeferralsEnded))
 				bInProgress = true;
 
-			if (_pEnvironment->m_nPendingInstalls)
+			// The agent configuration installs the OS dependencies of the environment, and stopping a container in the middle of an OS package
+			// installation leaves the packages broken
+			if (_pEnvironment->f_AgentConfigurationDefers() && !bGuestDeferralsEnded)
 				bInProgress = true;
 
-			// Stopping a container in the middle of an OS package installation leaves the packages broken
-			if (_pEnvironment->f_AgentUpdateDefers())
+			if (_pEnvironment->f_AgentUpdateDefers() && !bGuestDeferralsEnded)
 				bInProgress = true;
 
 			// An error script can outlive the operation of its application
-			if (_pEnvironment->m_nRunningScripts)
+			if (_pEnvironment->m_nRunningScripts && !bGuestDeferralsEnded)
+				bInProgress = true;
+
+			// A stopped file apply leaves the application without complete files, so applies are waited for past the limits. Each is bounded by
+			// its own timeout, and only the updates that the host runs start them
+			bool bFileApplies = _pEnvironment->m_nFileApplies != 0;
+			if (bFileApplies)
 				bInProgress = true;
 
 			if (!bInProgress)
 				co_return {};
 
-			if (Stopwatch.f_GetTime() > 1_hours)
+			if (Now - WaitStart > 1_hours && !bFileApplies)
 				co_return DMibErrorInstance("Operations kept the applications of environment '{}' busy for an hour"_f << _pEnvironment->m_Name);
 
 			co_await fg_Timeout(10.0);
@@ -2479,7 +2509,7 @@ namespace NMib::NCloud::NAppManager
 			if (pApplication->m_Settings.m_LaunchEnvironment != _Environment.m_Name)
 				continue;
 
-			if (fg_IsSet(pApplication->m_PreventRebootSensorFlags, CDistributedAppSensorReporter::ESensorInfoFlag::mc_AllPreventRebootFlags))
+			if (fp_ApplicationPreventsReboot(*pApplication, CAppManagerGuestDeferral::fs_Now()))
 				return pApplication->m_Name;
 		}
 
@@ -2515,14 +2545,22 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 
-		// An application can prevent the restart while the operations of the others finish, so both are checked together
+		CStopwatch Stopwatch{true};
+
+		// An application can prevent the restart while the operations of the others finish, so both are checked together. The applications and the
+		// agent of a container or VM environment are reported from the guest, so together they prevent the restart for at most the limit of
+		// CAppManagerGuestDeferral; the restart waits that out instead of giving up
+		bool bGuest = _pEnvironment->m_Settings.m_Type != CAppManagerInterface::EEnvironmentType_Local;
+		fp64 GuestDeferralsEnd = CAppManagerGuestDeferral::fs_Now() + CAppManagerGuestDeferral::mc_LimitSeconds;
 		auto fRestartPrevented = [&]
 			{
+				if (bGuest && CAppManagerGuestDeferral::fs_Now() >= GuestDeferralsEnd)
+					return false;
+
 				return !fp_FindApplicationPreventingEnvironmentRestart(*_pEnvironment).f_IsEmpty();
 			}
 		;
 
-		CStopwatch Stopwatch{true};
 		while (true)
 		{
 			if (fSuperseded())
@@ -2530,7 +2568,7 @@ namespace NMib::NCloud::NAppManager
 
 			if (!fRestartPrevented())
 			{
-				co_await (fp_WaitForEnvironmentIdle(_pEnvironment) % CStr("Aborted the restart of environment '{}'"_f << _pEnvironment->m_Name));
+				co_await (fp_WaitForEnvironmentIdle(_pEnvironment, GuestDeferralsEnd) % CStr("Aborted the restart of environment '{}'"_f << _pEnvironment->m_Name));
 
 				if (fSuperseded())
 					co_return {};
@@ -2539,7 +2577,7 @@ namespace NMib::NCloud::NAppManager
 					break;
 			}
 
-			if (Stopwatch.f_GetTime() > 1_hours)
+			if (!bGuest && Stopwatch.f_GetTime() > 1_hours)
 				co_return DMibErrorInstance("Aborted the restart of environment '{}': its applications prevented the restart for an hour"_f << _pEnvironment->m_Name);
 
 			co_await fg_Timeout(10.0);
@@ -2560,7 +2598,8 @@ namespace NMib::NCloud::NAppManager
 		;
 
 		{
-			// The stop suspends before it starts, and an update admitted meanwhile would be cut off
+			// The stop suspends before it starts, and an update admitted meanwhile would be cut off. The guest deferral limit covers the idle wait
+			// above, not the stop, whose calls to the applications have their own timeouts
 			++_pEnvironment->m_nUpdateAdmissionClosed;
 			auto ReopenUpdateAdmission = g_OnScopeExit / [_pEnvironment]
 				{
@@ -3534,6 +3573,14 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 
+		// The start, the removal through the agent, its configuration and the stop wait for the container or VM guest
+		++_pApplication->m_nGuestWaits;
+		auto EndGuestWait = g_OnScopeExit / [_pApplication]
+			{
+				--_pApplication->m_nGuestWaits;
+			}
+		;
+
 		auto StartResult = co_await fp_EnsureEnvironmentStarted(pEnvironment, EEnvironmentStart::mc_EvenIfStoppedManually).f_Wrap();
 
 		// The agent can disconnect between the start and this call
@@ -3570,12 +3617,9 @@ namespace NMib::NCloud::NAppManager
 		if (fLastRemovalInStoppedEnvironment())
 		{
 			// The start configured the agent, which can be installing OS packages
-			if (pEnvironment->m_nPendingAgentConfigurations)
-			{
-				co_await pEnvironment->m_OnAgentConfigured.f_Insert().f_Future().f_Wrap()
-					> fg_LogError("Malterlib/Cloud/AppManager", "The environment agent configuration failed before the stop after removing the application storage")
-				;
-			}
+			co_await fp_WaitForPendingAgentConfigurations(pEnvironment).f_Wrap()
+				> fg_LogError("Malterlib/Cloud/AppManager", "The environment agent configuration failed before the stop after removing the application storage")
+			;
 
 			// Another removal can have started while the configuration finished
 			if (fLastRemovalInStoppedEnvironment())
@@ -4734,6 +4778,9 @@ namespace NMib::NCloud::NAppManager
 
 		// The configuration installs OS packages, which can take long, but a guest that never replies must not hold the launches and stops that
 		// wait for it
+		pEnvironment->m_LastAgentConfigurationStart = CAppManagerGuestDeferral::fs_Now();
+		if (!pEnvironment->m_nPendingAgentConfigurations)
+			pEnvironment->m_AgentConfigurationDeferral.f_Update(true, pEnvironment->m_LastAgentConfigurationStart);
 		++pEnvironment->m_nPendingAgentConfigurations;
 		umint Sequence = ++pEnvironment->m_AgentConfigurationSequence;
 		pEnvironment->m_AgentInterface.f_CallActor(&CAppManagerEnvironmentInterface::f_ConfigureAgent)
@@ -4753,6 +4800,8 @@ namespace NMib::NCloud::NAppManager
 				if (--pEnvironment->m_nPendingAgentConfigurations)
 					return;
 
+				pEnvironment->m_AgentConfigurationDeferral.f_Update(false, CAppManagerGuestDeferral::fs_Now());
+
 				auto OnConfigured = fg_Move(pEnvironment->m_OnAgentConfigured);
 				for (auto &Promise : OnConfigured)
 				{
@@ -4771,15 +4820,41 @@ namespace NMib::NCloud::NAppManager
 		if (!_pEnvironment->m_AgentConfigurationError.f_IsEmpty() && !_pEnvironment->m_nPendingAgentConfigurations)
 			fp_SendEnvironmentAgentConfig(*_pEnvironment);
 
-		if (_pEnvironment->m_nPendingAgentConfigurations)
+		co_await fp_WaitForPendingAgentConfigurations(_pEnvironment);
+
+		co_return {};
+	}
+
+	// Waits for the pending configurations of a container or VM guest at most until the later of the end of their deferral and the guest deferral
+	// limit after the newest was sent
+	TCFuture<void> CAppManagerActor::fp_WaitForPendingAgentConfigurations(TCSharedPointer<CEnvironment> _pEnvironment)
+	{
+		if (!_pEnvironment->m_nPendingAgentConfigurations)
+			co_return {};
+
+		if (_pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_Local)
+		{
 			co_await _pEnvironment->m_OnAgentConfigured.f_Insert().f_Future();
+			co_return {};
+		}
+
+		// The deferral keeps its start across configurations that follow each other closely
+		CStr TimeoutError = "The agent of environment '{}' did not finish its configuration within the limit of guest deferrals"_f << _pEnvironment->m_Name;
+		fp64 End = fg_Max(_pEnvironment->m_AgentConfigurationDeferral.f_End(), _pEnvironment->m_LastAgentConfigurationStart + CAppManagerGuestDeferral::mc_LimitSeconds);
+		fp64 Remaining = End - CAppManagerGuestDeferral::fs_Now();
+
+		// The timers of f_Timeout have a resolution of a millisecond
+		if (Remaining < 0.001)
+			co_return DMibErrorInstance(TimeoutError);
+
+		co_await _pEnvironment->m_OnAgentConfigured.f_Insert().f_Future().f_Timeout(Remaining, TimeoutError);
 
 		co_return {};
 	}
 
 	TCFuture<void> CAppManagerActor::fp_OnEnvironmentAgentConnected(TCSharedPointer<CEnvironment> _pEnvironment, TCDistributedActorInterface<CAppManagerEnvironmentInterface> _Interface)
 	{
-		if (_pEnvironment->m_bDeleted || _pEnvironment->m_bStopping)
+		if (_pEnvironment->m_bDeleted || _pEnvironment->m_bStopping || _pEnvironment->m_bForceStopped)
 			co_return {};
 
 		_pEnvironment->m_AgentInterface = fg_Move(_Interface);
@@ -5107,6 +5182,117 @@ namespace NMib::NCloud::NAppManager
 		co_return {};
 	}
 
+	// Force-stops the container and VM environments when _Timeout ends, unless the shutdown before the host reboot aborts it first
+	TCFuture<void> CAppManagerActor::fp_ForceStopGuestEnvironmentsAfter(TCFuture<void> _Timeout)
+	{
+		if (!co_await fg_Move(_Timeout).f_Wrap())
+			co_return {};
+
+		DMibLogWithCategory(Malterlib/Cloud/AppManager, Warning, "The shutdown before the host reboot reached the guest deferral limit, force-stopping the container and VM environments");
+
+		TCFutureVector<void> Stops;
+		for (auto &pEnvironment : mp_Environments)
+		{
+			if (pEnvironment->m_Settings.m_Type != CAppManagerInterface::EEnvironmentType_Local)
+				fp_ForceStopGuestEnvironment(pEnvironment) > Stops;
+		}
+
+		co_await fg_AllDone(Stops).f_Wrap() > fg_LogError("Malterlib/Cloud/AppManager", "Failed to force-stop environments");
+
+		co_return {};
+	}
+
+	// Fails the waits for the agent connection, the agent configuration and the application startups, drops the connections of the agent and the
+	// applications, and kills the container or the VM this host runs. A VM hosted by a window client keeps running. The agent interface isn't
+	// attached again
+	TCFuture<void> CAppManagerActor::fp_ForceStopGuestEnvironment(TCSharedPointer<CEnvironment> _pEnvironment)
+	{
+		if (_pEnvironment->m_bForceStopped)
+			co_return {};
+
+		_pEnvironment->m_bForceStopped = true;
+
+		_pEnvironment->m_bForceStopping = true;
+		auto ForceStopFinished = g_OnScopeExit / [_pEnvironment]
+			{
+				_pEnvironment->m_bForceStopping = false;
+
+				auto OnForceStopFinished = fg_Move(_pEnvironment->m_OnForceStopFinished);
+				for (auto &Promise : OnForceStopFinished)
+					Promise.f_SetResult();
+			}
+		;
+
+		CStr Error = "Environment '{}' was force-stopped by the shutdown before a host reboot"_f << _pEnvironment->m_Name;
+
+		if (_pEnvironment->m_bStarting)
+			_pEnvironment->m_bStartAbortRequested = true;
+
+		auto OnAgentConnected = fg_Move(_pEnvironment->m_OnAgentConnected);
+		for (auto &Promise : OnAgentConnected)
+			Promise.f_SetException(DMibErrorInstance(Error));
+
+		auto OnAgentConfigured = fg_Move(_pEnvironment->m_OnAgentConfigured);
+		for (auto &Promise : OnAgentConfigured)
+			Promise.f_SetException(DMibErrorInstance(Error));
+
+		TCSet<CStr> HostIDs;
+		if (!_pEnvironment->m_AgentHostID.f_IsEmpty())
+			HostIDs[_pEnvironment->m_AgentHostID];
+
+		for (auto &pApplication : mp_Applications)
+		{
+			bool bInEnvironment
+				= pApplication->m_Settings.m_LaunchEnvironment == _pEnvironment->m_Name
+				|| pApplication->m_pLaunchedEnvironment == _pEnvironment
+				|| pApplication->m_pStoppingEnvironment == _pEnvironment
+			;
+
+			if (!bInEnvironment)
+				continue;
+
+			fp_AbortPendingDistributedAppWaits(*pApplication, Error);
+
+			if (!pApplication->m_AssociatedHostID.f_IsEmpty())
+				HostIDs[pApplication->m_AssociatedHostID];
+		}
+
+		_pEnvironment->m_bStarted = false;
+
+		{
+			TCFutureVector<void> Disconnects;
+
+			if (_pEnvironment->m_AgentInterface)
+			{
+				_pEnvironment->m_AgentInterface.f_Destroy() > Disconnects;
+				_pEnvironment->m_AgentInterface.f_Clear();
+			}
+
+			if (_pEnvironment->m_AgentAppInterface)
+			{
+				_pEnvironment->m_AgentAppInterface.f_Destroy() > Disconnects;
+				_pEnvironment->m_AgentAppInterface.f_Clear();
+			}
+
+			for (auto &HostID : HostIDs)
+				mp_State.m_DistributionManager(&CActorDistributionManager::f_KickHost, HostID) > Disconnects;
+
+			co_await fg_AllDone(Disconnects).f_Wrap() > fg_LogError("Malterlib/Cloud/AppManager", "Failed to disconnect the guest of an environment");
+		}
+
+		if (_pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_Container)
+			co_await fp_KillEnvironmentContainer(_pEnvironment).f_Wrap() > fg_LogError("Malterlib/Cloud/AppManager", "Failed to kill environment container");
+
+		if (_pEnvironment->m_VMActor)
+		{
+			co_await fg_TempCopy(_pEnvironment->m_VMActor)(&NVirtualization::CVirtualMachineActor::f_ForceStop).f_Wrap()
+				> fg_LogError("Malterlib/Cloud/AppManager", "Failed to force-stop environment virtual machine")
+			;
+		}
+
+		co_return {};
+	}
+
 	void CAppManagerActor::fp_AbortPendingDistributedAppWaits(CApplication &_Application, CStr const &_Error)
 	{
 		auto OnRegister = fg_Move(_Application.m_OnRegisterDistributedApp);
@@ -5243,6 +5429,18 @@ namespace NMib::NCloud::NAppManager
 		// A manual stop can happen while the launch is on its way here
 		if (auto pException = fStoppedManuallyError())
 			co_return pException;
+
+		// From here the launch waits for the container or VM guest: the start, the configuration, the launch, and the registration and start of the
+		// application. A Local environment is the host
+		bool bGuestWait = _pEnvironment->m_Settings.m_Type != CAppManagerInterface::EEnvironmentType_Local;
+		if (bGuestWait)
+			++_pApplication->m_nGuestWaits;
+		auto EndGuestWait = g_OnScopeExit / [_pApplication, bGuestWait]
+			{
+				if (bGuestWait)
+					--_pApplication->m_nGuestWaits;
+			}
+		;
 
 		TCVector<CStr> LowPortExecutables;
 		TCAsyncResult<NWeb::NHTTP::CURL> InterfaceAddress;

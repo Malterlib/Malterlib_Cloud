@@ -1093,6 +1093,16 @@ namespace NMib::NCloud::NAppManager
 
 		mp_bStoppingApp = true;
 
+		// Before a host reboot, the waits below for container and VM guests end at the latest at the guest deferral limit from here
+		CActorSubscription GuestLimitTimer;
+		TCFuture<void> GuestLimitForceStop;
+		if (mp_bRebooting)
+		{
+			auto TimeoutAbortable = co_await fg_TimeoutAbortable(CAppManagerGuestDeferral::mc_LimitSeconds);
+			GuestLimitTimer = fg_Move(TimeoutAbortable.m_Subscription);
+			GuestLimitForceStop = fp_ForceStopGuestEnvironmentsAfter(fg_Move(TimeoutAbortable.m_Future));
+		}
+
 		if (mp_RebootScheduleTimerSubscrption)
 			co_await fg_Exchange(mp_RebootScheduleTimerSubscrption, nullptr)->f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy reboot timer subscription");
 
@@ -1104,21 +1114,43 @@ namespace NMib::NCloud::NAppManager
 
 		co_await fp_CancelAllApplicationUpdatesOnStopAppManager();
 
-		// Stopping a container during an OS package installation breaks its packages, and closing the encryption of a parent application below stops
-		// the environments in its storage. The shutdown refuses new updates, and those of a container or VM defer it only within the guest deferral limit
+		// Initial installs aren't cancelled like updates, and stopping their environment while it stages or applies their files cuts them off
 		while (true)
 		{
-			bool bAgentUpdates = false;
+			bool bPendingInstalls = false;
 			for (auto &pEnvironment : mp_Environments)
 			{
-				if (pEnvironment->f_AgentUpdateDefers())
+				if (pEnvironment->m_nPendingInstalls)
 				{
-					bAgentUpdates = true;
+					bPendingInstalls = true;
 					break;
 				}
 			}
 
-			if (!bAgentUpdates)
+			if (!bPendingInstalls)
+				break;
+
+			co_await fg_Timeout(1.0);
+		}
+
+		// Stopping a container during an OS package installation breaks its packages and cuts off the scripts it runs, like an error script that
+		// outlives its update, and closing the encryption of a parent application below stops the environments in its storage. The shutdown refuses
+		// new updates, and the updates of a container or VM and the scripts of every environment defer it only within the guest deferral limit
+		fp64 GuestDeferralsEnd = CAppManagerGuestDeferral::fs_Now() + CAppManagerGuestDeferral::mc_LimitSeconds;
+		while (true)
+		{
+			bool bGuestDeferralsEnded = CAppManagerGuestDeferral::fs_Now() >= GuestDeferralsEnd;
+			bool bAgentWork = false;
+			for (auto &pEnvironment : mp_Environments)
+			{
+				if (pEnvironment->f_AgentUpdateDefers() || (pEnvironment->m_nRunningScripts && !bGuestDeferralsEnded))
+				{
+					bAgentWork = true;
+					break;
+				}
+			}
+
+			if (!bAgentWork)
 				break;
 
 			co_await fg_Timeout(1.0);
@@ -1145,6 +1177,12 @@ namespace NMib::NCloud::NAppManager
 				fp_StopEnvironmentInternal(pEnvironment) > EnvironmentStops;
 
 			co_await fg_AllDone(EnvironmentStops).f_Wrap() > LogError.f_Warning("Failed to stop environments");
+		}
+
+		if (GuestLimitTimer)
+		{
+			co_await GuestLimitTimer->f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy the guest deferral limit timer");
+			co_await fg_Move(GuestLimitForceStop).f_Wrap() > LogError.f_Warning("Failed to force-stop environments");
 		}
 
 		{
