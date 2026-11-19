@@ -11,6 +11,10 @@ namespace NMib::NCloud::NAppManager
 {
 	auto CAppManagerActor::fp_ApplicationFromHostID(CStr const &_HostID) -> TCSharedPointer<CApplication>
 	{
+		// Applications that never connected have no host ID
+		if (_HostID.f_IsEmpty())
+			return nullptr;
+
 		for (auto &pApplication : mp_Applications)
 		{
 			auto &Application = *pApplication;
@@ -23,6 +27,10 @@ namespace NMib::NCloud::NAppManager
 
 	auto CAppManagerActor::fp_ApplicationFromLaunchID(CStr const &_LaunchID) -> TCSharedPointer<CApplication>
 	{
+		// Applications that have not launched have no launch ID
+		if (_LaunchID.f_IsEmpty())
+			return nullptr;
+
 		for (auto &pApplication : mp_Applications)
 		{
 			auto &Application = *pApplication;
@@ -68,7 +76,31 @@ namespace NMib::NCloud::NAppManager
 		TCSharedPointer<CApplication> pApplication;
 
 		if (_RegisterInfo.m_LaunchID)
+		{
 			pApplication = pThis->fp_ApplicationFromLaunchID(*_RegisterInfo.m_LaunchID);
+
+			// The guest of an environment knows the launch IDs of the applications it launches, also of launches that ended, so a launch there
+			// binds the application to the host that redeemed the connection ticket of the launch, which the host issued only for that launch.
+			// An application added again onto the files it kept in environment storage still has its client connection, so it registers without
+			// a ticket: while the application has no host, a registration with its current launch binds it, unless the host is the agent of an
+			// environment or bound to another application. Only its environment knows the launch ID, and root there controls its files anyway
+			bool bBindsUnassociated = pApplication && pApplication->m_AssociatedHostID.f_IsEmpty() && !pThis->fp_ApplicationFromHostID(HostID) && !pThis->fp_EnvironmentFromHostID(HostID);
+
+			if (pApplication && !pApplication->m_Settings.m_LaunchEnvironment.f_IsEmpty() && pApplication->m_AssociatedHostID != HostID && !bBindsUnassociated)
+			{
+				DMibLogWithCategory
+					(
+						Malterlib/Cloud/AppManager
+						, Error
+						, "Host '{}' registered with the launch ID of application '{}' in environment '{}' without its connection ticket"
+						, CallingHostInfo.f_GetHostInfo().f_GetDesc()
+						, pApplication->m_Name
+						, pApplication->m_Settings.m_LaunchEnvironment
+					)
+				;
+				co_return DErrorInstance("Application not associated with your host");
+			}
+		}
 
 		if (!pApplication)
 			pApplication = pThis->fp_ApplicationFromHostID(HostID);
