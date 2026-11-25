@@ -203,6 +203,11 @@ namespace NMib::NCloud::NAppManager
 	{
 		auto &Application = *_pState->m_pApplication;
 
+		// The notifications below suspend, and a manual update can replace the files of a finished self update meanwhile, which records its own
+		// result
+		auto InstalledVersion = Application.m_LastInstalledVersion;
+		auto InstalledVersionInfo = Application.m_LastInstalledVersionInfo;
+
 		CAppManagerInterface::CUpdateNotification Notification;
 		Notification.m_Application = Application.m_Name;
 		Notification.m_Message = _Message;
@@ -286,6 +291,21 @@ namespace NMib::NCloud::NAppManager
 
 		Notification.m_bCoordinateWait = false;
 		co_await fp_SendUpdateNotifications(Notification);
+
+		if (_Stage == EUpdateStage::EUpdateStage_Finished && (Application.m_LastInstalledVersion != InstalledVersion || Application.m_LastInstalledVersionInfo != InstalledVersionInfo))
+		{
+			DMibLogWithCategory
+				(
+					Malterlib/Cloud/AppManager
+					, Info
+					, "Not recording version {} of application '{}' as finished, since another update replaced it"
+					, InstalledVersion
+					, Application.m_Name
+				)
+			;
+
+			co_return {};
+		}
 
 		if (_Stage != Application.m_UpdateStage)
 		{
