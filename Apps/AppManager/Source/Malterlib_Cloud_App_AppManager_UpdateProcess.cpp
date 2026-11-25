@@ -211,7 +211,8 @@ namespace NMib::NCloud::NAppManager
 				;
 			}
 
-			// Against the installed version, the time only tells packages of the same version ID apart; fp_FindVersion compares the IDs
+			// fp_FindVersion orders the time of the package against the published versions like their publication times: a package keeps the file
+			// times of its build, which come before the publication of later versions
 			State.m_VersionID = PackageInfo->m_VersionID;
 			State.m_VersionTime = PackageInfo->m_VersionInfo.m_Time;
 			VersionInfo = fg_Move(PackageInfo->m_VersionInfo);
@@ -292,7 +293,8 @@ namespace NMib::NCloud::NAppManager
 
 #ifdef DPlatformFamily_Windows
 			// A new run-as account gets a password of its own. The update can't change the password of an existing account, so it takes the password
-			// of the version info or of an application that runs as it, and is refused without one
+			// of the version info or of an application that runs as it, and is refused without one, also when a failed attempt of the update created
+			// the account
 			if (!NewSettings.m_RunAsUser.f_IsEmpty() && NewSettings.m_RunAsUser != Application.m_Settings.m_RunAsUser)
 			{
 				bool bAccountExists = false;
