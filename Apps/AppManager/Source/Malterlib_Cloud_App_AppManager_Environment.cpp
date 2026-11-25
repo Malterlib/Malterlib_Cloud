@@ -5321,6 +5321,8 @@ namespace NMib::NCloud::NAppManager
 			co_await fg_AllDone(Disconnects).f_Wrap() > fg_LogError("Malterlib/Cloud/AppManager", "Failed to disconnect the guest of an environment");
 		}
 
+		// The encryption close that waits for this force-stop unmounts without forcing, so a container that a failed kill leaves running fails the
+		// close instead of losing writes
 		if (_pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_Container)
 			co_await fp_KillEnvironmentContainer(_pEnvironment).f_Wrap() > fg_LogError("Malterlib/Cloud/AppManager", "Failed to kill environment container");
 
