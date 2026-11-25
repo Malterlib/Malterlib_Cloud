@@ -2217,6 +2217,33 @@ void CAppManager_Environment_Tests::f_DoTests()
 				)
 			;
 		}
+
+		{
+			DMibTestPath("Kept Directory Permissions");
+
+			// The application restricted the directory and keeps data in it, so the cleanup keeps it, and the update keeps its permissions
+			constexpr EFileAttrib c_Private = EFileAttrib_UserRead | EFileAttrib_UserWrite | EFileAttrib_UserExecute;
+			constexpr EFileAttrib c_Public = c_Private | EFileAttrib_GroupRead | EFileAttrib_GroupExecute | EFileAttrib_EveryoneRead | EFileAttrib_EveryoneExecute;
+
+			CStr PublicSource = RootDirectory / "PublicSource";
+			CFile::fs_CreateDirectory(PublicSource / "Data");
+			CFile::fs_CreateDirectory(PublicSource / "Recreated");
+			CFile::fs_SetAttributes(PublicSource / "Data", EFileAttrib_UnixAttributesValid | c_Public);
+			CFile::fs_SetAttributes(PublicSource / "Recreated", EFileAttrib_UnixAttributesValid | c_Public);
+
+			CFile::fs_CreateDirectory(ApplicationDirectory / "Data");
+			CFile::fs_WriteStringToFile(ApplicationDirectory / "Data/Database", "Data", false);
+			CFile::fs_SetAttributes(ApplicationDirectory / "Data", EFileAttrib_UnixAttributesValid | c_Private);
+			CFile::fs_CreateDirectory(ApplicationDirectory / "Recreated");
+			CFile::fs_SetAttributes(ApplicationDirectory / "Recreated", EFileAttrib_UnixAttributesValid | c_Private);
+
+			auto Installed = fg_AppManager_ReplaceApplicationFiles(ApplicationDirectory, PublicSource, {"Data", "Recreated"}, {"Data", "Recreated"});
+			DMibExpect(Installed, ==, fg_CreateVector<CStr>("Data", "Recreated"));
+
+			DMibExpect(CFile::fs_GetAttributes(ApplicationDirectory / "Data") & EFileAttrib_AllUnixPermissions, ==, c_Private);
+			DMibExpect(CFile::fs_ReadStringFromFile(ApplicationDirectory / "Data/Database"), ==, "Data");
+			DMibExpect(CFile::fs_GetAttributes(ApplicationDirectory / "Recreated") & EFileAttrib_AllUnixPermissions, ==, c_Public);
+		}
 #	endif
 
 		{
@@ -2260,6 +2287,25 @@ void CAppManager_Environment_Tests::f_DoTests()
 					(
 						fg_AppManager_ReplaceApplicationFiles(ApplicationDirectory, ConflictSource, {"Old.txt"}, {"Nested/File.txt"})
 						, DMibErrorInstance("The application file 'Nested' is where the update has a directory")
+					)
+				;
+				DMibExpect(CFile::fs_ReadStringFromFile(ApplicationDirectory / "Old.txt"), ==, "Old");
+			}
+
+			{
+				DMibTestPath("Old File Below A Link");
+
+				// The cleanup keeps the old file below the link, so it stays in the way of the directory, although it is the same file
+				CFile::fs_CreateDirectory(ConflictSource / "Real/Conflict");
+				CFile::fs_WriteStringToFile(ConflictSource / "Real/Conflict/File.txt", "New", false);
+				CFile::fs_CreateDirectory(ApplicationDirectory / "Real");
+				CFile::fs_WriteStringToFile(ApplicationDirectory / "Real/Conflict", "Application", false);
+				CFile::fs_CreateSymbolicLink(ApplicationDirectory / "Real", ApplicationDirectory / "LinkToReal", EFileAttrib_Directory, ESymbolicLinkFlag_None);
+
+				DMibExpectException
+					(
+						fg_AppManager_ReplaceApplicationFiles(ApplicationDirectory, ConflictSource, {"Old.txt", "LinkToReal/Conflict"}, {"Real/Conflict/File.txt"})
+						, DMibErrorInstance("The application file 'Real/Conflict' is where the update has a directory")
 					)
 				;
 				DMibExpect(CFile::fs_ReadStringFromFile(ApplicationDirectory / "Old.txt"), ==, "Old");

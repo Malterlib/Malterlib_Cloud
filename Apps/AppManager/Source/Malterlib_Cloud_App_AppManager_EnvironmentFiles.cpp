@@ -254,9 +254,11 @@ namespace NMib::NCloud
 		// file tells. Entries missing from _SourceDirectory, which the update scripts can remove, install nothing
 		auto fIsOldFileSpelledOtherwise = [&](CStr const &_DestinationPath)
 			{
+				// The cleanup keeps old files below links, which can resolve to the destination. Another hard link of an old file shares its
+				// identity, but applications don't link their files where a new version has a directory
 				for (auto &OldFile : _OldFiles)
 				{
-					if (!CFile::fs_FileExists(_Directory / OldFile, EFileAttrib_File | EFileAttrib_Link))
+					if (!CFile::fs_FileExists(_Directory / OldFile, EFileAttrib_File | EFileAttrib_Link) || fg_AppManager_HasLinkedParent(_Directory, OldFile))
 						continue;
 
 					if (CFile::fs_GetUniqueIdentifierOnLink(_Directory / OldFile) == CFile::fs_GetUniqueIdentifierOnLink(_DestinationPath))
@@ -288,6 +290,18 @@ namespace NMib::NCloud
 		for (auto &File : _OldFiles)
 			fg_AppManager_DeleteApplicationFile(_Directory, File);
 
+#ifndef DPlatformFamily_Windows
+		// A directory that the cleanup kept holds files of the application, which can have restricted its permissions, so only the directories
+		// that the update creates get the permissions of the package
+		NContainer::TCSet<CStr> KeptDirectories;
+		for (auto &File : _Files)
+		{
+			CStr DestinationPath = _Directory / File;
+			if (CFile::fs_FileExists(DestinationPath, EFileAttrib_Directory) && !CFile::fs_FileExists(DestinationPath, EFileAttrib_Link) && !fg_AppManager_HasLinkedParent(_Directory, File))
+				KeptDirectories[File];
+		}
+#endif
+
 #ifdef DPlatformFamily_Windows
 		if (CSystem::ms_PlatformVersion <= 10'0'017763)
 			NSys::fg_Thread_Sleep(5.0); // Try to work around access denied below when file is renamed
@@ -312,7 +326,8 @@ namespace NMib::NCloud
 					fg_AppManager_CreateApplicationDirectory(_Directory, File);
 #ifndef DPlatformFamily_Windows
 					// The unpack normalized the permissions of the packaged directory, which can keep other accounts out of it
-					CFile::fs_SetAttributes(DestinationPath, (CFile::fs_GetAttributes(SourcePath) & ~EFileAttrib_Directory) | EFileAttrib_UnixAttributesValid);
+					if (!KeptDirectories.f_FindEqual(File))
+						CFile::fs_SetAttributes(DestinationPath, (CFile::fs_GetAttributes(SourcePath) & ~EFileAttrib_Directory) | EFileAttrib_UnixAttributesValid);
 #endif
 					Installed.f_Insert(File);
 				}
