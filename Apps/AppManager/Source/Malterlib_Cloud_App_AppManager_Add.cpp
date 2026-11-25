@@ -148,8 +148,8 @@ namespace NMib::NCloud::NAppManager
 				if (bPackageIsAgent && AgentPlatform.m_LocalPath.f_IsEmpty() && AgentPlatform.m_Platform == DetectedPlatform)
 					continue;
 
-				// The host installation that this command adds is the agent of the host platform, which another copy would shadow
-				if (!bPackageIsAgent && AgentPlatform.m_Platform == DMalterlibCloudPlatform)
+				// The self update source of the host is the agent of the host platform, which another copy would shadow
+				if (AgentPlatform.m_Platform == DMalterlibCloudPlatform)
 					continue;
 
 				if (AgentPlatform.m_LocalPath.f_IsEmpty() && bFromFile)
@@ -267,6 +267,17 @@ namespace NMib::NCloud::NAppManager
 			}
 		}
 
+		// An agent distribution has no launch environment, so its update scripts would run on the host when only the agent updates
+		auto fRemoveUpdateScripts = [](CEJsonSorted &o_Params)
+			{
+				for (auto *pScript : {"UpdateScript_PreUpdate", "UpdateScript_PostUpdate", "UpdateScript_PostLaunch", "UpdateScript_OnError"})
+				{
+					if (o_Params.f_GetMember(pScript))
+						o_Params.f_RemoveMember(pScript);
+				}
+			}
+		;
+
 		// Adding the host installation can self update, which restarts this AppManager, so the agents are added first
 		for (auto &AgentPlatform : AgentPlatforms)
 		{
@@ -284,13 +295,7 @@ namespace NMib::NCloud::NAppManager
 			PlatformParams["VersionManagerPlatform"] = AgentPlatform.m_Platform;
 			PlatformParams["SelfUpdateSource"] = false;
 			PlatformParams["SettingsFromVersionInfo"] = false;
-
-			// An agent distribution has no launch environment, so its update scripts would run on the host when only the agent updates
-			for (auto *pScript : {"UpdateScript_PreUpdate", "UpdateScript_PostUpdate", "UpdateScript_PostLaunch", "UpdateScript_OnError"})
-			{
-				if (PlatformParams.f_GetMember(pScript))
-					PlatformParams.f_RemoveMember(pScript);
-			}
+			fRemoveUpdateScripts(PlatformParams);
 
 			if (!AgentPlatform.m_LocalPath.f_IsEmpty())
 			{
@@ -323,6 +328,7 @@ namespace NMib::NCloud::NAppManager
 			AgentParams["VersionManagerPlatform"] = DetectedPlatform;
 			AgentParams["SelfUpdateSource"] = false;
 			AgentParams["SettingsFromVersionInfo"] = false;
+			fRemoveUpdateScripts(AgentParams);
 
 			Status = co_await fp_CommandLine_AddApplication(fg_Move(AgentParams), _pCommandLine);
 		}
@@ -1061,9 +1067,9 @@ namespace NMib::NCloud::NAppManager
 		fp_OnApplicationAdded(pApplication);
 
 		// The subscriptions send the newest versions across all platforms, which can leave out the updates of the platform of an agent
-		// distribution added from a file. The resubscription of a new platform can end before the distribution is published here. Until then
-		// the package keeps the time of its files, which only tells it apart from an offered build of the same version ID, since updates
-		// compare the version IDs
+		// distribution added from a file. The resubscription of a new platform can end before the distribution is published here. The package
+		// keeps the newest time of its files, which fp_FindVersion orders against the published versions like their publication times: a
+		// package keeps the file times of its build, which come before the publication of later versions
 		if (!_FromLocalFile.f_IsEmpty())
 		{
 			CStr AgentPlatform = pApplication->f_AgentDistributionPlatform();
