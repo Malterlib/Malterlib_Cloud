@@ -615,8 +615,15 @@ namespace NMib::NCloud::NAppManager
 					&& Application.m_LastTriedInstalledVersionInfo.m_Time == Application.m_LastInstalledVersionInfo.m_Time
 					&& Application.m_LastTriedInstalledVersionInfo.m_RetrySequence == Application.m_LastInstalledVersionInfo.m_RetrySequence
 				;
+				// The self update that waits for this start to finish ran its post-update script before the restart
+				bool bPendingSelfUpdateOfInstalledVersion
+					= PendingSelfUpdate.m_Name == Name
+					&& PendingSelfUpdate.m_VersionID == Application.m_LastInstalledVersion
+					&& PendingSelfUpdate.m_VersionTime == Application.m_LastInstalledVersionInfo.m_Time
+				;
 				bool bInstalledVersionMigrated
 					= !bFailureOfInstalledVersion
+					|| bPendingSelfUpdateOfInstalledVersion
 					|| Application.m_LastFailedInstalledVersionFailureStage < EUpdateStage::EUpdateStage_SaveApplicationState
 					||
 					(
