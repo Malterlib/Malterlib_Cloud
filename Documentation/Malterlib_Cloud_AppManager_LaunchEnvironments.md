@@ -18,9 +18,9 @@ past the environment boundary need the host access permission of the AppManager:
 arguments of containers, container networks other than the runtime's defaults (bridge, none and default), like the
 host network, the network of another container or a named network, and the OS dependencies of a Local environment,
 which install on the host. Settings of the host that restart environments to apply them, like the Colima and VM
-settings, need access to each environment they restart. So do adding a Colima environment and changing the extra
-mounts, parent application or runtime of one, which change the directories that the Colima VM shares: the next start
-of a Colima environment applies them by restarting the Colima VM with every Colima environment running in it. Opening
+settings, need access to each environment they restart that runs when the change is made. So do adding a Colima
+environment and changing the extra mounts, parent application or runtime of one, which change the directories that
+the Colima VM shares: the next start of a Colima environment applies them by restarting the Colima VM with every Colima environment running in it. Opening
 the encryption of the parent application of a Colima environment changes the shares as well.
 
 ## Environment types
@@ -32,13 +32,15 @@ the encryption of the parent application of a Colima environment changes the sha
   The runtime is Docker on Linux hosts. On macOS hosts it is the Apple container runtime, the default, which runs
   each container in a lightweight VM, or Colima, which runs Docker in a VM that the AppManager owns. A stopped
   container is reused on the next start, so changes inside it, like OS updates, survive restarts; a change of the
-  settings the container was created with replaces it with a new one, after an attempt to pull the newest image,
-  which falls back to the image the host already has. Containers use the default network of the runtime unless
+  settings the container was created with replaces it with a new one. The replacement removes the old container with
+  its writable file system first, and then tries to pull the newest image, which falls back to the image the host
+  already has, so a changed image that the host doesn't have yet needs the registry. The application data in the data
+  storage survives the replacement. Containers use the default network of the runtime unless
   they are configured for another, so on a Docker host they share its default bridge with the other containers
   there; see the threat model. The guest host names of VM guests, and of Docker containers that don't share the host
   name of the host or of another container, like those on the host network, are made from the name of the host computer and the environment, apart
   from the container names that `docker` commands take: a container takes a new computer name when it is next created
-  and a VM guest when the host next installs its agent. The Apple container runtime names the guest host after the
+  and a VM guest when its agent next starts after the host set it up. The Apple container runtime names the guest host after the
   container, since it keeps the agent from renaming it.
 - **VM** runs a macOS guest through Virtualization.framework on Apple silicon hosts with macOS 26 or later, which
   the isolated network of the guest needs. The guest boots from an image
@@ -120,8 +122,10 @@ container never sees a partial update; the container runs the new agent when it 
 the agent, like its trust database, logs and state, lives in the data storage.
 
 The storage of an application can't change while it is installed, so an application moves only between the host and
-Local environments, which share host storage. Files that a container or VM could change never return to the host or
-reach another environment, other than through an image bundle that the next VM boots.
+Local environments, which share host storage. The installs and updates of the AppManager never bring files that a
+container or VM could change back to the host or to another environment, other than through an image bundle that the
+next VM boots. Writable extra mounts and backup rules of a parent application that take environment storage, which
+the sections below describe, are configured by an administrator and do share such files.
 
 The AppManager keeps environment storage in `.Environment` and VM images in `.VMImages` directories, in its root
 directory and in application directories, names that no application can take. An environment can have a parent
@@ -165,7 +169,8 @@ it starts its container or VM, also one that was stopped manually, which the las
   wait for its guest, like update scripts in it. The file applies of updates are waited for until they end, within
   their own timeout of an hour, since a stopped apply leaves the application without complete files. Closing the encryption of a parent application, or
   of an application that the extra mounts of a container are in, stops those environments without waiting for them to
-  be idle, so work in them that must finish needs the environment stopped first.
+  be idle, only for the OS updates of their agents, so other work in them that must finish needs the environment
+  stopped first.
 - Stopping an environment stops its applications through the agent first. When the agent is lost, the host clears
   the launches in the environment, stops it and retries the applications later.
 - Moving an application into or out of a Local environment stops it, changes its settings and launches it at its
@@ -189,8 +194,8 @@ launches the applications of its environment. An installation inside a container
 stops, and the launches and scripts that wait for it, for at most an hour.
 
 Agents in containers and VMs run their own host monitor, configured from the host's automatic update settings: they
-patch the environment's OS and ask the host to restart the environment when an update needs it. The agent of a
-read-only container only monitors. Only Linux guests
+patch the environment's OS and ask the host to restart the environment when an update needs it. The host restarts it
+only while its own automatic reboot setting is on. The agent of a read-only container only monitors. Only Linux guests
 are patched; a macOS VM guest logs that it doesn't install the updates. An update an agent reports holds back host
 reboots and environment stops for at most an hour, and the host refuses updates that start once it stops the
 environment, reboots or shuts down. The sensors of applications in a container or VM hold back automatic host
