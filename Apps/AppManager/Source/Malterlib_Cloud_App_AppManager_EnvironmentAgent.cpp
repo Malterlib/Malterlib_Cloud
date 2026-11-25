@@ -1044,6 +1044,16 @@ namespace NMib::NCloud::NAppManager
 		for (auto &File : _Apply.m_OldFiles)
 			fg_AppManager_DeleteApplicationFile(_Directory, File);
 
+		// A directory that the cleanup kept holds files of the application, which can have restricted its permissions, so only the directories
+		// that the apply creates get the permissions of the package
+		TCSet<CStr> KeptDirectories;
+		for (auto &File : _Apply.m_Files)
+		{
+			CStr DestinationPath = _Directory / File;
+			if (CFile::fs_FileExists(DestinationPath, EFileAttrib_Directory) && !CFile::fs_FileExists(DestinationPath, EFileAttrib_Link) && !fg_AppManager_HasLinkedParent(_Directory, File))
+				KeptDirectories[File];
+		}
+
 		CStr User = _pUniqueUserGroup->f_GetUser(Settings.m_RunAsUser);
 		CStr Group = _pUniqueUserGroup->f_GetGroup(Settings.m_RunAsGroup);
 
@@ -1082,8 +1092,11 @@ namespace NMib::NCloud::NAppManager
 			{
 				// Moving files only creates their parent directories, so each packaged directory, empty ones included, is created here with its normalized permissions
 				fg_AppManager_CreateApplicationDirectory(_Directory, File);
-				CFile::fs_SetAttributes(DestinationPath, (CFile::fs_GetAttributes(SourcePath) & ~EFileAttrib_Directory) | EFileAttrib_UnixAttributesValid);
-				fsp_UpdateAttributes(DestinationPath);
+				if (!KeptDirectories.f_FindEqual(File))
+				{
+					CFile::fs_SetAttributes(DestinationPath, (CFile::fs_GetAttributes(SourcePath) & ~EFileAttrib_Directory) | EFileAttrib_UnixAttributesValid);
+					fsp_UpdateAttributes(DestinationPath);
+				}
 				fSetOwners(DestinationPath);
 			}
 		}
