@@ -2908,6 +2908,23 @@ void CAppManager_Environment_Tests::f_DoTests()
 		}
 	};
 
+	DMibTestSuite("Agent Automatic Reboot")
+	{
+		CEJsonSortedYaml RebootConfig;
+		RebootConfig["AutoUpdate"]["SecurityUpdates"] = true;
+		RebootConfig["AutoUpdate"]["AutomaticReboot"] = true;
+
+		CEJsonSortedYaml NoRebootConfig;
+		NoRebootConfig["AutoUpdate"]["SecurityUpdates"] = true;
+
+		DMibExpectTrue(fg_AppManager_EnvironmentAgentAutomaticReboot(CAppManagerInterface::EEnvironmentType_Container, false, RebootConfig));
+		DMibExpectTrue(fg_AppManager_EnvironmentAgentAutomaticReboot(CAppManagerInterface::EEnvironmentType_VM, false, RebootConfig));
+		DMibExpectFalse(fg_AppManager_EnvironmentAgentAutomaticReboot(CAppManagerInterface::EEnvironmentType_Container, true, RebootConfig));
+		DMibExpectFalse(fg_AppManager_EnvironmentAgentAutomaticReboot(CAppManagerInterface::EEnvironmentType_Local, false, RebootConfig));
+		DMibExpectFalse(fg_AppManager_EnvironmentAgentAutomaticReboot(CAppManagerInterface::EEnvironmentType_Container, false, NoRebootConfig));
+		DMibExpectFalse(fg_AppManager_EnvironmentAgentAutomaticReboot(CAppManagerInterface::EEnvironmentType_VM, false, CEJsonSortedYaml()));
+	};
+
 	DMibTestSuite("Container Arguments") -> TCFuture<void>
 	{
 		{

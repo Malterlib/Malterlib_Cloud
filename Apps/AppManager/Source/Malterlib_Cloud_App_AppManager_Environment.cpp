@@ -155,6 +155,20 @@ namespace NMib::NCloud
 		return {};
 	}
 
+	// Whether the AutoUpdate settings of the host let the agent of an environment of _Type restart its environment after OS updates
+	bool fg_AppManager_EnvironmentAgentAutomaticReboot(CAppManagerInterface::EEnvironmentType _Type, bool _bReadOnly, NEncoding::CEJsonSortedYaml const &_HostConfig)
+	{
+		using namespace NMib::NEncoding;
+
+		if (_Type == CAppManagerInterface::EEnvironmentType_Local || (_Type == CAppManagerInterface::EEnvironmentType_Container && _bReadOnly))
+			return false;
+
+		if (auto pAutoUpdate = _HostConfig.f_GetMember("AutoUpdate", EJsonType_Object))
+			return pAutoUpdate->f_GetMemberValue("AutomaticReboot", false).f_Boolean();
+
+		return false;
+	}
+
 	// Replaces the control characters of guest text, except line feeds and tabs and including the C1 controls in UTF-8, with '?', and cuts it to
 	// at most _MaxLength bytes at the start of a character
 	NStr::CStr fg_AppManager_SanitizeGuestText(NStr::CStr const &_Text, umint _MaxLength)

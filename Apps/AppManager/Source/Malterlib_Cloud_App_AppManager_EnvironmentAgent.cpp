@@ -1778,6 +1778,10 @@ namespace NMib::NCloud::NAppManager
 		if (!pEnvironment)
 			co_return DErrorInstance("Environment agent not associated with your host");
 
+		// The guest asks for restarts itself, so the host enforces its own setting, which can also have changed since the agent was configured
+		if (!fg_AppManager_EnvironmentAgentAutomaticReboot(pEnvironment->m_Settings.m_Type, pEnvironment->m_Settings.m_bContainerReadOnly, pThis->mp_State.m_ConfigDatabase.m_Data))
+			co_return DErrorInstance("Automatic restarts are not enabled for this environment");
+
 		// The requests that come while a restart waits join it, so only the first one reaches the log of the host
 		if (!pEnvironment->m_bRestartWhenIdlePending)
 			DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Environment '{}' requested a restart: {}", pEnvironment->m_Name, fg_AppManager_SanitizeGuestText(_Reason, 256));

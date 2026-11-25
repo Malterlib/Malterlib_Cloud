@@ -64,6 +64,7 @@ namespace NMib::NCloud
 	};
 
 	NStr::CStr fg_AppManager_EnvironmentAgentAutoUpdateConfig(CAppManagerInterface::EEnvironmentType _Type, bool _bReadOnly, NEncoding::CEJsonSortedYaml const &_HostConfig);
+	bool fg_AppManager_EnvironmentAgentAutomaticReboot(CAppManagerInterface::EEnvironmentType _Type, bool _bReadOnly, NEncoding::CEJsonSortedYaml const &_HostConfig);
 	NStr::CStr fg_AppManager_SanitizeGuestText(NStr::CStr const &_Text, umint _MaxLength);
 
 	/// Where the agent of a docker or VM environment reaches the environment listen of the host
