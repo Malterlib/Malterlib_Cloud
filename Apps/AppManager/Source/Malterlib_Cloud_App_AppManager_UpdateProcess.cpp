@@ -732,6 +732,9 @@ namespace NMib::NCloud::NAppManager
 			if (!pEnvironment->m_AgentInterface)
 				co_return DMibErrorInstance("The environment agent is not connected");
 
+			if (pEnvironment->f_RefusesFileApplies())
+				co_return DMibErrorInstance("Environment '{}' is stopping"_f << pEnvironment->m_Name);
+
 			auto &Settings = State.m_pNewSettings ? *State.m_pNewSettings : State.m_pApplication->m_Settings;
 
 			CAppManagerEnvironmentInterface::CApplicationApply Apply;

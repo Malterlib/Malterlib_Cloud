@@ -235,6 +235,7 @@ namespace NMib::NCloud::NAppManager
 			bool f_IsStarted() const;
 			bool f_AgentUpdateDefers() const;
 			bool f_AgentConfigurationDefers() const;
+			bool f_RefusesFileApplies() const;
 			void f_SetAgentUpdateInProgress(CStr &&_Description);
 
 			CIntrusiveRefCount m_RefCount;

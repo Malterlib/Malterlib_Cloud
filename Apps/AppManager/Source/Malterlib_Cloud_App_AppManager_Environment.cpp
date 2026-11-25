@@ -387,6 +387,12 @@ namespace NMib::NCloud::NAppManager
 		return m_AgentConfigurationDeferral.f_Defers(CAppManagerGuestDeferral::fs_Now());
 	}
 
+	// A stop that has waited for the file applies doesn't wait for those that start after it, which the stop would cut off
+	bool CAppManagerActor::CEnvironment::f_RefusesFileApplies() const
+	{
+		return m_bStopping || m_bStartAbortRequested || m_nUpdateAdmissionClosed;
+	}
+
 	// An empty description clears the reported update and ends its deferral
 	void CAppManagerActor::CEnvironment::f_SetAgentUpdateInProgress(CStr &&_Description)
 	{

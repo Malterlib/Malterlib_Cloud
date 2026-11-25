@@ -934,6 +934,9 @@ namespace NMib::NCloud::NAppManager
 				if (!pRemoteStorageEnvironment->m_AgentInterface)
 					co_return Auditor.f_Exception(fg_Format("The agent of environment '{}' disconnected before the application files were applied", pRemoteStorageEnvironment->m_Name));
 
+				if (pRemoteStorageEnvironment->f_RefusesFileApplies())
+					co_return Auditor.f_Exception(fg_Format("Environment '{}' stopped before the application files were applied", pRemoteStorageEnvironment->m_Name));
+
 				// A stop in the middle of the apply leaves files that a retry without --force-install refuses, so the apply holds back environment
 				// stops past the guest deferral limit, bounded by its own timeout
 				++pRemoteStorageEnvironment->m_nFileApplies;
