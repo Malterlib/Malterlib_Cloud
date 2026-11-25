@@ -215,12 +215,6 @@ namespace NMib::NCloud
 				auto InstallResult = co_await f_Patch_InstallPatches().f_Wrap();
 				if (!InstallResult)
 					DMibLogWithCategory(Malterlib/Cloud/HostMonitor, Error, "Failed to install patches automatically (OS patch status): {}", InstallResult.f_GetExceptionStr());
-				else if (m_Config.m_bKernelManagedExternally)
-				{
-					// needrestart finds the processes that use replaced libraries only in services and login sessions, which a container
-					// without an init system doesn't run its processes in
-					m_bPatchesInstalledWithExternalKernel = true;
-				}
 
 				if (m_Config.m_fOnPatchingChanged)
 					co_await m_Config.m_fOnPatchingChanged(false).f_Wrap() > LogError("Failed to report patching end (OS patch status)");

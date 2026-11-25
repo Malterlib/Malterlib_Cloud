@@ -41,6 +41,12 @@ namespace NMib::NCloud
 #else
 		co_await fg_RunApt("apt-get", {"update"});
 		co_await fg_RunApt("apt-get", {"dist-upgrade", "--yes"});
+
+		// needrestart finds the processes that use replaced libraries only in services and login sessions, which a container without an init
+		// system doesn't run its processes in. The upgrade has replaced them also when the cleanup below fails
+		if (m_Config.m_bKernelManagedExternally)
+			m_bPatchesInstalledWithExternalKernel = true;
+
 		co_await fg_RunApt("apt-get", {"autoremove", "--yes"});
 
 		co_return {};
