@@ -5640,6 +5640,8 @@ namespace NMib::NCloud::NAppManager
 		Launch.m_bDistributedApp = _pApplication->m_Settings.m_bDistributedApp;
 		Launch.m_InterfaceAddress = InterfaceAddress->f_Encode();
 		Launch.m_LaunchID = _pApplication->m_LaunchID;
+		// The staging creates the accounts of the application before these dependencies install, with useradd and groupadd, which the Linux
+		// guest images the agent supports include
 		Launch.m_OSDependencies = _pApplication->m_Settings.m_OSDependencies;
 		Launch.m_LowPortExecutables = fg_Move(LowPortExecutables);
 
