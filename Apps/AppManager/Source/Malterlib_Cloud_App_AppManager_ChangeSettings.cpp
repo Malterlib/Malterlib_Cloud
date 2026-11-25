@@ -83,7 +83,9 @@ namespace NMib::NCloud::NAppManager
 
 		auto LowPortExecutablesToGrant = co_await
 			(
-				g_Dispatch(BlockingActorCheckout) / [=, Directory = _pApplication->f_GetDirectory(), pUniqueUserGroup = mp_pUniqueUserGroup]() mutable -> TCOptional<TCMap<CStr, CStr>>
+				g_Dispatch(BlockingActorCheckout)
+				/ [=, Directory = _pApplication->f_GetDirectory(), pUniqueUserGroup = mp_pUniqueUserGroup, VersionInfo = _pApplication->m_LastInstalledVersionInfo]
+				() mutable -> TCOptional<TCMap<CStr, CStr>>
 				{
 					if (_OldVersion < 0x101)
 					{
@@ -120,7 +122,18 @@ namespace NMib::NCloud::NAppManager
 							}
 						}
 
-						return fsp_UpdateApplicationFilePermissions(Directory, _pApplication, _pApplication->m_Settings, _pApplication->m_Files, pUniqueUserGroup, fOnInfo, false);
+						return fsp_UpdateApplicationFilePermissions
+							(
+								Directory
+								, _pApplication
+								, _pApplication->m_Settings
+								, VersionInfo
+								, _pApplication->m_Files
+								, pUniqueUserGroup
+								, fOnInfo
+								, false
+							)
+						;
 					}
 
 					return {};
@@ -392,7 +405,13 @@ namespace NMib::NCloud::NAppManager
 				(
 					(
 						g_Dispatch(BlockingActorCheckout) /
-						[=, Directory = pApplication->f_GetDirectory(), pUniqueUserGroup = mp_pUniqueUserGroup, bRemoteStorage = (bool)fp_ApplicationRemoteStorageEnvironment(*pApplication)]
+						[
+							=
+							, Directory = pApplication->f_GetDirectory()
+							, pUniqueUserGroup = mp_pUniqueUserGroup
+							, bRemoteStorage = (bool)fp_ApplicationRemoteStorageEnvironment(*pApplication)
+							, VersionInfo = pApplication->m_LastInstalledVersionInfo
+						]
 						() -> TCOptional<TCMap<CStr, CStr>>
 						{
 							// The agent prepares the accounts and file owners of an application in environment storage
@@ -406,6 +425,7 @@ namespace NMib::NCloud::NAppManager
 									Directory
 									, pApplication
 									, NewSettings
+									, VersionInfo
 									, pApplication->m_Files
 									, pUniqueUserGroup
 									, _fOnInfo

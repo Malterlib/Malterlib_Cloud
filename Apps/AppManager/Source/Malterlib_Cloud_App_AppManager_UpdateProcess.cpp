@@ -799,11 +799,12 @@ namespace NMib::NCloud::NAppManager
 						, Files = State.m_Files
 						, pApplication = State.m_pApplication
 						, Settings = State.m_pNewSettings ? *State.m_pNewSettings : State.m_pApplication->m_Settings
+						, VersionInfo = State.m_pApplication->m_LastTriedInstalledVersionInfo
 						, pUniqueUserGroup = mp_pUniqueUserGroup
 						, fOnInfo = State.m_fOnInfo
 					]
 					{
-						return fsp_UpdateApplicationFilePermissions(OutputDirectory, pApplication, Settings, Files, pUniqueUserGroup, fOnInfo, true);
+						return fsp_UpdateApplicationFilePermissions(OutputDirectory, pApplication, Settings, VersionInfo, Files, pUniqueUserGroup, fOnInfo, true);
 					}
 				)
 			;

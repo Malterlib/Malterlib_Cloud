@@ -1015,6 +1015,7 @@ namespace NMib::NCloud::NAppManager
 								Directory
 								, pApplication
 								, pApplication->m_Settings
+								, pApplication->m_LastInstalledVersionInfo
 								, pApplication->m_Files
 								, pUniqueUserGroup
 								, _fOnInfo

@@ -922,6 +922,7 @@ namespace NMib::NCloud::NAppManager
 				CStr const &_ApplicationDir
 				, TCSharedPointer<CApplication> const &_pApplication
 				, CApplicationSettings const &_Settings
+				, CVersionManager::CVersionInformation const &_FilesVersionInfo
 				, TCVector<CStr> const &_Files
 				, TCSharedPointer<CUniqueUserGroup> const &_pUniqueUserGroup
 				, TCFunction<void (CStr const &_Info)> const &_fLogInfo

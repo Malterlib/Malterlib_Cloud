@@ -409,13 +409,15 @@ namespace NMib::NCloud::NAppManager
 	}
 
 	// Returns the low port executables whose capabilities couldn't be set, with their digests, for a launch to grant once it has installed the OS
-	// dependencies. _bReassignFiles gives the regular files of _Files the account of _Settings, for files that an install or update brings, a
-	// changed account or a forced update of the permissions; otherwise the files keep the owners an administrator can have given them
+	// dependencies. _FilesVersionInfo is the version info of the files in _ApplicationDir, which names the low port executables. _bReassignFiles
+	// gives the regular files of _Files the account of _Settings, for files that an install or update brings, a changed account or a forced update
+	// of the permissions; otherwise the files keep the owners an administrator can have given them
 	auto CAppManagerActor::fsp_UpdateApplicationFilePermissions
 		(
 			CStr const &_ApplicationDir
 			, TCSharedPointer<CApplication> const &_pApplication
 			, CApplicationSettings const &_Settings
+			, CVersionManager::CVersionInformation const &_FilesVersionInfo
 			, TCVector<CStr> const &_Files
 			, TCSharedPointer<CUniqueUserGroup> const &_pUniqueUserGroup
 			, TCFunction<void (CStr const &_Info)> const &_fLogInfo
@@ -471,7 +473,7 @@ namespace NMib::NCloud::NAppManager
 #endif
 
 #ifdef DPlatformFamily_Linux
-		if (auto pLowPortExetutables = _pApplication->m_LastTriedInstalledVersionInfo.m_ExtraInfo.f_GetMember("LowPortExecutables", EJsonType_Array))
+		if (auto pLowPortExetutables = _FilesVersionInfo.m_ExtraInfo.f_GetMember("LowPortExecutables", EJsonType_Array))
 		{
 			for (auto &Executable : pLowPortExetutables->f_Array())
 			{
