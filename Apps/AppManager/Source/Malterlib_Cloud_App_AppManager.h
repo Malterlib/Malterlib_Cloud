@@ -1238,6 +1238,8 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<void> fp_VersionManagerResubscribeAll();
 		TCFuture<void> fp_VersionManagerListPlatformVersions(CStr _Application, CStr _Platform);
 		TCFuture<void> fp_VersionManagerListPlatformVersionsFrom(TCDistributedActor<CVersionManager> _Manager, CStr _Application, CStr _Platform);
+		TCFuture<void> fp_VersionManagerRetryListPlatformVersions(TCDistributedActor<CVersionManager> _Manager, CStr _Application, CStr _Platform, umint _SubscribeSequence);
+		TCFuture<void> fp_VersionManagerTryListPlatformVersionsFrom(TCDistributedActor<CVersionManager> _Manager, CStr _Application, CStr _Platform);
 		TCFuture<void> fp_VersionManagerSubscribe(TCDistributedActor<CVersionManager> _VersionManager);
 		TCFuture<void> fp_VersionManagerAdded(TCDistributedActor<CVersionManager> _VersionManager, CTrustedActorInfo _Info);
 		void fp_VersionManagerRemoved(TCWeakDistributedActor<CActor> const &_VersionManager);

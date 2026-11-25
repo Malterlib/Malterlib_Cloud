@@ -3,6 +3,7 @@
 
 #include <Mib/Encoding/JsonShortcuts>
 #include <Mib/Concurrency/ActorSubscription>
+#include <Mib/Concurrency/LogError>
 #include "Malterlib_Cloud_App_AppManager.h"
 
 namespace NMib::NCloud::NAppManager
@@ -199,24 +200,65 @@ namespace NMib::NCloud::NAppManager
 		co_return {};
 	}
 
+	// A failed listing is listed again in the background until it succeeds or the subscription to _Manager is replaced, since a full resend of the
+	// subscription has cleared the versions that the listing adds, and nothing else lists them
 	TCFuture<void> CAppManagerActor::fp_VersionManagerListPlatformVersionsFrom(TCDistributedActor<CVersionManager> _Manager, CStr _Application, CStr _Platform)
+	{
+		auto *pState = mp_VersionManagers.f_FindEqual(_Manager);
+		if (!pState)
+			co_return {};
+
+		umint SubscribeSequence = pState->m_SubscribeSequence;
+
+		auto Result = co_await fp_VersionManagerTryListPlatformVersionsFrom(_Manager, _Application, _Platform).f_Wrap();
+		if (Result)
+			co_return {};
+
+		DMibLogWithCategory(Malterlib/Cloud/AppManager, Warning, "Failed to list the versions of '{}' from a version manager: {}", _Application, Result.f_GetExceptionStr());
+
+		fp_VersionManagerRetryListPlatformVersions(_Manager, _Application, _Platform, SubscribeSequence)
+			> fg_LogError("Malterlib/Cloud/AppManager", "Failed to list the versions of an agent platform again")
+		;
+
+		co_return {};
+	}
+
+	TCFuture<void> CAppManagerActor::fp_VersionManagerRetryListPlatformVersions(TCDistributedActor<CVersionManager> _Manager, CStr _Application, CStr _Platform, umint _SubscribeSequence)
+	{
+		auto CheckDestroy = co_await f_CheckDestroyedOnResume();
+
+		while (true)
+		{
+			co_await fg_Timeout(60.0);
+
+			auto *pState = mp_VersionManagers.f_FindEqual(_Manager);
+			if (!pState || pState->m_SubscribeSequence != _SubscribeSequence)
+				co_return {};
+
+			auto Result = co_await fp_VersionManagerTryListPlatformVersionsFrom(_Manager, _Application, _Platform).f_Wrap();
+			if (Result)
+				break;
+
+			DMibLogWithCategory(Malterlib/Cloud/AppManager, Warning, "Failed to list the versions of '{}' from a version manager again: {}", _Application, Result.f_GetExceptionStr());
+		}
+
+		fp_AutoUpdate_Update();
+
+		co_return {};
+	}
+
+	TCFuture<void> CAppManagerActor::fp_VersionManagerTryListPlatformVersionsFrom(TCDistributedActor<CVersionManager> _Manager, CStr _Application, CStr _Platform)
 	{
 		CVersionManager::CListVersions Params;
 		Params.m_ForApplication = _Application;
 
-		auto Result = co_await _Manager.f_CallActor(&CVersionManager::f_ListVersions)(fg_Move(Params)).f_Timeout(60.0, "Timed out listing the versions of the application").f_Wrap();
-
-		if (!Result)
-		{
-			DMibLogWithCategory(Malterlib/Cloud/AppManager, Warning, "Failed to list the versions of '{}' from a version manager: {}", _Application, Result.f_GetExceptionStr());
-			co_return {};
-		}
+		auto Result = co_await _Manager.f_CallActor(&CVersionManager::f_ListVersions)(fg_Move(Params)).f_Timeout(60.0, "Timed out listing the versions of the application");
 
 		auto *pState = mp_VersionManagers.f_FindEqual(_Manager);
 		if (!pState)
 			co_return {};
 
-		auto *pVersions = Result->m_Versions.f_FindEqual(_Application);
+		auto *pVersions = Result.m_Versions.f_FindEqual(_Application);
 		if (!pVersions)
 			co_return {};
 
