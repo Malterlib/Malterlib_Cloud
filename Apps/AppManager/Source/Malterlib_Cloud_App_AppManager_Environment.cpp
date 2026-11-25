@@ -4988,6 +4988,27 @@ namespace NMib::NCloud::NAppManager
 		;
 	}
 
+	// Stops _pEnvironment without waiting for its applications to be idle. An OS update that the agent reports finishes first, since stopping a
+	// container in the middle of a package installation breaks its packages; f_AgentUpdateDefers bounds the wait for a container or VM
+	TCFuture<void> CAppManagerActor::fp_StopEnvironmentAfterAgentUpdates(TCSharedPointer<CEnvironment> _pEnvironment)
+	{
+		auto CheckDestroy = co_await f_CheckDestroyedOnResume();
+
+		++_pEnvironment->m_nUpdateAdmissionClosed;
+		auto ReopenUpdateAdmission = g_OnScopeExit / [_pEnvironment]
+			{
+				--_pEnvironment->m_nUpdateAdmissionClosed;
+			}
+		;
+
+		while (_pEnvironment->f_AgentUpdateDefers() && !_pEnvironment->m_bDeleted)
+			co_await fg_Timeout(1.0);
+
+		co_await fp_StopEnvironmentInternal(_pEnvironment);
+
+		co_return {};
+	}
+
 	// Does not wait for idle or for the updates of the agent: callers that need them finished wait for them first and refuse new ones meanwhile.
 	// Fails only when the final container stop fails or the agent of a VM hosted by a window client fails the shutdown request, which doesn't
 	// confirm that the VM powered off; other teardown failures are logged

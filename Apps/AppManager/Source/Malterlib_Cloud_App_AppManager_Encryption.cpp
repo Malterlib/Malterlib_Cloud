@@ -110,11 +110,11 @@ namespace NMib::NCloud::NAppManager
 					}
 				}
 
-				// Unlike an environment stop, closing does not wait for the environment applications to be idle
+				// Unlike an environment stop, closing does not wait for the environment applications to be idle, only for the OS updates of the agent
 				for (auto &pEnvironment : ConfinedEnvironments)
 				{
 					if (pEnvironment->f_IsStarted() || pEnvironment->m_bStarting || pEnvironment->m_bStopping)
-						co_await (fp_StopEnvironmentInternal(pEnvironment) % "Failed to stop environment before closing encryption");
+						co_await (fp_StopEnvironmentAfterAgentUpdates(pEnvironment) % "Failed to stop environment before closing encryption");
 				}
 			}
 
@@ -144,7 +144,7 @@ namespace NMib::NCloud::NAppManager
 				}
 
 				for (auto &pEnvironment : MountingEnvironments)
-					co_await (fp_StopEnvironmentInternal(pEnvironment) % "Failed to stop environment before closing encryption");
+					co_await (fp_StopEnvironmentAfterAgentUpdates(pEnvironment) % "Failed to stop environment before closing encryption");
 			}
 
 			if (pEncryptionApplication->m_DirectoryMonitorSubscription)

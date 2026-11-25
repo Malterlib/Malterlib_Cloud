@@ -1049,6 +1049,7 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<void> fp_RestartEnvironmentWhenIdle(TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<void> fp_SetEnvironmentSensorStatus(TCSharedPointer<CEnvironment> _pEnvironment, CStr _Status, CAppManagerInterface::EStatusSeverity _Severity);
 		TCFuture<void> fp_StopEnvironmentInternal(TCSharedPointer<CEnvironment> _pEnvironment);
+		TCFuture<void> fp_StopEnvironmentAfterAgentUpdates(TCSharedPointer<CEnvironment> _pEnvironment);
 		void fp_StopEnvironmentAfterFailedStart(TCSharedPointer<CEnvironment> const &_pEnvironment, CStr const &_Failure);
 		TCFuture<void> fp_ForceStopGuestEnvironmentsAfter(TCFuture<void> _Timeout);
 		TCFuture<void> fp_ForceStopGuestEnvironment(TCSharedPointer<CEnvironment> _pEnvironment);
