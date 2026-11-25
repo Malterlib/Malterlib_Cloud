@@ -307,6 +307,10 @@ namespace NMib::NCloud::NAppManager
 
 			co_await (fp_WaitForEnvironmentAgentConfiguration(pEnvironment) % "Cannot run update script: failed to configure the environment");
 
+			// The agent finds the directory of the application by its name, which an application added after a forced removal can have taken
+			if (_pApplication->m_bDeleted)
+				co_return DMibErrorInstance("Cannot run update script: application '{}' was removed"_f << _pApplication->m_Name);
+
 			// The agent resolves the configured names to the accounts inside the environment
 			EnvironmentScript.m_RunAsUser = _pApplication->m_Settings.m_RunAsUser;
 			EnvironmentScript.m_RunAsGroup = _pApplication->m_Settings.m_RunAsGroup;
