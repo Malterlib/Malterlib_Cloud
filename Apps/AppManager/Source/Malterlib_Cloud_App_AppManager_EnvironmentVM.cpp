@@ -978,7 +978,7 @@ namespace NMib::NCloud::NAppManager
 		_pEnvironment->f_SetStatus("VM running, setting up the agent", CAppManagerInterface::EStatusSeverity_Warning);
 
 		// An agent installed in the guest that registers first keeps the host name it was installed with, like a container keeps its name
-		// until it is created again; the host name follows a renamed host computer when the host next installs the agent
+		// until it is created again; the host name follows a renamed host computer when the agent next starts after the host set it up
 		if (!_pEnvironment->f_IsStarted())
 		{
 			// Without provisioning the start waits for an agent already installed in the guest to boot and connect
@@ -1397,14 +1397,15 @@ namespace NMib::NCloud::NAppManager
 			AgentFileList += NStr::fg_StrEscapeBashSingleQuotes(File);
 		}
 
-		// The agent reads its connect settings when it starts, so a kept agent restarts when the address, the launch ID or the host name changes.
-		// The ticket changes with every start and is not part of the identity
+		// The agent reads its connect settings when it starts, so a kept agent restarts when the address or the launch ID changes. The ticket
+		// changes with every start and is not part of the identity. Neither is the host name: an agent that registered while the bootstrap ran
+		// keeps running, and the host name in the refreshed connect settings applies when it next starts
 		CStr ConnectIdentity;
 		{
 			auto CaptureScope = co_await (g_CaptureExceptions % "Failed to parse the agent connect settings");
 
 			CEJsonSorted ConnectJson = CEJsonSorted::fs_FromString(_ConnectSettings);
-			CStr IdentityData = ConnectJson["Address"].f_String() + "\n" + ConnectJson["LaunchID"].f_String() + "\n" + ConnectJson["EnvironmentHostName"].f_AsString();
+			CStr IdentityData = ConnectJson["Address"].f_String() + "\n" + ConnectJson["LaunchID"].f_String();
 			ConnectIdentity = NCryptography::CHash_SHA256::fs_DigestFromData(IdentityData.f_GetStr(), IdentityData.f_GetLen()).f_GetString();
 		}
 
