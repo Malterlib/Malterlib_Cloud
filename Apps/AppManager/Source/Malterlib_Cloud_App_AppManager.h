@@ -1447,10 +1447,11 @@ namespace NMib::NCloud::NAppManager
 		bool mp_bColimaSystemReady = false;
 		bool mp_bColimaSystemStarting = false;
 		CStr mp_ColimaConfigFingerprint;
+		umint mp_ColimaSharesGeneration = 0; /// Counts the times fp_ForgetColimaShares forgot the shares, which a start that runs meanwhile doesn't record
 		TCVector<TCPromise<void>> mp_OnColimaSystemReady;
-		uint32 mp_ColimaCPUCount = 0; /// 0 uses the default of colima
-		uint64 mp_ColimaMemoryMB = 0; /// 0 uses the default of colima
-		uint64 mp_ColimaDiskGB = 0;   /// 0 leaves the value to the colima profile
+		uint32 mp_ColimaCPUCount = 0;        /// 0 uses the default of colima
+		uint64 mp_ColimaMemoryMB = 0;        /// 0 uses the default of colima
+		uint64 mp_ColimaDiskGB = 0;          /// 0 leaves the value to the colima profile
 
 		bool mp_bVMWindow = false; /// Applies at VM start: hosts the VM in a window showing the guest display when a graphical session is available
 

@@ -672,6 +672,9 @@ namespace NMib::NCloud::NAppManager
 
 		mp_bColimaSystemStarting = true;
 
+		// The shares were computed before a removal that forgets them, so a removal while this start runs leaves the configuration unrecorded
+		umint SharesGeneration = mp_ColimaSharesGeneration;
+
 		bool bReady = false;
 		auto Cleanup = g_OnScopeExit / [&, this]
 			{
@@ -890,6 +893,10 @@ namespace NMib::NCloud::NAppManager
 					)
 				;
 			}
+
+			// The removal deleted the marker before the write above can have created it again
+			if (SharesGeneration != mp_ColimaSharesGeneration)
+				co_await fp_ForgetColimaShares().f_Wrap() > fg_LogError("Malterlib/Cloud/AppManager", "Failed to reset the colima configuration state");
 		}
 
 		CStr LastError;
@@ -918,7 +925,9 @@ namespace NMib::NCloud::NAppManager
 		if (!bHealthy)
 			co_return DMibErrorInstance("The docker daemon in the colima virtual machine is not responding: {}"_f << LastError);
 
-		mp_ColimaConfigFingerprint = ConfigFingerprint;
+		if (SharesGeneration == mp_ColimaSharesGeneration)
+			mp_ColimaConfigFingerprint = ConfigFingerprint;
+
 		bReady = true;
 
 		co_return {};
@@ -928,6 +937,7 @@ namespace NMib::NCloud::NAppManager
 	// restart of the machine, which the next start makes once the recorded configuration is gone
 	TCFuture<void> CAppManagerActor::fp_ForgetColimaShares()
 	{
+		++mp_ColimaSharesGeneration;
 		mp_ColimaConfigFingerprint.f_Clear();
 
 		auto BlockingActorCheckout = fg_BlockingActor();
